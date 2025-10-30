@@ -3,7 +3,7 @@ import { getGameDetails } from "@/lib/igdb";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Record<string, string> }
 ) {
   try {
     const id = Number(params.id);

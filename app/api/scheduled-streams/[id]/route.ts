@@ -3,7 +3,7 @@ import { deleteScheduledStream, getScheduledStreamById } from "@/lib/db-queries"
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Record<string, string> }
 ) {
   try {
     const { id } = params;
