@@ -42,35 +42,22 @@ export const EnhancedGameModal = ({
   onOpenChange,
   streamData,
 }: GameModalProps) => {
-  if (!streamData) return null;
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("pt-BR", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const title = streamData.game?.title || streamData.gameTitle || "Jogo";
-  const image = streamData.game?.image || streamData.gameImage || undefined;
-  const synopsis =
-    streamData.game?.synopsis || streamData.gameSynopsis || undefined;
-  const platform = streamData.game?.platform || undefined;
-  const genre = streamData.game?.genre || undefined;
-  const [storeLinks, setStoreLinks] = useState<Array<{ name: string; url: string }>>(
-    streamData.game?.storeLinks || []
-  );
+  const [storeLinks, setStoreLinks] = useState<
+    Array<{ name: string; url: string }>
+  >([]);
 
   useEffect(() => {
+    if (!streamData) {
+      setStoreLinks([]);
+      return;
+    }
     setStoreLinks(streamData.game?.storeLinks || []);
   }, [streamData]);
 
   useEffect(() => {
+    if (!open || !streamData) return;
     let aborted = false;
     const loadDetails = async () => {
-      if (!open) return;
       const igdbId =
         (streamData as any)?.igdbGameId ||
         (streamData as any)?.igdb_game_id ||
@@ -81,10 +68,14 @@ export const EnhancedGameModal = ({
         const title = streamData?.game?.title || streamData?.gameTitle;
         if (!title) return;
         try {
-          const resSearch = await fetch(`/api/igdb/search?q=${encodeURIComponent(title)}&limit=1`);
+          const resSearch = await fetch(
+            `/api/igdb/search?q=${encodeURIComponent(title)}&limit=1`
+          );
           if (resSearch.ok) {
             const dataSearch = await resSearch.json();
-            const first = Array.isArray(dataSearch?.results) ? dataSearch.results[0] : null;
+            const first = Array.isArray(dataSearch?.results)
+              ? dataSearch.results[0]
+              : null;
             if (first?.id) {
               finalId = first.id;
             }
@@ -109,7 +100,26 @@ export const EnhancedGameModal = ({
     return () => {
       aborted = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, streamData]);
+
+  if (!streamData) return null;
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString("pt-BR", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const title = streamData.game?.title || streamData.gameTitle || "Jogo";
+  const image = streamData.game?.image || streamData.gameImage || undefined;
+  const synopsis =
+    streamData.game?.synopsis || streamData.gameSynopsis || undefined;
+  const platform = streamData.game?.platform || undefined;
+  const genre = streamData.game?.genre || undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
