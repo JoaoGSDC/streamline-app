@@ -3,9 +3,10 @@ import { deleteStreamerGame, updateStreamerGame } from "@/lib/db-queries";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
+    const { params } = context as { params: { id: string } };
     const id = params.id;
     const body = await request.json();
     const allowed = ["gameId", "customTitle", "customImage", "status", "startedAt", "finishedAt", "notes", "sortOrder"];
@@ -28,9 +29,10 @@ export async function PATCH(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
+    const { params } = context as { params: { id: string } };
     const id = params.id;
     await deleteStreamerGame(id);
     return NextResponse.json({ ok: true });
