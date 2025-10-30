@@ -24,6 +24,16 @@ export const GameModal = memo(
   ({ open, onOpenChange, game }: GameModalProps) => {
     if (!game) return null;
 
+    const displayImage = (() => {
+      const raw = game.image;
+      const fallback = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=1280&q=80";
+      if (!raw) return undefined;
+      const full = raw.startsWith("//") ? `https:${raw}` : raw;
+      let url = full.replace("/t_thumb/", "/t_1080p/");
+      if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
+      return url || fallback;
+    })();
+
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-primary/20">
@@ -40,9 +50,9 @@ export const GameModal = memo(
 
           <div className="space-y-6">
             <div className="relative h-64 overflow-hidden">
-              {game.image ? (
+              {displayImage ? (
                 <Image
-                  src={game.image}
+                  src={displayImage}
                   alt={game.title}
                   fill
                   className="object-cover"

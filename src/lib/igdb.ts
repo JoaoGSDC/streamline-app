@@ -5,11 +5,47 @@ const IGDB_BASE_URL = "https://api.igdb.com/v4";
 export const igdbClient = axios.create({
   baseURL: IGDB_BASE_URL,
   headers: {
-    "Client-ID": process.env.NEXT_PUBLIC_IGDB_CLIENT_ID || "",
-    Authorization: `Bearer ${process.env.IGDB_ACCESS_TOKEN || ""}`,
+    // Definido dinamicamente em ensureIgdbToken()
+    "Client-ID": process.env.TWITCH_CLIENT_ID || process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || "",
+    Authorization: "",
     "Content-Type": "text/plain",
   },
 });
+
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0; // epoch ms
+
+async function fetchTwitchAppToken(): Promise<{ access_token: string; expires_in: number }> {
+  const clientId = process.env.TWITCH_CLIENT_ID || process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || "";
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET || process.env.NEXT_PUBLIC_TWITCH_CLIENT_SECRET || "";
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing Twitch client credentials for IGDB");
+  }
+  const res = await fetch(
+    `https://id.twitch.tv/oauth2/token?client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&grant_type=client_credentials`,
+    { method: "POST" }
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to obtain Twitch app token (${res.status})`);
+  }
+  return res.json();
+}
+
+async function ensureIgdbToken(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedToken && now < tokenExpiresAt - 60_000) {
+    // token válido por pelo menos mais 60s
+    return cachedToken;
+  }
+  const { access_token, expires_in } = await fetchTwitchAppToken();
+  cachedToken = access_token;
+  tokenExpiresAt = now + expires_in * 1000;
+  // injetar headers
+  const clientId = process.env.TWITCH_CLIENT_ID || process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || "";
+  igdbClient.defaults.headers["Client-ID"] = clientId;
+  igdbClient.defaults.headers["Authorization"] = `Bearer ${cachedToken}`;
+  return cachedToken;
+}
 
 interface GameInfo {
   id: number;
@@ -31,12 +67,26 @@ export const searchGames = async (
   limit: number = 10
 ): Promise<any[]> => {
   try {
-    const response = await igdbClient.post(
+    await ensureIgdbToken();
+    let response = await igdbClient.post(
       "/games",
       `search "${query}"; fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,websites.url; limit ${limit};`
     );
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.response?.status === 401) {
+      try {
+        await ensureIgdbToken(true);
+        const retry = await igdbClient.post(
+          "/games",
+          `search "${query}"; fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,websites.url; limit ${limit};`
+        );
+        return retry.data;
+      } catch (e) {
+        console.error("Error searching games (after refresh):", e);
+        return [];
+      }
+    }
     console.error("Error searching games:", error);
     return [];
   }
@@ -44,12 +94,26 @@ export const searchGames = async (
 
 export const getGameById = async (id: number): Promise<any> => {
   try {
+    await ensureIgdbToken();
     const response = await igdbClient.post(
       "/games",
       `fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,release_dates.date,websites.url,videos.video_id; where id = ${id};`
     );
     return response.data[0];
   } catch (error) {
+    if ((error as any)?.response?.status === 401) {
+      try {
+        await ensureIgdbToken(true);
+        const retry = await igdbClient.post(
+          "/games",
+          `fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,release_dates.date,websites.url,videos.video_id; where id = ${id};`
+        );
+        return retry.data[0];
+      } catch (e) {
+        console.error("Error fetching game (after refresh):", e);
+        return null;
+      }
+    }
     console.error("Error fetching game:", error);
     return null;
   }

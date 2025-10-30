@@ -25,6 +25,7 @@ export default function StreamerSchedule() {
   const [games, setGames] = useState<any[]>([]);
   const [loadingStreamer, setLoadingStreamer] = useState(true);
   const [streamerGames, setStreamerGames] = useState<any[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined" || !slug) return;
@@ -94,86 +95,64 @@ export default function StreamerSchedule() {
         const normalizedStreamer = normalizeStreamer(apiStreamer, accessToken);
         setStreamer(normalizedStreamer);
 
-        // Buscar streams agendadas no backend
-        const res = await fetch(
+        setLoadingLists(true);
+        const fetchScheduled = fetch(
           `/api/scheduled-streams?streamerId=${normalizedStreamer.id}`
-        );
-        const streams = await res.json();
+        ).then((r) => r.json());
+        const fetchStreamerGames = fetch(
+          `/api/streamer-games?streamerId=${normalizedStreamer.id}`
+        ).then((r) => r.json());
 
-        // Mapear jogos base
-        const baseMapped = (Array.isArray(streams) ? streams : []).map(
-          (s: any) => {
-            const igdbId =
-              s.game?.igdbId || s.igdbGameId || s.igdb_game_id || null;
-            return {
-              id: s.id,
-              title: s.game?.title || s.gameTitle || "Jogo",
-              image: (() => {
-                const raw = s.game?.image || s.gameImage || null;
-                if (!raw)
-                  return "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
+        const [streams, sgdata] = await Promise.allSettled([
+          fetchScheduled,
+          fetchStreamerGames,
+        ]);
+
+        if (streams.status === "fulfilled") {
+          const baseMapped = (Array.isArray(streams.value) ? streams.value : []).map(
+            (s: any) => {
+              const igdbId = s.game?.igdbId || s.igdbGameId || s.igdb_game_id || null;
+              const raw = s.game?.image || s.gameImage || null;
+              const img = (() => {
+                const fallback = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
+                if (!raw) return fallback;
                 const full = raw.startsWith("//") ? `https:${raw}` : raw;
                 let url = full.replace("/t_thumb/", "/t_1080p/");
                 if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-                return url;
-              })(),
-              scheduledTime: new Date(s.scheduledDate).toLocaleString("pt-BR", {
-                weekday: "long",
-                day: "2-digit",
-                month: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              scheduledAt: new Date(s.scheduledDate).getTime(),
-              duration: s.duration,
-              platform: s.game?.platform || "",
-              synopsis: s.game?.synopsis || s.gameSynopsis || "",
-              streamUrl: `https://twitch.tv/${normalizedStreamer.twitchUsername}`,
-              website: undefined as string | undefined,
-              storeLinks: [] as Array<{ name: string; url: string }>,
-              igdbId,
-              raw: s,
-            };
-          }
-        );
-
-        // Enriquecer com websites/lojas para itens com igdbId
-        const enriched = await Promise.all(
-          baseMapped.map(async (g: any) => {
-            if (!g.igdbId) return g;
-            try {
-              const res = await fetch(`/api/igdb/games/${g.igdbId}`);
-              if (!res.ok) return g;
-              const data = await res.json();
-              const details = data?.game;
-              if (!details) return g;
+                return url || fallback;
+              })();
               return {
-                ...g,
-                website: details.website || g.website,
-                storeLinks: Array.isArray(details.storeLinks)
-                  ? details.storeLinks
-                  : g.storeLinks,
+                id: s.id,
+                title: s.game?.title || s.gameTitle || "Jogo",
+                image: img,
+                scheduledTime: new Date(s.scheduledDate).toLocaleString("pt-BR", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+                scheduledAt: new Date(s.scheduledDate).getTime(),
+                duration: s.duration,
+                platform: s.game?.platform || "",
+                synopsis: s.game?.synopsis || s.gameSynopsis || "",
+                streamUrl: `https://twitch.tv/${normalizedStreamer.twitchUsername}`,
+                website: undefined as string | undefined,
+                storeLinks: [] as Array<{ name: string; url: string }>,
+                igdbId,
+                raw: s,
               };
-            } catch {
-              return g;
             }
-          })
-        );
+          );
+          setGames(baseMapped.sort((a: any, b: any) => a.scheduledAt - b.scheduledAt));
+        }
 
-        setGames(enriched.sort((a: any, b: any) => a.scheduledAt - b.scheduledAt));
-
-        // Carregar jogos do streamer (controle: para jogar, jogando, zerados)
-        try {
-          const sgres = await fetch(`/api/streamer-games?streamerId=${normalizedStreamer.id}`);
-          if (sgres.ok) {
-            const sgdata = await sgres.json();
-            setStreamerGames(Array.isArray(sgdata) ? sgdata : []);
-          } else {
-            setStreamerGames([]);
-          }
-        } catch {
+        if (sgdata.status === "fulfilled") {
+          setStreamerGames(Array.isArray(sgdata.value) ? sgdata.value : []);
+        } else {
           setStreamerGames([]);
         }
+        setLoadingLists(false);
       } catch (err) {
         console.error("Failed to fetch streamer data:", err);
         router.push("/");
@@ -201,9 +180,7 @@ export default function StreamerSchedule() {
     }
   };
 
-  if (!streamer || loadingStreamer) {
-    return null;
-  }
+  const isLoading = !streamer || loadingStreamer || loadingLists;
 
   const handleLogout = () => {
     logout();
@@ -277,7 +254,11 @@ export default function StreamerSchedule() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <StreamerHeader {...streamer} />
+        {streamer ? (
+          <StreamerHeader {...streamer} />
+        ) : (
+          <div className="h-24 w-full bg-muted animate-pulse" />
+        )}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold text-foreground">
@@ -286,14 +267,24 @@ export default function StreamerSchedule() {
           <ViewToggle currentView={currentView} onViewChange={setCurrentView} />
         </div>
 
-        {currentView === "daily" && (
-          <DailyView games={games} onGameClick={handleGameClick} />
-        )}
-        {currentView === "weekly" && (
-          <WeeklyView games={games} onGameClick={handleGameClick} />
-        )}
-        {currentView === "monthly" && (
-          <CalendarView games={games} onGameClick={handleGameClick} />
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-40 bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {currentView === "daily" && (
+              <DailyView games={games} onGameClick={handleGameClick} />
+            )}
+            {currentView === "weekly" && (
+              <WeeklyView games={games} onGameClick={handleGameClick} />
+            )}
+            {currentView === "monthly" && (
+              <CalendarView games={games} onGameClick={handleGameClick} />
+            )}
+          </>
         )}
 
         <div className="mt-10 space-y-8">
