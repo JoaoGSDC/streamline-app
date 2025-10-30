@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { GameSearch } from "@/components/GameSearch";
 import { StorageService, StreamerService } from "@/services";
@@ -18,7 +24,7 @@ const STATUS_OPTIONS = [
   { value: "finished", label: "Zerados" },
 ] as const;
 
-type Status = typeof STATUS_OPTIONS[number]["value"];
+type Status = (typeof STATUS_OPTIONS)[number]["value"];
 
 export default function AdminGames() {
   const router = useRouter();
@@ -48,10 +54,14 @@ export default function AdminGames() {
           setStreamer(sessionData);
           load(sessionData.id);
           try {
-            const streamers = StorageService.get<any[]>(STORAGE_KEYS.STREAMERS) || [];
+            const streamers =
+              StorageService.get<any[]>(STORAGE_KEYS.STREAMERS) || [];
             const exists = streamers.some((s) => s.id === sessionData.id);
             if (!exists) {
-              StorageService.set(STORAGE_KEYS.STREAMERS, [...streamers, sessionData]);
+              StorageService.set(STORAGE_KEYS.STREAMERS, [
+                ...streamers,
+                sessionData,
+              ]);
             }
             StreamerService.setCurrent(sessionData);
           } catch {}
@@ -91,33 +101,64 @@ export default function AdminGames() {
         image: sel.cover?.url || null,
         synopsis: sel.summary || null,
       };
-      const gameRes = await fetch("/api/games", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const gameRes = await fetch("/api/games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const game = await gameRes.json();
       const sgRes = await fetch("/api/streamer-games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ streamerId: streamer.id, gameId: game.id, status }),
+        body: JSON.stringify({
+          streamerId: streamer.id,
+          gameId: game.id,
+          status,
+        }),
       });
       const sg = await sgRes.json();
       setItems((prev) => [sg, ...prev]);
-      toast({ title: "Jogo adicionado", description: `${sel.name} (${labelOf(status)})` });
+      toast({
+        title: "Jogo adicionado",
+        description: `${sel.name} (${labelOf(status)})`,
+      });
     } catch (e) {
-      toast({ title: "Erro", description: "Não foi possível adicionar o jogo", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar o jogo",
+        variant: "destructive",
+      });
     }
   }
 
-  async function addCustom(title: string, image: string | undefined, status: Status) {
+  async function addCustom(
+    title: string,
+    image: string | undefined,
+    status: Status
+  ) {
     try {
       const res = await fetch("/api/streamer-games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ streamerId: streamer.id, customTitle: title, customImage: image || null, status }),
+        body: JSON.stringify({
+          streamerId: streamer.id,
+          customTitle: title,
+          customImage: image || null,
+          status,
+        }),
       });
       const sg = await res.json();
       setItems((prev) => [sg, ...prev]);
-      toast({ title: "Jogo adicionado", description: `${title} (${labelOf(status)})` });
+      toast({
+        title: "Jogo adicionado",
+        description: `${title} (${labelOf(status)})`,
+      });
     } catch (e) {
-      toast({ title: "Erro", description: "Não foi possível adicionar o jogo", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar o jogo",
+        variant: "destructive",
+      });
     }
   }
 
@@ -163,7 +204,9 @@ export default function AdminGames() {
           <CardContent>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <label className="text-sm text-muted-foreground">Buscar no IGDB</label>
+                <label className="text-sm text-muted-foreground">
+                  Buscar no IGDB
+                </label>
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   <div className="flex-1">
                     <GameSearch
@@ -172,12 +215,16 @@ export default function AdminGames() {
                       }}
                     />
                   </div>
-                  <span className="text-xs text-muted-foreground">Adiciona em "Para jogar"</span>
+                  <span className="text-xs text-muted-foreground">
+                    Adiciona em &quot;Para jogar&quot;
+                  </span>
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <label className="text-sm text-muted-foreground">Adicionar manualmente</label>
+                <label className="text-sm text-muted-foreground">
+                  Adicionar manualmente
+                </label>
                 <AddCustomForm onSubmit={addCustom} />
               </div>
             </div>
@@ -192,20 +239,36 @@ export default function AdminGames() {
   );
 }
 
-function AddCustomForm({ onSubmit }: { onSubmit: (title: string, image: string | undefined, status: Status) => void }) {
+function AddCustomForm({
+  onSubmit,
+}: {
+  onSubmit: (title: string, image: string | undefined, status: Status) => void;
+}) {
   const [title, setTitle] = useState("");
   const [image, setImage] = useState<string>("");
   const [status, setStatus] = useState<Status>("to_play");
 
   return (
     <div className="flex flex-col sm:flex-row gap-2">
-      <Input placeholder="Título do jogo" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <Input placeholder="URL da imagem (opcional)" value={image} onChange={(e) => setImage(e.target.value)} />
+      <Input
+        placeholder="Título do jogo"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <Input
+        placeholder="URL da imagem (opcional)"
+        value={image}
+        onChange={(e) => setImage(e.target.value)}
+      />
       <Select value={status} onValueChange={(v) => setStatus(v as Status)}>
-        <SelectTrigger className="min-w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+        <SelectTrigger className="min-w-[160px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
         <SelectContent>
           {STATUS_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -224,11 +287,21 @@ function AddCustomForm({ onSubmit }: { onSubmit: (title: string, image: string |
   );
 }
 
-function Section({ title, items, onRemove }: { title: string; items: any[]; onRemove: (id: string) => void }) {
+function Section({
+  title,
+  items,
+  onRemove,
+}: {
+  title: string;
+  items: any[];
+  onRemove: (id: string) => void;
+}) {
   return (
     <Card className="border-primary/20">
       <CardHeader>
-        <CardTitle>{title} ({items.length})</CardTitle>
+        <CardTitle>
+          {title} ({items.length})
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
@@ -247,15 +320,28 @@ function Section({ title, items, onRemove }: { title: string; items: any[]; onRe
                   })()
                 : null;
               return (
-                <div key={it.id} className="flex flex-col gap-2 border border-border p-2">
+                <div
+                  key={it.id}
+                  className="flex flex-col gap-2 border border-border p-2"
+                >
                   {img ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img} alt={displayTitle} className="w-full h-32 object-cover" />
+                    <img
+                      src={img}
+                      alt={displayTitle}
+                      className="w-full h-32 object-cover"
+                    />
                   ) : (
                     <div className="w-full h-32 bg-muted" />
                   )}
-                  <div className="text-sm font-medium line-clamp-2">{displayTitle}</div>
-                  <Button variant="ghost" className="text-destructive px-0 justify-start" onClick={() => onRemove(it.id)}>
+                  <div className="text-sm font-medium line-clamp-2">
+                    {displayTitle}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="text-destructive px-0 justify-start"
+                    onClick={() => onRemove(it.id)}
+                  >
                     Remover
                   </Button>
                 </div>
