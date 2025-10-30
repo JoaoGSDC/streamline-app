@@ -1,3 +1,5 @@
+"use client";
+
 import { GameCard } from "@/components/GameCard";
 
 interface WeeklyViewProps {
@@ -12,18 +14,19 @@ const daysOfWeek = [
   "Quinta-feira",
   "Sexta-feira",
   "Sábado",
-  "Domingo"
+  "Domingo",
 ];
 
 export const WeeklyView = ({ games, onGameClick }: WeeklyViewProps) => {
   // Agrupar jogos por dia da semana
-  const groupedGames = daysOfWeek.map(day => ({
+  const groupedGames = daysOfWeek.map((day) => ({
     day,
-    games: games.filter(game => 
-      game.scheduledTime.toLowerCase().includes(day.toLowerCase()) ||
-      game.scheduledTime.toLowerCase().includes("hoje") ||
-      game.scheduledTime.toLowerCase().includes("amanhã")
-    )
+    games: games.filter(
+      (game) =>
+        game.scheduledTime.toLowerCase().includes(day.toLowerCase()) ||
+        game.scheduledTime.toLowerCase().includes("hoje") ||
+        game.scheduledTime.toLowerCase().includes("amanhã")
+    ),
   }));
 
   return (
@@ -33,21 +36,21 @@ export const WeeklyView = ({ games, onGameClick }: WeeklyViewProps) => {
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-semibold text-foreground">{day}</h3>
             <div className="flex-1 h-px bg-border"></div>
-            <span className="text-sm text-muted-foreground">{dayGames.length} jogo(s)</span>
+            <span className="text-sm text-muted-foreground">
+              {dayGames.length} jogo(s)
+            </span>
           </div>
-          
+
           {dayGames.length === 0 ? (
-            <p className="text-sm text-muted-foreground pl-4">Nenhum jogo agendado</p>
+            <p className="text-sm text-muted-foreground pl-4">
+              Nenhum jogo agendado
+            </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {dayGames.map((game) => (
                 <GameCard
                   key={game.id}
-                  title={game.title}
-                  image={game.image}
-                  scheduledTime={game.scheduledTime}
-                  duration={game.duration}
-                  platform={game.platform}
+                  game={game}
                   onClick={() => onGameClick(game)}
                 />
               ))}

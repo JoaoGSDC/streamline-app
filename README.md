@@ -1,73 +1,83 @@
-# Welcome to your Lovable project
+# Streamline
 
-## Project info
+Sua agenda gamer, simples e compartilhável.
 
-**URL**: https://lovable.dev/projects/468038c7-e811-420c-ab5c-020974e538f2
+---
 
-## How can I edit this code?
+## Sobre o projeto
 
-There are several ways of editing your application.
+O **Streamline** facilita a organização e o compartilhamento da sua agenda de lives e jogos na Twitch. Gerencie horários, jogos e mantenha sua comunidade sempre informada do que vai rolar!
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/468038c7-e811-420c-ab5c-020974e538f2) and start prompting.
+## Principais funcionalidades
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Autenticação com Twitch OAuth**  
+  Faça login com a sua conta Twitch com um clique.
+- **Busca de jogos pela IGDB**  
+  Encontre rapidamente jogos populares e adicione à sua programação.
+- **Agenda flexível**  
+  Programe jogos e streams em visualizações diária, semanal ou mensal.
+- **Perfil público personalizado**  
+  Compartilhe sua página e mantenha sua comunidade atualizada.
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Tecnologias
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Next.js 15  
+- TypeScript  
+- React  
+- Tailwind CSS & shadcn-ui  
+- Twitch OAuth  
+- IGDB API  
+- Axios  
 
-Follow these steps:
+---
+
+## Como rodar localmente
+
+Pré-requisitos: [Node.js + npm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 1. Clone o repositório
+git clone <SEU_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+cd <NOME_DA_PASTA>
 
-# Step 3: Install the necessary dependencies.
+# 2. Instale as dependências
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 3. Configure variáveis de ambiente  
+# Crie o arquivo .env.local com suas credenciais Twitch e IGDB  
+# Mais detalhes em CONFIGURATION.md
+
+# 4. Rode o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Editando & Colaborando
 
-**Use GitHub Codespaces**
+- **Via seu editor local:**  
+  Clone o projeto, edite e faça push normalmente.
+- **Via GitHub:**  
+  Use o botão de editar (pencil) nos arquivos e submeta suas alterações.
+- **Via Codespaces:**  
+  Inicie um Codespace pelo botão verde "Code" e trabalhe direto do browser.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+## Configuração
 
-This project is built with:
+Antes de rodar, configure:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. **Twitch OAuth** – Para login dos usuários.
+2. **IGDB API** – Para busca de jogos.
 
-## How can I deploy this project?
+Veja instruções completas em [CONFIGURATION.md](./CONFIGURATION.md).
 
-Simply open [Lovable](https://lovable.dev/projects/468038c7-e811-420c-ab5c-020974e538f2) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Siga, compartilhe e torne seu streaming mais organizado com o **Streamline**!
