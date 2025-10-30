@@ -3,9 +3,10 @@ import { deleteScheduledStream, getScheduledStreamById } from "@/lib/db-queries"
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Record<string, string> }
+  context: any
 ) {
   try {
+    const { params } = context as { params: { id: string } };
     const { id } = params;
     // Derivar streamer da sessão
     const sessionCookie = request.cookies.get("twitch_session")?.value;

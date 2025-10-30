@@ -3,9 +3,10 @@ import { getGameDetails } from "@/lib/igdb";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Record<string, string> }
+  context: any
 ) {
   try {
+    const { params } = context as { params: { id: string } };
     const id = Number(params.id);
     if (!Number.isFinite(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
