@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getTwitchAuthUrl } from "@/lib/twitch-auth";
 import Link from "next/link";
 
-export default function Auth() {
+function AuthInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -101,5 +101,13 @@ export default function Auth() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function Auth() {
+  return (
+    <Suspense fallback={<div />}> 
+      <AuthInner />
+    </Suspense>
   );
 }

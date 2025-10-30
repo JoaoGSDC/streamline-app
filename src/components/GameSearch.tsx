@@ -83,7 +83,7 @@ export const GameSearch = ({
 
   // Fechar lista ao clicar fora / tecla ESC
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: Event) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
