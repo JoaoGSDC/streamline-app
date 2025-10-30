@@ -201,7 +201,7 @@ export async function createStreamerGame(data: {
   gameId?: string | null;
   customTitle?: string | null;
   customImage?: string | null;
-  status: "to_play" | "playing" | "finished";
+  status: "to_play" | "playing" | "finished" | "dropped";
   startedAt?: Date | null;
   finishedAt?: Date | null;
   notes?: string | null;
@@ -244,7 +244,7 @@ export async function updateStreamerGame(
     gameId: string | null;
     customTitle: string | null;
     customImage: string | null;
-    status: "to_play" | "playing" | "finished";
+    status: "to_play" | "playing" | "finished" | "dropped";
     startedAt: Date | null;
     finishedAt: Date | null;
     notes: string | null;

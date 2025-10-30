@@ -302,6 +302,7 @@ export default function StreamerSchedule() {
               to_play: streamerGames.filter((i: any) => i.status === "to_play"),
               playing: streamerGames.filter((i: any) => i.status === "playing"),
               finished: streamerGames.filter((i: any) => i.status === "finished"),
+              dropped: streamerGames.filter((i: any) => i.status === "dropped"),
             } as const;
 
             const Section = ({ title, items }: { title: string; items: any[] }) => (
@@ -314,14 +315,14 @@ export default function StreamerSchedule() {
                     {items.map((it: any) => {
                       const title = it.game?.title || it.customTitle || "Jogo";
                       const raw = it.game?.image || it.customImage || null;
-                      const img = raw
-                        ? (() => {
-                            const full = raw.startsWith("//") ? `https:${raw}` : raw;
-                            let url = full.replace("/t_thumb/", "/t_720p/");
-                            if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-                            return url;
-                          })()
-                        : null;
+                      const img = (() => {
+                        const fallback = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
+                        if (!raw) return fallback;
+                        const full = raw.startsWith("//") ? `https:${raw}` : raw;
+                        let url = full.replace("/t_thumb/", "/t_720p/");
+                        if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
+                        return url || fallback;
+                      })();
                       return (
                         <button
                           key={it.id}
@@ -347,11 +348,7 @@ export default function StreamerSchedule() {
                             handleGameClick(g);
                           }}
                         >
-                          {img ? (
-                            <img src={img} alt={title} className="w-full h-32 object-cover" />
-                          ) : (
-                            <div className="w-full h-32 bg-muted" />
-                          )}
+                          <img src={img} alt={title} className="w-full h-32 object-cover" />
                           <div className="text-sm font-medium line-clamp-2">{title}</div>
                         </button>
                       );
@@ -366,6 +363,7 @@ export default function StreamerSchedule() {
                 <Section title="Para jogar" items={groups.to_play} />
                 <Section title="Jogando" items={groups.playing} />
                 <Section title="Zerados" items={groups.finished} />
+                <Section title="Droppados" items={groups.dropped} />
               </>
             );
           })()}

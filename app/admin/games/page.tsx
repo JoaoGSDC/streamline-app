@@ -21,7 +21,8 @@ import { STORAGE_KEYS } from "@/constants";
 const STATUS_OPTIONS = [
   { value: "to_play", label: "Para jogar" },
   { value: "playing", label: "Jogando" },
-  { value: "finished", label: "Zerados" },
+  { value: "finished", label: "Concluídos" },
+  { value: "dropped", label: "Droppados" },
 ] as const;
 
 type Status = (typeof STATUS_OPTIONS)[number]["value"];
@@ -38,8 +39,46 @@ export default function AdminGames() {
       to_play: items.filter((i) => i.status === "to_play"),
       playing: items.filter((i) => i.status === "playing"),
       finished: items.filter((i) => i.status === "finished"),
-    };
+      dropped: items.filter((i) => i.status === "dropped"),
+    } as const;
   }, [items]);
+
+  function normalizeImageUrl(raw?: string | null) {
+    if (!raw) {
+      return "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
+    }
+    const full = raw.startsWith("//") ? `https:${raw}` : raw;
+    let url = full.replace("/t_thumb/", "/t_720p/");
+    if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
+    return url;
+  }
+
+  async function moveItem(id: string, newStatus: Status) {
+    try {
+      await fetch(`/api/streamer-games/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: newStatus } : i)));
+    } catch (e) {
+      toast({ title: "Erro", description: "Não foi possível mover o card", variant: "destructive" });
+    }
+  }
+
+  async function updateNotes(id: string, notes: string) {
+    try {
+      await fetch(`/api/streamer-games/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, notes } : i)));
+      toast({ title: "Observação salva" });
+    } catch (e) {
+      toast({ title: "Erro", description: "Não foi possível salvar a observação", variant: "destructive" });
+    }
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -231,9 +270,18 @@ export default function AdminGames() {
           </CardContent>
         </Card>
 
-        <Section title="Para jogar" items={grouped.to_play} onRemove={remove} />
-        <Section title="Jogando" items={grouped.playing} onRemove={remove} />
-        <Section title="Zerados" items={grouped.finished} onRemove={remove} />
+        <Kanban
+          columns={[
+            { key: "to_play", title: "Para jogar", items: grouped.to_play },
+            { key: "playing", title: "Jogando", items: grouped.playing },
+            { key: "finished", title: "Concluídos", items: grouped.finished },
+            { key: "dropped", title: "Droppados", items: grouped.dropped },
+          ]}
+          onDropItem={moveItem}
+          onRemove={remove}
+          onSaveNotes={updateNotes}
+          normalizeImageUrl={normalizeImageUrl}
+        />
       </main>
     </div>
   );
@@ -287,69 +335,96 @@ function AddCustomForm({
   );
 }
 
-function Section({
-  title,
-  items,
+type KanbanColumnKey = "to_play" | "playing" | "finished" | "dropped";
+
+function Kanban({
+  columns,
+  onDropItem,
   onRemove,
+  onSaveNotes,
+  normalizeImageUrl,
 }: {
-  title: string;
-  items: any[];
+  columns: { key: KanbanColumnKey; title: string; items: any[] }[];
+  onDropItem: (id: string, newStatus: KanbanColumnKey) => void;
   onRemove: (id: string) => void;
+  onSaveNotes: (id: string, notes: string) => void;
+  normalizeImageUrl: (raw?: string | null) => string;
 }) {
   return (
-    <Card className="border-primary/20">
-      <CardHeader>
-        <CardTitle>
-          {title} ({items.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">Nenhum jogo</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {items.map((it) => {
-              const displayTitle = it.game?.title || it.customTitle || "Jogo";
-              const raw = it.game?.image || it.customImage || null;
-              const img = raw
-                ? (() => {
-                    const full = raw.startsWith("//") ? `https:${raw}` : raw;
-                    let url = full.replace("/t_thumb/", "/t_720p/");
-                    if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-                    return url;
-                  })()
-                : null;
-              return (
-                <div
-                  key={it.id}
-                  className="flex flex-col gap-2 border border-border p-2"
-                >
-                  {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={img}
-                      alt={displayTitle}
-                      className="w-full h-32 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-32 bg-muted" />
-                  )}
-                  <div className="text-sm font-medium line-clamp-2">
-                    {displayTitle}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    className="text-destructive px-0 justify-start"
-                    onClick={() => onRemove(it.id)}
-                  >
-                    Remover
-                  </Button>
-                </div>
-              );
-            })}
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {columns.map((col) => (
+        <div
+          key={col.key}
+          className="border border-border min-h-[280px]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData("text/plain");
+            if (id) onDropItem(id, col.key);
+          }}
+        >
+          <div className="px-4 py-3 border-b border-border bg-muted/40 font-semibold">
+            {col.title} ({col.items.length})
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="p-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
+            {col.items.length === 0 && (
+              <p className="text-muted-foreground text-sm">Nenhum jogo</p>
+            )}
+            {col.items.map((it) => (
+              <KanbanCard
+                key={it.id}
+                item={it}
+                onRemove={onRemove}
+                onSaveNotes={onSaveNotes}
+                normalizeImageUrl={normalizeImageUrl}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function KanbanCard({
+  item,
+  onRemove,
+  onSaveNotes,
+  normalizeImageUrl,
+}: {
+  item: any;
+  onRemove: (id: string) => void;
+  onSaveNotes: (id: string, notes: string) => void;
+  normalizeImageUrl: (raw?: string | null) => string;
+}) {
+  const [notes, setNotes] = useState<string>(item.notes || "");
+  const displayTitle = item.game?.title || item.customTitle || "Jogo";
+  const img = normalizeImageUrl(item.game?.image || item.customImage || null);
+  return (
+    <div
+      className="flex flex-col gap-2 border border-border p-2 bg-card"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", item.id);
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={img} alt={displayTitle} className="w-full h-28 object-cover" />
+      <div className="text-sm font-medium line-clamp-2">{displayTitle}</div>
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Observação (opcional)"
+        className="min-h-16 text-sm p-2 border border-border bg-background outline-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <Button variant="outline" size="sm" onClick={() => onSaveNotes(item.id, notes)}>
+          Salvar
+        </Button>
+        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => onRemove(item.id)}>
+          Remover
+        </Button>
+      </div>
+    </div>
   );
 }

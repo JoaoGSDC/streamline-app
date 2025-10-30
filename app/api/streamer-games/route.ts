@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { streamerId, gameId, customTitle, customImage, status, startedAt, finishedAt, notes, sortOrder } = body;
     if (!streamerId) return NextResponse.json({ error: "streamerId is required" }, { status: 400 });
-    if (!status || !["to_play", "playing", "finished"].includes(status)) {
+    if (!status || !["to_play", "playing", "finished", "dropped"].includes(status)) {
       return NextResponse.json({ error: "invalid status" }, { status: 400 });
     }
     const item = await createStreamerGame({
