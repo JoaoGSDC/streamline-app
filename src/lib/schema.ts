@@ -28,6 +28,25 @@ export const games = sqliteTable("games", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+// Tabela de Jogos por Streamer (controle de status)
+export const streamerGames = sqliteTable("streamer_games", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  gameId: text("game_id").references(() => games.id, { onDelete: "cascade" }),
+  // Para jogos customizados sem cadastro prévio em games
+  customTitle: text("custom_title"),
+  customImage: text("custom_image"),
+  status: text("status").notNull(), // to_play | playing | finished
+  startedAt: integer("started_at", { mode: "timestamp" }),
+  finishedAt: integer("finished_at", { mode: "timestamp" }),
+  notes: text("notes"),
+  sortOrder: integer("sort_order"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 // Tabela de Streams Agendadas
 export const scheduledStreams = sqliteTable("scheduled_streams", {
   id: text("id").primaryKey(),

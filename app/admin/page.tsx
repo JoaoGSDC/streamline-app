@@ -226,6 +226,11 @@ export default function Admin() {
                   Ver Minha Agenda Pública
                 </Link>
               </Button>
+              <Button asChild variant="secondary">
+                <Link href="/admin/games" prefetch>
+                  Gerenciar Jogos
+                </Link>
+              </Button>
               <Button onClick={() => setShowForm(!showForm)} variant="outline">
                 {showForm ? "Cancelar" : "Agendar Stream"}
               </Button>

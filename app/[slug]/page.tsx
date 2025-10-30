@@ -24,6 +24,7 @@ export default function StreamerSchedule() {
   const [streamer, setStreamer] = useState<any>(null);
   const [games, setGames] = useState<any[]>([]);
   const [loadingStreamer, setLoadingStreamer] = useState(true);
+  const [streamerGames, setStreamerGames] = useState<any[]>([]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !slug) return;
@@ -160,6 +161,19 @@ export default function StreamerSchedule() {
         );
 
         setGames(enriched.sort((a: any, b: any) => a.scheduledAt - b.scheduledAt));
+
+        // Carregar jogos do streamer (controle: para jogar, jogando, zerados)
+        try {
+          const sgres = await fetch(`/api/streamer-games?streamerId=${normalizedStreamer.id}`);
+          if (sgres.ok) {
+            const sgdata = await sgres.json();
+            setStreamerGames(Array.isArray(sgdata) ? sgdata : []);
+          } else {
+            setStreamerGames([]);
+          }
+        } catch {
+          setStreamerGames([]);
+        }
       } catch (err) {
         console.error("Failed to fetch streamer data:", err);
         router.push("/");
@@ -281,6 +295,81 @@ export default function StreamerSchedule() {
         {currentView === "monthly" && (
           <CalendarView games={games} onGameClick={handleGameClick} />
         )}
+
+        <div className="mt-10 space-y-8">
+          {(() => {
+            const groups = {
+              to_play: streamerGames.filter((i: any) => i.status === "to_play"),
+              playing: streamerGames.filter((i: any) => i.status === "playing"),
+              finished: streamerGames.filter((i: any) => i.status === "finished"),
+            } as const;
+
+            const Section = ({ title, items }: { title: string; items: any[] }) => (
+              <section>
+                <h3 className="text-xl font-semibold mb-3">{title} ({items.length})</h3>
+                {items.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Nenhum jogo</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {items.map((it: any) => {
+                      const title = it.game?.title || it.customTitle || "Jogo";
+                      const raw = it.game?.image || it.customImage || null;
+                      const img = raw
+                        ? (() => {
+                            const full = raw.startsWith("//") ? `https:${raw}` : raw;
+                            let url = full.replace("/t_thumb/", "/t_720p/");
+                            if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
+                            return url;
+                          })()
+                        : null;
+                      return (
+                        <button
+                          key={it.id}
+                          className="flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                          onClick={() => {
+                            const g = it.game
+                              ? {
+                                  id: it.game.id,
+                                  title: it.game.title,
+                                  image: it.game.image,
+                                  synopsis: it.game.synopsis,
+                                  genre: it.game.genre,
+                                  platform: it.game.platform,
+                                }
+                              : {
+                                  id: it.id,
+                                  title: it.customTitle,
+                                  image: it.customImage,
+                                  synopsis: undefined,
+                                  genre: [],
+                                  platform: undefined,
+                                };
+                            handleGameClick(g);
+                          }}
+                        >
+                          {img ? (
+                            <img src={img} alt={title} className="w-full h-32 object-cover" />
+                          ) : (
+                            <div className="w-full h-32 bg-muted" />
+                          )}
+                          <div className="text-sm font-medium line-clamp-2">{title}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+
+            return (
+              <>
+                <Section title="Para jogar" items={groups.to_play} />
+                <Section title="Jogando" items={groups.playing} />
+                <Section title="Zerados" items={groups.finished} />
+              </>
+            );
+          })()}
+        </div>
       </main>
 
       <GameModal

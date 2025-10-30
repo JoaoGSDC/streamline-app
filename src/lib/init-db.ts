@@ -59,6 +59,23 @@ export async function initializeDatabase() {
         created_at INTEGER NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS streamer_games (
+        id TEXT PRIMARY KEY,
+        streamer_id TEXT NOT NULL,
+        game_id TEXT,
+        custom_title TEXT,
+        custom_image TEXT,
+        status TEXT NOT NULL,
+        started_at INTEGER,
+        finished_at INTEGER,
+        notes TEXT,
+        sort_order INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+        FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS scheduled_streams (
         id TEXT PRIMARY KEY,
         streamer_id TEXT NOT NULL,
@@ -115,6 +132,23 @@ export async function initializeDatabase() {
         store_links TEXT,
         is_custom_game INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS streamer_games (
+        id TEXT PRIMARY KEY,
+        streamer_id TEXT NOT NULL,
+        game_id TEXT,
+        custom_title TEXT,
+        custom_image TEXT,
+        status TEXT NOT NULL,
+        started_at INTEGER,
+        finished_at INTEGER,
+        notes TEXT,
+        sort_order INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+        FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS scheduled_streams (

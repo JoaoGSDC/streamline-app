@@ -1,6 +1,6 @@
 import { eq, and, gte, lte } from "drizzle-orm";
 import { db } from "./db";
-import { scheduledStreams, games, streamers } from "./schema";
+import { scheduledStreams, games, streamers, streamerGames } from "./schema";
 
 // ========== STREAMERS ==========
 export async function createStreamer(data: {
@@ -192,4 +192,74 @@ export async function updateScheduledStream(
       updatedAt: new Date(),
     })
     .where(eq(scheduledStreams.id, id));
+}
+
+// ========== STREAMER GAMES (to_play | playing | finished) ==========
+export async function createStreamerGame(data: {
+  id: string;
+  streamerId: string;
+  gameId?: string | null;
+  customTitle?: string | null;
+  customImage?: string | null;
+  status: "to_play" | "playing" | "finished";
+  startedAt?: Date | null;
+  finishedAt?: Date | null;
+  notes?: string | null;
+  sortOrder?: number | null;
+}) {
+  const result = await db
+    .insert(streamerGames)
+    .values({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning();
+  return result[0];
+}
+
+export async function listStreamerGamesByStreamer(streamerId: string) {
+  const result = await db
+    .select()
+    .from(streamerGames)
+    .leftJoin(games, eq(streamerGames.gameId, games.id))
+    .where(eq(streamerGames.streamerId, streamerId));
+
+  const rows = Array.isArray(result) ? result : [result];
+  return rows.map((row: any) => ({
+    ...row.streamer_games,
+    game: row.games
+      ? {
+          ...row.games,
+          genre: JSON.parse(row.games.genre || "[]"),
+          storeLinks: JSON.parse(row.games.storeLinks || "[]"),
+        }
+      : null,
+  }));
+}
+
+export async function updateStreamerGame(
+  id: string,
+  data: Partial<{
+    gameId: string | null;
+    customTitle: string | null;
+    customImage: string | null;
+    status: "to_play" | "playing" | "finished";
+    startedAt: Date | null;
+    finishedAt: Date | null;
+    notes: string | null;
+    sortOrder: number | null;
+  }>
+) {
+  await db
+    .update(streamerGames)
+    .set({
+      ...data,
+      updatedAt: new Date(),
+    })
+    .where(eq(streamerGames.id, id));
+}
+
+export async function deleteStreamerGame(id: string) {
+  await db.delete(streamerGames).where(eq(streamerGames.id, id));
 }
