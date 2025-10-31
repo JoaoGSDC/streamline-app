@@ -35,11 +35,25 @@ export default function AdminGames() {
   const [loading, setLoading] = useState(true);
 
   const grouped = useMemo(() => {
-    return {
+    const byStatus = {
       to_play: items.filter((i) => i.status === "to_play"),
       playing: items.filter((i) => i.status === "playing"),
       finished: items.filter((i) => i.status === "finished"),
       dropped: items.filter((i) => i.status === "dropped"),
+    } as const;
+    const sortFn = (a: any, b: any) => {
+      const ao = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      const at = (a.game?.title || a.customTitle || "").toLowerCase();
+      const bt = (b.game?.title || b.customTitle || "").toLowerCase();
+      return at.localeCompare(bt);
+    };
+    return {
+      to_play: [...byStatus.to_play].sort(sortFn),
+      playing: [...byStatus.playing].sort(sortFn),
+      finished: [...byStatus.finished].sort(sortFn),
+      dropped: [...byStatus.dropped].sort(sortFn),
     } as const;
   }, [items]);
 
@@ -51,6 +65,37 @@ export default function AdminGames() {
     let url = full.replace("/t_thumb/", "/t_720p/");
     if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
     return url;
+  }
+
+  async function reindexColumn(columnKey: KanbanColumnKey, orderedIds: string[]) {
+    // atribuir sortOrder em passos de 10
+    const updates = orderedIds.map((gid, idx) => ({ id: gid, sortOrder: (idx + 1) * 10 }));
+    try {
+      for (const up of updates) {
+        await fetch(`/api/streamer-games/${up.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: columnKey, sortOrder: up.sortOrder }),
+        });
+      }
+      setItems((prev) =>
+        prev.map((it) =>
+          orderedIds.includes(it.id)
+            ? { ...it, status: columnKey, sortOrder: updates.find((u) => u.id === it.id)!.sortOrder }
+            : it
+        )
+      );
+    } catch (e) {
+      toast({ title: "Erro", description: "Não foi possível salvar a ordem", variant: "destructive" });
+    }
+  }
+
+  function handleDropAt(columnKey: KanbanColumnKey, beforeId: string | null, draggedId: string) {
+    const colItems = grouped[columnKey];
+    const remaining = colItems.filter((it) => it.id !== draggedId).map((it) => it.id);
+    const insertIndex = beforeId ? Math.max(0, remaining.indexOf(beforeId)) : remaining.length;
+    const newOrderIds = [...remaining.slice(0, insertIndex), draggedId, ...remaining.slice(insertIndex)];
+    reindexColumn(columnKey, newOrderIds);
   }
 
   async function moveItem(id: string, newStatus: Status) {
@@ -278,6 +323,7 @@ export default function AdminGames() {
             { key: "dropped", title: "Droppados", items: grouped.dropped },
           ]}
           onDropItem={moveItem}
+          onDropAt={handleDropAt}
           onRemove={remove}
           onSaveNotes={updateNotes}
           normalizeImageUrl={normalizeImageUrl}
@@ -340,12 +386,14 @@ type KanbanColumnKey = "to_play" | "playing" | "finished" | "dropped";
 function Kanban({
   columns,
   onDropItem,
+  onDropAt,
   onRemove,
   onSaveNotes,
   normalizeImageUrl,
 }: {
   columns: { key: KanbanColumnKey; title: string; items: any[] }[];
   onDropItem: (id: string, newStatus: KanbanColumnKey) => void;
+  onDropAt: (columnKey: KanbanColumnKey, beforeId: string | null, draggedId: string) => void;
   onRemove: (id: string) => void;
   onSaveNotes: (id: string, notes: string) => void;
   normalizeImageUrl: (raw?: string | null) => string;
@@ -360,7 +408,8 @@ function Kanban({
           onDrop={(e) => {
             e.preventDefault();
             const id = e.dataTransfer.getData("text/plain");
-            if (id) onDropItem(id, col.key);
+            // drop ao fim da coluna (append)
+            if (id) onDropAt(col.key, null, id);
           }}
         >
           <div className="px-4 py-3 border-b border-border bg-muted/40 font-semibold">
@@ -370,15 +419,36 @@ function Kanban({
             {col.items.length === 0 && (
               <p className="text-muted-foreground text-sm">Nenhum jogo</p>
             )}
-            {col.items.map((it) => (
-              <KanbanCard
-                key={it.id}
-                item={it}
-                onRemove={onRemove}
-                onSaveNotes={onSaveNotes}
-                normalizeImageUrl={normalizeImageUrl}
-              />
+            {col.items.map((it, idx) => (
+              <div key={it.id} className="flex flex-col gap-2">
+                {/* dropzone antes do card */}
+                <div
+                  className="h-2 border border-dashed border-transparent hover:border-primary/40"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("text/plain");
+                    if (id) onDropAt(col.key, it.id, id);
+                  }}
+                />
+                <KanbanCard
+                  item={it}
+                  onRemove={onRemove}
+                  onSaveNotes={onSaveNotes}
+                  normalizeImageUrl={normalizeImageUrl}
+                />
+              </div>
             ))}
+            {/* dropzone ao final da coluna */}
+            <div
+              className="h-3 border border-dashed border-transparent hover:border-primary/40"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData("text/plain");
+                if (id) onDropAt(col.key, null, id);
+              }}
+            />
           </div>
         </div>
       ))}

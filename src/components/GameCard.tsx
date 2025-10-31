@@ -13,6 +13,7 @@ interface GameCardProps {
 }
 
 export const GameCard = memo(({ game, onClick }: GameCardProps) => {
+
   const displayImage = game.image
     ? (() => {
         const full = game.image.startsWith("//") ? `https:${game.image}` : game.image;
@@ -91,6 +92,8 @@ export const GameCard = memo(({ game, onClick }: GameCardProps) => {
             {game.synopsis}
           </p>
         )}
+
+        {/* Store links are intentionally not shown on cards; only in modals */}
 
         {(game as any).streamUrl && (
           <div className="mt-3">

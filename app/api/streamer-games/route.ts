@@ -5,11 +5,24 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const streamerId = searchParams.get("streamerId");
+    const q = (searchParams.get("q") || "").toLowerCase().trim();
+    const status = searchParams.get("status");
     if (!streamerId) {
       return NextResponse.json({ error: "streamerId is required" }, { status: 400 });
     }
     const items = await listStreamerGamesByStreamer(streamerId);
-    return NextResponse.json(items);
+
+    const filtered = items.filter((it: any) => {
+      const okQ = q
+        ? ((it.game?.title || it.customTitle || "").toLowerCase().includes(q))
+        : true;
+      const okStatus = status && ["to_play", "playing", "finished", "dropped"].includes(status)
+        ? it.status === status
+        : true;
+      return okQ && okStatus;
+    });
+
+    return NextResponse.json(filtered);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch streamer games" }, { status: 500 });
   }

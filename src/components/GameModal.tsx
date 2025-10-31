@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { ExternalLink, ShoppingCart, Calendar, Clock } from "lucide-react";
 import {
   Dialog,
@@ -23,6 +23,54 @@ interface GameModalProps {
 export const GameModal = memo(
   ({ open, onOpenChange, game }: GameModalProps) => {
     if (!game) return null;
+
+    const [storeLinks, setStoreLinks] = useState<Array<{ name: string; url: string }>>(game.storeLinks || []);
+    const [loadingLinks, setLoadingLinks] = useState(false);
+
+    useEffect(() => {
+      setStoreLinks(game.storeLinks || []);
+    }, [game]);
+
+    useEffect(() => {
+      if (!open || !game) return;
+      let aborted = false;
+      const loadDetails = async () => {
+        if (storeLinks && storeLinks.length > 0) return;
+        setLoadingLinks(true);
+        let finalId = (game as any)?.igdbId as number | undefined;
+        if (!finalId) {
+          const title = game?.title;
+          if (title) {
+            try {
+              const resSearch = await fetch(`/api/igdb/search?q=${encodeURIComponent(title)}&limit=1`);
+              if (resSearch.ok) {
+                const dataSearch = await resSearch.json();
+                const first = Array.isArray(dataSearch?.results) ? dataSearch.results[0] : null;
+                if (first?.id) finalId = first.id;
+              }
+            } catch {}
+          }
+        }
+        if (!finalId) return;
+        try {
+          const res = await fetch(`/api/igdb/games/${finalId}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const details = data?.game;
+          if (!details) return;
+          if (!aborted && Array.isArray(details.storeLinks)) {
+            setStoreLinks(details.storeLinks);
+          }
+        } catch {}
+        finally {
+          if (!aborted) setLoadingLinks(false);
+        }
+      };
+      loadDetails();
+      return () => {
+        aborted = true;
+      };
+    }, [open, game, storeLinks?.length]);
 
     const displayImage = (() => {
       const raw = game.image;
@@ -114,14 +162,25 @@ export const GameModal = memo(
               </div>
             )}
 
-            {game.storeLinks && game.storeLinks.length > 0 && (
+            {(game as any).notes && (
               <div>
-                <h3 className="font-semibold text-lg mb-3 text-foreground flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Onde Comprar
+                <h3 className="font-semibold text-lg mb-2 text-foreground">
+                  Observações
                 </h3>
+                <DialogDescription className="text-muted-foreground leading-relaxed">
+                  {(game as any).notes}
+                </DialogDescription>
+              </div>
+            )}
+
+            <div>
+              <h3 className="font-semibold text-lg mb-3 text-foreground flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Onde Comprar
+              </h3>
+              {storeLinks && storeLinks.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {game.storeLinks.map((link) => (
+                  {storeLinks.map((link) => (
                     <Button
                       key={link.name}
                       variant="outline"
@@ -134,8 +193,12 @@ export const GameModal = memo(
                     </Button>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {loadingLinks ? "Procurando lojas..." : "Nenhum link de loja encontrado"}
+                </p>
+              )}
+            </div>
 
             {(game as any).streamUrl && (
               <div>

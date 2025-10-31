@@ -8,9 +8,22 @@ import { DailyView } from "@/components/schedule/DailyView";
 import { WeeklyView } from "@/components/schedule/WeeklyView";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogIn, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks";
 import { GameModal } from "@/components";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export default function StreamerSchedule() {
   const params = useParams();
@@ -26,6 +39,14 @@ export default function StreamerSchedule() {
   const [loadingStreamer, setLoadingStreamer] = useState(true);
   const [streamerGames, setStreamerGames] = useState<any[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
+  const [gamesQuery, setGamesQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<"title_asc" | "recent">("recent");
+  const [gamesView, setGamesView] = useState<"grid" | "table">("table");
+  const [tableSortKey, setTableSortKey] = useState<"status" | "title" | "platform" | "updatedAt">("updatedAt");
+  const [tableSortDir, setTableSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(12);
 
   useEffect(() => {
     if (typeof window === "undefined" || !slug) return;
@@ -138,7 +159,8 @@ export default function StreamerSchedule() {
                 synopsis: s.game?.synopsis || s.gameSynopsis || "",
                 streamUrl: `https://twitch.tv/${normalizedStreamer.twitchUsername}`,
                 website: undefined as string | undefined,
-                storeLinks: [] as Array<{ name: string; url: string }>,
+                storeLinks: (s.game?.storeLinks as Array<{ name: string; url: string }>) || [],
+                notes: s.notes || undefined,
                 igdbId,
                 raw: s,
               };
@@ -163,6 +185,37 @@ export default function StreamerSchedule() {
 
     fetchStreamerAndGames();
   }, [slug, router]);
+
+  // Debounced fetch for streamer games (server-side filtering by q and status)
+  useEffect(() => {
+    if (!streamer?.id) return;
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        setLoadingLists(true);
+        const params = new URLSearchParams({ streamerId: streamer.id });
+        const q = gamesQuery.trim();
+        const status = statusFilter !== "all" ? statusFilter : "";
+        if (q) params.set("q", q);
+        if (status) params.set("status", status);
+        const res = await fetch(`/api/streamer-games?${params.toString()}`, { signal: controller.signal });
+        const data = await res.json();
+        if (Array.isArray(data)) setStreamerGames(data);
+      } catch (_e) {
+        // ignore aborts
+      } finally {
+        setLoadingLists(false);
+      }
+    }, 300);
+    return () => {
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [streamer?.id, gamesQuery, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [gamesQuery]);
 
   const handleGameClick = (game: any) => {
     setSelectedGame(game);
@@ -260,105 +313,445 @@ export default function StreamerSchedule() {
           <div className="h-24 w-full bg-muted animate-pulse" />
         )}
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <h2 className="text-2xl font-bold text-foreground">
-            {getViewTitle()}
-          </h2>
-          <ViewToggle currentView={currentView} onViewChange={setCurrentView} />
-        </div>
+        <Tabs defaultValue="agenda" className="mt-6">
+          <TabsList className="grid grid-cols-2 w-full sm:w-auto">
+            <TabsTrigger value="agenda">Agenda</TabsTrigger>
+            <TabsTrigger value="jogos">Jogos</TabsTrigger>
+          </TabsList>
 
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-40 bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <>
-            {currentView === "daily" && (
-              <DailyView games={games} onGameClick={handleGameClick} />
-            )}
-            {currentView === "weekly" && (
-              <WeeklyView games={games} onGameClick={handleGameClick} />
-            )}
-            {currentView === "monthly" && (
-              <CalendarView games={games} onGameClick={handleGameClick} />
-            )}
-          </>
-        )}
+          <TabsContent value="agenda" className="mt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-bold text-foreground">
+                {getViewTitle()}
+              </h2>
+              <ViewToggle currentView={currentView} onViewChange={setCurrentView} />
+            </div>
 
-        <div className="mt-10 space-y-8">
-          {(() => {
-            const groups = {
-              to_play: streamerGames.filter((i: any) => i.status === "to_play"),
-              playing: streamerGames.filter((i: any) => i.status === "playing"),
-              finished: streamerGames.filter((i: any) => i.status === "finished"),
-              dropped: streamerGames.filter((i: any) => i.status === "dropped"),
-            } as const;
-
-            const Section = ({ title, items }: { title: string; items: any[] }) => (
-              <section>
-                <h3 className="text-xl font-semibold mb-3">{title} ({items.length})</h3>
-                {items.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Nenhum jogo</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {items.map((it: any) => {
-                      const title = it.game?.title || it.customTitle || "Jogo";
-                      const raw = it.game?.image || it.customImage || null;
-                      const img = (() => {
-                        const fallback = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
-                        if (!raw) return fallback;
-                        const full = raw.startsWith("//") ? `https:${raw}` : raw;
-                        let url = full.replace("/t_thumb/", "/t_720p/");
-                        if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-                        return url || fallback;
-                      })();
-                      return (
-                        <button
-                          key={it.id}
-                          className="flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
-                          onClick={() => {
-                            const g = it.game
-                              ? {
-                                  id: it.game.id,
-                                  title: it.game.title,
-                                  image: it.game.image,
-                                  synopsis: it.game.synopsis,
-                                  genre: it.game.genre,
-                                  platform: it.game.platform,
-                                }
-                              : {
-                                  id: it.id,
-                                  title: it.customTitle,
-                                  image: it.customImage,
-                                  synopsis: undefined,
-                                  genre: [],
-                                  platform: undefined,
-                                };
-                            handleGameClick(g);
-                          }}
-                        >
-                          <img src={img} alt={title} className="w-full h-32 object-cover" />
-                          <div className="text-sm font-medium line-clamp-2">{title}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            );
-
-            return (
+            {isLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-40 bg-muted animate-pulse" />
+                ))}
+              </div>
+            ) : (
               <>
-                <Section title="Para jogar" items={groups.to_play} />
-                <Section title="Jogando" items={groups.playing} />
-                <Section title="Zerados" items={groups.finished} />
-                <Section title="Droppados" items={groups.dropped} />
+                {currentView === "daily" && (
+                  <DailyView games={games} onGameClick={handleGameClick} />
+                )}
+                {currentView === "weekly" && (
+                  <WeeklyView games={games} onGameClick={handleGameClick} />
+                )}
+                {currentView === "monthly" && (
+                  <CalendarView games={games} onGameClick={handleGameClick} />
+                )}
               </>
-            );
-          })()}
-        </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="jogos" className="mt-6">
+            {(() => {
+                const normalized = streamerGames.map((it: any) => {
+                  const title = it.game?.title || it.customTitle || "";
+                  const updatedAt = it.updatedAt ? new Date(it.updatedAt).getTime() : 0;
+                  return { ...it, _title: title.toLowerCase(), _updatedAt: updatedAt };
+                });
+
+                const filtered = normalized; // já filtrado no servidor por q e status
+
+                const sorted = [...filtered].sort((a, b) => {
+                  if (gamesView === "grid") {
+                    if (sortKey === "recent") return (b._updatedAt || 0) - (a._updatedAt || 0);
+                    return (a._title || "").localeCompare(b._title || "");
+                  }
+                  let valA: any;
+                  let valB: any;
+                  if (tableSortKey === "status") {
+                    const order = { playing: 3, to_play: 2, finished: 1, dropped: 0 } as any;
+                    valA = order[a.status] ?? -1;
+                    valB = order[b.status] ?? -1;
+                  } else if (tableSortKey === "title") {
+                    valA = a._title || "";
+                    valB = b._title || "";
+                  } else {
+                    valA = a._updatedAt || 0;
+                    valB = b._updatedAt || 0;
+                  }
+                  const comp = typeof valA === "number" ? valA - valB : String(valA).localeCompare(String(valB));
+                  return tableSortDir === "asc" ? comp : -comp;
+                });
+
+                const groups = {
+                  to_play: sorted.filter((i: any) => i.status === "to_play"),
+                  playing: sorted.filter((i: any) => i.status === "playing"),
+                  finished: sorted.filter((i: any) => i.status === "finished"),
+                  dropped: sorted.filter((i: any) => i.status === "dropped"),
+                } as const;
+
+                const normalize = (raw?: string | null) => {
+                  const fallback = "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
+                  if (!raw) return fallback;
+                  const full = raw.startsWith("//") ? `https:${raw}` : raw;
+                  let url = full.replace("/t_thumb/", "/t_720p/");
+                  if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
+                  return url || fallback;
+                };
+
+                const statusLabel = (s: string) =>
+                  s === "to_play" ? "Para jogar" : s === "playing" ? "Jogando" : s === "finished" ? "Concluído" : s === "dropped" ? "Droppado" : s;
+
+                const statusBadgeVariant = (s: string) =>
+                  s === "playing" ? "default" : s === "to_play" ? "secondary" : s === "finished" ? "outline" : "destructive";
+
+                const Toolbar = () => (
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center mb-6">
+                    <Input
+                      placeholder="Buscar jogo"
+                      value={gamesQuery}
+                      onChange={(e) => setGamesQuery(e.target.value)}
+                      className="sm:w-64"
+                    />
+                    <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+                      <SelectTrigger className="sm:w-48">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos status</SelectItem>
+                        <SelectItem value="playing">Jogando</SelectItem>
+                        <SelectItem value="to_play">Para jogar</SelectItem>
+                        <SelectItem value="finished">Concluído</SelectItem>
+                        <SelectItem value="dropped">Droppado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {gamesView === "grid" && (
+                      <Select value={sortKey} onValueChange={(v) => setSortKey(v as any)}>
+                        <SelectTrigger className="sm:w-40">
+                          <SelectValue placeholder="Ordenar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recent">Recentes</SelectItem>
+                          <SelectItem value="title_asc">Título (A-Z)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <div className="ml-auto flex gap-2">
+                      <Button
+                        variant={gamesView === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => {
+                          setGamesView("grid");
+                          setPage(1);
+                        }}
+                      >
+                        Grade
+                      </Button>
+                      <Button
+                        variant={gamesView === "table" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => {
+                          setGamesView("table");
+                          setPage(1);
+                        }}
+                      >
+                        Tabela
+                      </Button>
+                    </div>
+                  </div>
+                );
+
+                const Section = ({ title, items }: { title: string; items: any[] }) => (
+                  <section className="mb-8">
+                    <h3 className="text-xl font-semibold mb-3">{title} ({items.length})</h3>
+
+                    {/* Mobile: carrossel horizontal */}
+                    <div className="sm:hidden -mx-4 px-4 overflow-x-auto snap-x snap-mandatory">
+                      <div className="flex gap-3">
+                        {items.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">Nenhum jogo</p>
+                        ) : (
+                          items.map((it: any) => {
+                            const title = it.game?.title || it.customTitle || "Jogo";
+                            const img = normalize(it.game?.image || it.customImage || null);
+                            const links: Array<{ name: string; url: string }> = it.game?.storeLinks || [];
+                            return (
+                              <div
+                                key={it.id}
+                                className="snap-start min-w-[160px] flex-shrink-0 flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                                onClick={() => {
+                                  const g = it.game
+                                    ? {
+                                        id: it.game.id,
+                                        title: it.game.title,
+                                        image: it.game.image,
+                                        synopsis: it.game.synopsis,
+                                        genre: it.game.genre,
+                                        platform: it.game.platform,
+                                        igdbId: it.game.igdbId,
+                                        storeLinks: it.game.storeLinks,
+                                        notes: it.notes,
+                                      }
+                                    : {
+                                        id: it.id,
+                                        title: it.customTitle,
+                                        image: it.customImage,
+                                        synopsis: undefined,
+                                        genre: [],
+                                        platform: undefined,
+                                      };
+                                  handleGameClick(g);
+                                }}
+                                role="button"
+                                tabIndex={0}
+                              >
+                                <img src={img} alt={title} className="w-full h-24 object-cover" />
+                                <div className="text-sm font-medium line-clamp-2">{title}</div>
+                                {/* Loja: não exibir nas miniaturas */}
+                                {(it.status === "finished" || it.status === "dropped") && it.notes && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">{it.notes}</div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop: 4-6 col grid */}
+                    <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                      {items.length === 0 ? (
+                        <p className="text-muted-foreground text-sm col-span-full">Nenhum jogo</p>
+                      ) : (
+                        items.map((it: any) => {
+                          const title = it.game?.title || it.customTitle || "Jogo";
+                          const img = normalize(it.game?.image || it.customImage || null);
+                          const links: Array<{ name: string; url: string }> = it.game?.storeLinks || [];
+                          return (
+                            <div
+                              key={it.id}
+                              className="flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                              onClick={() => {
+                                const g = it.game
+                                  ? {
+                                      id: it.game.id,
+                                      title: it.game.title,
+                                      image: it.game.image,
+                                      synopsis: it.game.synopsis,
+                                      genre: it.game.genre,
+                                      platform: it.game.platform,
+                                      igdbId: it.game.igdbId,
+                                      storeLinks: it.game.storeLinks,
+                                    }
+                                  : {
+                                      id: it.id,
+                                      title: it.customTitle,
+                                      image: it.customImage,
+                                      synopsis: undefined,
+                                      genre: [],
+                                      platform: undefined,
+                                    };
+                                handleGameClick(g);
+                              }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <img src={img} alt={title} className="w-full h-32 object-cover" />
+                              <div className="text-sm font-medium line-clamp-2">{title}</div>
+                              {/* Loja: não exibir nas miniaturas */}
+                              {(it.status === "finished" || it.status === "dropped") && it.notes && (
+                                <div className="text-xs text-muted-foreground line-clamp-2">{it.notes}</div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </section>
+                );
+
+                if (gamesView === "grid") {
+                  return (
+                    <>
+                      <Toolbar />
+                      <Section title="Para jogar" items={groups.to_play} />
+                      <Section title="Jogando" items={groups.playing} />
+                      <Section title="Zerados" items={groups.finished} />
+                      <Section title="Droppados" items={groups.dropped} />
+                    </>
+                  );
+                }
+
+                const tableItems = sorted;
+                const totalPages = Math.max(1, Math.ceil(tableItems.length / pageSize));
+                const safePage = Math.min(page, totalPages);
+                const sliceStart = (safePage - 1) * pageSize;
+                const pageItems = tableItems.slice(sliceStart, sliceStart + pageSize);
+
+                const setSort = (key: typeof tableSortKey) => {
+                  if (tableSortKey === key) {
+                    setTableSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                  } else {
+                    setTableSortKey(key);
+                    setTableSortDir(key === "updatedAt" ? "desc" : "asc");
+                  }
+                };
+
+                const headerClass = (key: typeof tableSortKey) =>
+                  `cursor-pointer select-none ${tableSortKey === key ? "text-foreground" : "text-muted-foreground"}`;
+
+                const sortIndicator = (key: typeof tableSortKey) =>
+                  tableSortKey === key ? (tableSortDir === "asc" ? "▲" : "▼") : "";
+
+                return (
+                  <>
+                    <Toolbar />
+                    <div className="hidden sm:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className={headerClass("title")} onClick={() => setSort("title")}>
+                              Jogo {sortIndicator("title")}
+                            </TableHead>
+                            <TableHead className={headerClass("status")} onClick={() => setSort("status")}>
+                              Status {sortIndicator("status")}
+                            </TableHead>
+                            <TableHead className={headerClass("updatedAt")} onClick={() => setSort("updatedAt")}>
+                              Atualizado {sortIndicator("updatedAt")}
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pageItems.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center text-muted-foreground">
+                                Nenhum jogo
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            pageItems.map((it: any) => {
+                              const title = it.game?.title || it.customTitle || "Jogo";
+                              const img = normalize(it.game?.image || it.customImage || null);
+                              const updated = it.updatedAt ? new Date(it.updatedAt).toLocaleDateString("pt-BR") : "-";
+                              return (
+                                <TableRow
+                                  key={it.id}
+                                  className="hover:bg-muted/50"
+                                  onClick={() => {
+                                    const g = it.game
+                                      ? {
+                                          id: it.game.id,
+                                          title: it.game.title,
+                                          image: it.game.image,
+                                          synopsis: it.game.synopsis,
+                                          genre: it.game.genre,
+                                          platform: it.game.platform,
+                                          igdbId: it.game.igdbId,
+                                          notes: it.notes,
+                                        }
+                                      : {
+                                          id: it.id,
+                                          title: it.customTitle,
+                                          image: it.customImage,
+                                          synopsis: undefined,
+                                          genre: [],
+                                          platform: undefined,
+                                        };
+                                    handleGameClick(g);
+                                  }}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <img src={img} alt={title} className="w-12 h-12 object-cover border border-border" />
+                                      <div className="font-medium">{title}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    <Badge variant={statusBadgeVariant(it.status) as any}>{statusLabel(it.status)}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">{updated}</TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                      <div className="mt-4">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); setPage((p) => Math.max(1, p - 1)); }} />
+                            </PaginationItem>
+                            {Array.from({ length: totalPages }).map((_, idx) => (
+                              <PaginationItem key={idx}>
+                                <PaginationLink
+                                  href="#"
+                                  isActive={safePage === idx + 1}
+                                  onClick={(e) => { e.preventDefault(); setPage(idx + 1); }}
+                                >
+                                  {idx + 1}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
+                            <PaginationItem>
+                              <PaginationNext href="#" onClick={(e) => { e.preventDefault(); setPage((p) => Math.min(totalPages, p + 1)); }} />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    </div>
+
+                    {/* Mobile fallback for table view: vertical list with image, name and status */}
+                    <div className="sm:hidden">
+                      <div className="flex flex-col gap-2">
+                        {sorted.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">Nenhum jogo</p>
+                        ) : (
+                          sorted.map((it: any) => {
+                            const title = it.game?.title || it.customTitle || "Jogo";
+                            const img = normalize(it.game?.image || it.customImage || null);
+                            return (
+                              <button
+                                key={it.id}
+                                className="w-full flex items-center justify-between gap-3 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                                onClick={() => {
+                                  const g = it.game
+                                    ? {
+                                        id: it.game.id,
+                                        title: it.game.title,
+                                        image: it.game.image,
+                                        synopsis: it.game.synopsis,
+                                        genre: it.game.genre,
+                                        platform: it.game.platform,
+                                        igdbId: it.game.igdbId,
+                                        storeLinks: it.game.storeLinks,
+                                      }
+                                    : {
+                                        id: it.id,
+                                        title: it.customTitle,
+                                        image: it.customImage,
+                                        synopsis: undefined,
+                                        genre: [],
+                                        platform: undefined,
+                                        storeLinks: it.storeLinks,
+                                      };
+                                  handleGameClick(g);
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <img src={img} alt={title} className="w-12 h-12 object-cover border border-border" />
+                                  <div className="text-sm font-medium line-clamp-2">{title}</div>
+                                </div>
+                                <Badge variant={statusBadgeVariant(it.status) as any}>{statusLabel(it.status)}</Badge>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <GameModal
