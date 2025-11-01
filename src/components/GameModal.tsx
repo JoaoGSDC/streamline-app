@@ -22,13 +22,11 @@ interface GameModalProps {
 
 export const GameModal = memo(
   ({ open, onOpenChange, game }: GameModalProps) => {
-    if (!game) return null;
-
-    const [storeLinks, setStoreLinks] = useState<Array<{ name: string; url: string }>>(game.storeLinks || []);
+    const [storeLinks, setStoreLinks] = useState<Array<{ name: string; url: string }>>(game?.storeLinks || []);
     const [loadingLinks, setLoadingLinks] = useState(false);
 
     useEffect(() => {
-      setStoreLinks(game.storeLinks || []);
+      setStoreLinks(game?.storeLinks || []);
     }, [game]);
 
     useEffect(() => {
@@ -70,7 +68,9 @@ export const GameModal = memo(
       return () => {
         aborted = true;
       };
-    }, [open, game, storeLinks?.length]);
+    }, [open, game, storeLinks]);
+
+    if (!game) return null;
 
     const displayImage = (() => {
       const raw = game.image;
