@@ -19,6 +19,7 @@ import { StorageService, StreamerService } from "@/services";
 import { STORAGE_KEYS } from "@/constants";
 import { Streamer } from "@/types";
 import Link from "next/link";
+import { Header } from "@/components/Header";
 
 interface ScheduledStream {
   id: string;
@@ -200,19 +201,17 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Painel do Streamer
-          </h1>
+      <Header
+        title="Painel do Streamer"
+        trailing={
           <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
+            <LogOut className="mr-2 h-4 w-4" />
             Sair
           </Button>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="container-cinematic py-6">
         <Card className="mb-6 border-primary/20">
           <CardHeader>
             <CardTitle>Bem-vindo, {streamer.name}!</CardTitle>
@@ -267,7 +266,7 @@ export default function Admin() {
                   streams?.map((stream) => (
                     <div
                       key={stream.id}
-                      className="flex items-center gap-4 p-4  border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                      className="glass-panel flex cursor-pointer items-center gap-4 rounded-md border border-outline-variant/40 p-4 transition-all duration-fast hover:border-primary/50 hover:shadow-glow-purple"
                       onClick={() => handleStreamClick(stream)}
                     >
                       {(() => {

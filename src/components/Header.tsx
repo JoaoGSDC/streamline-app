@@ -1,18 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LogIn, LogOut, User, Plus } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { ClassNames } from "@/utils";
 import Link from "next/link";
+import { ChannelSearch } from "@/components/ChannelSearch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   title?: string;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  showSearch?: boolean;
+  /** Oculta a área esquerda (ex.: botão Início) no mobile para a busca usar a largura total */
+  hideLeadingOnMobile?: boolean;
 }
 
-export const Header = ({ title = "Streamline" }: HeaderProps) => {
+const headerShell = "app-header sticky top-0 z-50 px-4 py-3";
+
+export const Header = ({
+  title = "Streamline",
+  leading,
+  trailing,
+  showSearch = true,
+  hideLeadingOnMobile = false,
+}: HeaderProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -32,84 +47,92 @@ export const Header = ({ title = "Streamline" }: HeaderProps) => {
     return pathname === `/${user.twitchUsername}`;
   };
 
-  const isAdminPage = () => {
-    return pathname === "/admin";
-  };
+  const defaultLeading = (
+    <Link
+      href="/"
+      prefetch
+      className="gradient-text-primary font-headline text-xl font-bold hover:opacity-90"
+    >
+      {title}
+    </Link>
+  );
+
+  const defaultTrailing = (
+    <div className="flex items-center gap-2">
+      {isAuthenticated && user ? (
+        <>
+          {isOwnProfile() ? (
+            <Button size="sm" asChild>
+              <Link href="/admin" prefetch>
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Registrar na Agenda</span>
+                <span className="sm:hidden">Agenda</span>
+              </Link>
+            </Button>
+          ) : (
+            <Button size="sm" asChild>
+              <Link href={`/${user.twitchUsername}`} prefetch>
+                <User className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Meu Perfil</span>
+                <span className="sm:hidden">Perfil</span>
+              </Link>
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            className="text-muted-foreground hover:text-destructive"
+            title="Sair"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" variant="nav-login" asChild>
+          <Link href="/auth" prefetch>
+            <LogIn className="mr-2 h-4 w-4" />
+            Login
+          </Link>
+        </Button>
+      )}
+    </div>
+  );
+
+  const leadingClassName = cn(
+    "shrink-0",
+    hideLeadingOnMobile && "hidden md:block"
+  );
 
   if (!isClient || isLoading) {
     return (
-      <header className="px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {title}
-          </h1>
-          <div className="w-20 h-8 bg-muted animate-pulse rounded" />
+      <header className={headerShell}>
+        <div className="container-cinematic flex items-center gap-2 md:gap-4">
+          {!hideLeadingOnMobile && (
+            <Skeleton className="h-7 w-28 shrink-0" />
+          )}
+          {showSearch && (
+            <Skeleton className="h-10 min-w-0 flex-1 md:max-w-md" />
+          )}
+          <Skeleton className="h-9 w-16 shrink-0 md:w-24" />
         </div>
       </header>
     );
   }
 
   return (
-    <header className="px-4 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          {title}
-        </h1>
+    <header className={headerShell}>
+      <div className="container-cinematic flex items-center gap-2 md:gap-4">
+        <div className={leadingClassName}>{leading ?? defaultLeading}</div>
 
-        <div className="flex items-center gap-2">
-          {isAuthenticated && user ? (
-            <>
-              {/* Se estiver no próprio perfil, mostrar botão para registrar na agenda */}
-              {isOwnProfile() ? (
-                <Button
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  asChild
-                >
-                  <Link href="/admin" prefetch>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Registrar na Agenda
-                  </Link>
-                </Button>
-              ) : (
-                /* Se estiver logado mas não no próprio perfil, mostrar botão para ir ao perfil */
-                <Button
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                  asChild
-                >
-                  <Link href={`/${user.twitchUsername}`} prefetch>
-                    <User className="h-4 w-4 mr-2" />
-                    Meu Perfil
-                  </Link>
-                </Button>
-              )}
+        {showSearch && (
+          <div className="flex min-w-0 flex-1 md:justify-center md:px-2">
+            <ChannelSearch className="w-full md:max-w-md" />
+          </div>
+        )}
 
-              {/* Botão de logout */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                className="text-muted-foreground hover:text-destructive"
-                title="Sair"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            /* Se não estiver logado, mostrar botão de login */
-            <Button
-              size="sm"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              asChild
-            >
-              <Link href="/auth" prefetch>
-                <LogIn className="h-4 w-4 mr-2" />
-                Login
-              </Link>
-            </Button>
-          )}
-        </div>
+        <div className="shrink-0">{trailing ?? defaultTrailing}</div>
       </div>
     </header>
   );

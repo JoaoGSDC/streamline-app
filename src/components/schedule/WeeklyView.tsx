@@ -34,8 +34,8 @@ export const WeeklyView = ({ games, onGameClick }: WeeklyViewProps) => {
       {groupedGames.map(({ day, games: dayGames }) => (
         <div key={day} className="space-y-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-foreground">{day}</h3>
-            <div className="flex-1 h-px bg-border"></div>
+            <h3 className="font-headline text-body-lg font-semibold text-foreground">{day}</h3>
+            <hr className="h-px flex-1 border-0 bg-outline-variant/50" />
             <span className="text-sm text-muted-foreground">
               {dayGames.length} jogo(s)
             </span>

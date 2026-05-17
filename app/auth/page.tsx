@@ -56,14 +56,14 @@ function AuthInner() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-primary/20 shadow-lg">
+      <Card className="w-full max-w-md border-primary/20 shadow-glow-purple">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="p-3 rounded-full bg-primary/10">
               <Twitch className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Streamline</CardTitle>
+          <CardTitle className="gradient-text-primary">Streamline</CardTitle>
           <CardDescription>Conecte-se com sua conta Twitch</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -76,7 +76,8 @@ function AuthInner() {
 
           <Button
             onClick={handleTwitchLogin}
-            className="w-full bg-[#9146FF] hover:bg-[#9146FF]/90 text-white"
+            variant="twitch"
+            className="w-full"
           >
             <Twitch className="mr-2 h-5 w-5" />
             Entrar com Twitch

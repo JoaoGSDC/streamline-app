@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Header } from "@/components/Header";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -262,11 +263,9 @@ export default function AdminGames() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Meus Jogos
-          </h1>
+      <Header
+        title="Meus Jogos"
+        trailing={
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <Link href="/admin">Voltar</Link>
@@ -277,10 +276,10 @@ export default function AdminGames() {
               </Link>
             </Button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main className="container-cinematic space-y-6 py-6">
         <Card className="border-primary/20">
           <CardHeader>
             <CardTitle>Adicionar Jogo</CardTitle>
@@ -403,7 +402,7 @@ function Kanban({
       {columns.map((col) => (
         <div
           key={col.key}
-          className="border border-border min-h-[280px]"
+          className="glass-panel min-h-[280px] rounded-lg border border-outline-variant/40"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -412,9 +411,9 @@ function Kanban({
             if (id) onDropAt(col.key, null, id);
           }}
         >
-          <div className="px-4 py-3 border-b border-border bg-muted/40 font-semibold">
+          <header className="border-b border-outline-variant/40 bg-surface-container-high/80 px-4 py-3 font-headline text-body-sm font-semibold uppercase tracking-wider text-muted-foreground">
             {col.title} ({col.items.length})
-          </div>
+          </header>
           <div className="p-3 grid grid-cols-2 lg:grid-cols-1 gap-3">
             {col.items.length === 0 && (
               <p className="text-muted-foreground text-sm">Nenhum jogo</p>
@@ -472,7 +471,7 @@ function KanbanCard({
   const img = normalizeImageUrl(item.game?.image || item.customImage || null);
   return (
     <div
-      className="flex flex-col gap-2 border border-border p-2 bg-card"
+      className="glass-panel flex flex-col gap-2 rounded-md border border-outline-variant/40 p-2 transition-all duration-fast hover:border-primary/40 hover:shadow-glow-purple"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", item.id);
@@ -485,7 +484,7 @@ function KanbanCard({
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Observação (opcional)"
-        className="min-h-16 text-sm p-2 border border-border bg-background outline-none"
+        className="input-cinematic min-h-16 rounded-md p-2 text-body-sm outline-none"
       />
       <div className="flex items-center justify-between gap-2">
         <Button variant="outline" size="sm" onClick={() => onSaveNotes(item.id, notes)}>

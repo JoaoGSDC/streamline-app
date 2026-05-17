@@ -30,6 +30,14 @@ export const ROUTES = {
   STREAMER_PROFILE: (username: string) => `/${username}`,
 } as const;
 
+/** Streamers com badge Partner da aplicação Streamline (não status da Twitch) */
+export const APP_PARTNER_USERNAMES = ["fantonlord"] as const;
+
+export const isAppPartner = (username: string): boolean =>
+  (APP_PARTNER_USERNAMES as readonly string[]).includes(
+    username.toLowerCase()
+  );
+
 // Configurações de view types
 export const VIEW_TYPES = {
   DAILY: { type: "daily" as const, label: "Agenda de Hoje" },

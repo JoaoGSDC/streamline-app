@@ -1,5 +1,6 @@
 // Componentes principais
 export { Header } from "./Header";
+export { ChannelSearch } from "./ChannelSearch";
 export { GameCard } from "./GameCard";
 export { GameModal } from "./GameModal";
 export { AuthForm } from "./AuthForm";

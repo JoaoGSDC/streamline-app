@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LogIn, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks";
-import { GameModal } from "@/components";
+import { GameModal } from "@/components/GameModal";
+import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { isAppPartner } from "@/constants";
 
 export default function StreamerSchedule() {
   const params = useParams();
@@ -91,18 +93,21 @@ export default function StreamerSchedule() {
       return data.data?.[0];
     };
 
-    const normalizeStreamer = (apiStreamer: any, accessToken: string) => ({
-      id: apiStreamer.id,
-      name: apiStreamer.display_name || apiStreamer.login,
-      twitchUsername: apiStreamer.login,
-      avatar: apiStreamer.profile_image_url,
-      bio: apiStreamer.description || "",
-      twitchUrl: `https://twitch.tv/${apiStreamer.login}`,
-      followers: "", // followers count not directly available here
-      accessToken,
-      broadcasterType: apiStreamer.broadcaster_type,
-      createdAt: apiStreamer.created_at,
-    });
+    const normalizeStreamer = (apiStreamer: any, accessToken: string) => {
+      return {
+        id: apiStreamer.id,
+        name: apiStreamer.display_name || apiStreamer.login,
+        twitchUsername: apiStreamer.login,
+        avatar: apiStreamer.profile_image_url,
+        bio: apiStreamer.description || "",
+        twitchUrl: `https://twitch.tv/${apiStreamer.login}`,
+        followers: "",
+        accessToken,
+        broadcasterType: apiStreamer.broadcaster_type,
+        partner: isAppPartner(apiStreamer.login || slug),
+        createdAt: apiStreamer.created_at,
+      };
+    };
 
     const fetchStreamerAndGames = async () => {
       setLoadingStreamer(true);
@@ -248,8 +253,9 @@ export default function StreamerSchedule() {
 
   return (
     <div className="relative z-10">
-      <header className="relative top-2 z-50 px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <Header
+        hideLeadingOnMobile
+        leading={
           <Button
             size="sm"
             variant="outline"
@@ -258,24 +264,21 @@ export default function StreamerSchedule() {
           >
             Início
           </Button>
-
+        }
+        trailing={
           <div className="flex items-center gap-2">
             {isAuthenticated && currentUser ? (
               isOwnProfile() ? (
                 <>
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    onClick={() => router.push("/admin")}
-                  >
-                    <LogIn className="h-4 w-4 mr-2" />
+                  <Button size="sm" onClick={() => router.push("/admin")}>
+                    <LogIn className="mr-2 h-4 w-4" />
                     Painel
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={handleLogout}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive"
                     title="Sair"
                   >
                     <LogOut className="h-4 w-4" />
@@ -288,40 +291,61 @@ export default function StreamerSchedule() {
                   onClick={() => router.push(`/${currentUser.twitchUsername}`)}
                   className="text-muted-foreground hover:text-primary"
                 >
-                  <User className="h-4 w-4 mr-2" />
+                  <User className="mr-2 h-4 w-4" />
                   Meu Perfil
                 </Button>
               )
             ) : (
               <Button
                 size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                variant="nav-login"
                 onClick={() => router.push("/auth")}
               >
-                <LogIn className="h-4 w-4 mr-2" />
+                <LogIn className="mr-2 h-4 w-4" />
                 Login
               </Button>
             )}
           </div>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {streamer ? (
-          <StreamerHeader {...streamer} />
-        ) : (
-          <div className="h-24 w-full bg-muted animate-pulse" />
-        )}
+      <main className="container-cinematic py-6">
+        <Tabs defaultValue="agenda" className="w-full">
+          <StreamerHeader
+            {...(streamer ?? {
+              id: "",
+              name: "",
+              twitchUsername: slug ?? "",
+              avatar: "",
+              bio: "",
+              twitchUrl: "",
+            })}
+            partner={streamer?.partner}
+            loading={loadingStreamer}
+            navigation={
+              <TabsList className="streamer-nav-tabs">
+                <TabsTrigger
+                  value="agenda"
+                  className="streamer-nav-tab-trigger font-headline text-body-sm font-semibold shadow-none"
+                >
+                  Agenda
+                </TabsTrigger>
+                <TabsTrigger
+                  value="jogos"
+                  className="streamer-nav-tab-trigger font-headline text-body-sm font-semibold shadow-none"
+                >
+                  Jogos
+                </TabsTrigger>
+              </TabsList>
+            }
+          />
 
-        <Tabs defaultValue="agenda" className="mt-6">
-          <TabsList className="grid grid-cols-2 w-full sm:w-auto">
-            <TabsTrigger value="agenda">Agenda</TabsTrigger>
-            <TabsTrigger value="jogos">Jogos</TabsTrigger>
-          </TabsList>
+          <div className="streamer-divider" />
 
-          <TabsContent value="agenda" className="mt-6">
+          <section className="streamer-profile-card py-4 sm:py-6">
+          <TabsContent value="agenda" className="mt-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-bold text-foreground">
+              <h2 className="font-headline text-headline-lg text-foreground">
                 {getViewTitle()}
               </h2>
               <ViewToggle currentView={currentView} onViewChange={setCurrentView} />
@@ -348,7 +372,7 @@ export default function StreamerSchedule() {
             )}
           </TabsContent>
 
-          <TabsContent value="jogos" className="mt-6">
+          <TabsContent value="jogos" className="mt-0">
             {(() => {
                 const normalized = streamerGames.map((it: any) => {
                   const title = it.game?.title || it.customTitle || "";
@@ -475,7 +499,7 @@ export default function StreamerSchedule() {
                             return (
                               <div
                                 key={it.id}
-                                className="snap-start min-w-[160px] flex-shrink-0 flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                                className="glass-panel snap-start flex min-w-[160px] flex-shrink-0 flex-col gap-2 rounded-md border border-outline-variant/40 p-2 text-left transition-all duration-fast hover:border-primary/50 hover:shadow-glow-cyan"
                                 onClick={() => {
                                   const g = it.game
                                     ? {
@@ -527,7 +551,7 @@ export default function StreamerSchedule() {
                           return (
                             <div
                               key={it.id}
-                              className="flex flex-col gap-2 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                              className="glass-panel flex flex-col gap-2 rounded-md border border-outline-variant/40 p-2 text-left transition-all duration-fast hover:border-primary/50 hover:shadow-glow-cyan"
                               onClick={() => {
                                 const g = it.game
                                   ? {
@@ -711,7 +735,7 @@ export default function StreamerSchedule() {
                             return (
                               <button
                                 key={it.id}
-                                className="w-full flex items-center justify-between gap-3 border border-border p-2 text-left hover:border-primary/50 transition-colors"
+                                className="glass-panel flex w-full items-center justify-between gap-3 rounded-md border border-outline-variant/40 p-2 text-left transition-all duration-fast hover:border-primary/50 hover:shadow-glow-cyan"
                                 onClick={() => {
                                   const g = it.game
                                     ? {
@@ -751,6 +775,7 @@ export default function StreamerSchedule() {
                 );
               })()}
           </TabsContent>
+          </section>
         </Tabs>
       </main>
 

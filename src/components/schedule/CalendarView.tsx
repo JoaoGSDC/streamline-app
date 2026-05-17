@@ -37,20 +37,20 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Componente de calendário */}
-        <div className="flex justify-center lg:justify-start w-full">
+        <div className="flex w-full shrink-0 justify-center lg:w-auto lg:justify-start">
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={setSelectedDate}
             locale={ptBR}
-            className="rounded-md border shadow w-full sm:w-auto"
+            className="glass-panel w-full rounded-lg border border-outline-variant/30 !shadow-none sm:w-auto"
           />
         </div>
 
         {/* Lista de jogos para a data selecionada */}
-        <div className="flex-grow">
+        <div className="flex min-w-0 w-full flex-1 flex-col">
           <div className="mb-4">
             <h3 className="text-xl font-bold">
               {selectedDate
@@ -89,7 +89,7 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
               ))}
             </div>
           ) : (
-            <Card className="p-8 text-center">
+            <Card className="w-full p-8 text-center lg:min-h-[280px] lg:flex lg:items-center lg:justify-center">
               <p className="text-muted-foreground">
                 Nenhum jogo agendado para esta data
               </p>

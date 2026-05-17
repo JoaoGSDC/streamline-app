@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Header } from "@/components/Header";
 
 function getCurrentStreamer() {
   if (typeof window === "undefined") return null;
@@ -85,33 +86,28 @@ export default function Index() {
 
       {/* Overlay para conteúdo */}
       <div className="relative z-10">
-        {/* HEADER */}
-        <header className="sticky top-0 z-50 px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div />
-
-            <Button
-              size="sm"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              asChild
-            >
+        <Header
+          hideLeadingOnMobile
+          leading={<div className="hidden w-24 md:block" aria-hidden />}
+          trailing={
+            <Button size="sm" variant="nav-login" asChild>
               {currentStreamer ? (
                 <Link href={`/${currentStreamer.twitchUsername}`} prefetch>
-                  <LogIn className="h-4 w-4 mr-2" />
+                  <LogIn className="mr-2 h-4 w-4" />
                   Acessar Perfil
                 </Link>
               ) : (
                 <Link href="/auth" prefetch>
-                  <LogIn className="h-4 w-4 mr-2" />
+                  <LogIn className="mr-2 h-4 w-4" />
                   Login
                 </Link>
               )}
             </Button>
-          </div>
-        </header>
+          }
+        />
 
         {/* MAIN */}
-        <main className="max-w-7xl mx-auto px-4 py-12">
+        <main className="container-cinematic py-12">
           <div className="text-center mb-12">
             <div className="flex justify-center mb-6">
               <div className="p-4 rounded-full relative w-full max-w-xs sm:max-w-none h-24 sm:h-48 mx-auto">
@@ -125,16 +121,12 @@ export default function Index() {
               </div>
             </div>
 
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            <p className="mb-8 max-w-2xl mx-auto text-body-lg text-muted-foreground">
               Organize e compartilhe a agenda dos seus jogos com sua comunidade
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                asChild
-              >
+              <Button size="lg" asChild>
                 {currentStreamer ? (
                   <Link href="/admin" prefetch>
                     <LogIn className="h-5 w-5 mr-2" />
@@ -178,7 +170,7 @@ export default function Index() {
             ].map(({ icon, title, desc }) => (
               <Card
                 key={title}
-                className="border-primary/20 bg-background/80 backdrop-blur-md"
+                className="border-primary/20"
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

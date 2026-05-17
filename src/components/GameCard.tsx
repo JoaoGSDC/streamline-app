@@ -24,7 +24,7 @@ export const GameCard = memo(({ game, onClick }: GameCardProps) => {
     : null;
   return (
     <Card
-      className="group relative overflow-hidden cursor-pointer bg-gradient-to-br from-card to-card/80 border-border hover:border-primary/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(145,70,255,0.3)] hover:scale-[1.02]"
+      className="group relative cursor-pointer overflow-hidden transition-all duration-smooth hover:scale-[1.02] hover:border-primary/50 hover:shadow-glow-purple"
       onClick={onClick}
     >
       <div className="relative h-40 overflow-hidden">
@@ -43,9 +43,9 @@ export const GameCard = memo(({ game, onClick }: GameCardProps) => {
         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent opacity-80" />
 
         {game.platform && (
-          <div className="absolute top-2 right-2 bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs px-2 py-1 rounded-full">
+          <span className="absolute right-2 top-2 rounded-full bg-primary-container/90 px-2 py-1 font-mono text-label-caps text-[hsl(var(--on-primary-container))] backdrop-blur-sm">
             {game.platform}
-          </div>
+          </span>
         )}
       </div>
 
