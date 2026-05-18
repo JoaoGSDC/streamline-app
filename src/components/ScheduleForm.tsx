@@ -21,12 +21,26 @@ interface Link {
   name: string;
 }
 
+import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
+import type { AdminChannel } from "@/components/admin/AdminProvider";
+
 interface ScheduleFormProps {
-  streamerId: string;
+  formTarget: string;
+  onFormTargetChange: (id: string) => void;
+  ownerChannel: AdminChannel | null;
+  moderatedChannels: AdminChannel[];
+  resolveStreamerId: (formTarget: string) => string;
   onSuccess: () => void;
 }
 
-export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
+export const ScheduleForm = ({
+  formTarget,
+  onFormTargetChange,
+  ownerChannel,
+  moderatedChannels,
+  resolveStreamerId,
+  onSuccess,
+}: ScheduleFormProps) => {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isCustomGame, setIsCustomGame] = useState(false);
   const [customGameTitle, setCustomGameTitle] = useState("");
@@ -77,10 +91,12 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
 
       // Criar stream agendada
       const validLinks = links.filter((link) => link.url.trim());
-      await fetch("/api/scheduled-streams", {
+      const streamerId = resolveStreamerId(formTarget);
+      const res = await fetch("/api/scheduled-streams", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          streamerId,
           gameId: null, // não persistimos jogos
           igdbGameId: !isCustomGame && selectedGame ? selectedGame.id : null,
           gameTitle: isCustomGame ? customGameTitle : selectedGame?.name,
@@ -96,6 +112,10 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
           notes: notes.trim() || undefined,
         }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro ao agendar");
+      }
 
       // Limpar formulário
       setSelectedGame(null);
@@ -117,7 +137,18 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <AdminStreamerFormSelect
+        value={formTarget}
+        onChange={onFormTargetChange}
+        ownerChannel={ownerChannel}
+        moderatedChannels={moderatedChannels}
+        alwaysShow
+        label="Streamer"
+        disabledHint="Você não modera outros canais. A agenda será registrada no seu perfil."
+        enabledHint="Escolha em qual canal esta agenda será registrada."
+      />
+
       {/* Busca de Jogo */}
       <div className="space-y-2">
         <Label>Jogo</Label>
@@ -193,6 +224,7 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
             type="date"
             value={scheduledDate}
             onChange={(e) => setScheduledDate(e.target.value)}
+            className="input-cinematic"
             required
           />
         </div>
@@ -203,6 +235,7 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
             type="time"
             value={scheduledTime}
             onChange={(e) => setScheduledTime(e.target.value)}
+            className="input-cinematic"
             required
           />
         </div>
@@ -215,6 +248,7 @@ export const ScheduleForm = ({ streamerId, onSuccess }: ScheduleFormProps) => {
           placeholder="Ex: 3 horas"
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
+          className="input-cinematic"
         />
       </div>
 

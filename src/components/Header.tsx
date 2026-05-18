@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ChannelSearch } from "@/components/ChannelSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { isStreamerProfilePath } from "@/lib/streamer-profile-routes";
 
 interface HeaderProps {
   title?: string;
@@ -44,7 +45,7 @@ export const Header = ({
 
   const isOwnProfile = () => {
     if (!user || !pathname) return false;
-    return pathname === `/${user.twitchUsername}`;
+    return isStreamerProfilePath(pathname, user.twitchUsername);
   };
 
   const defaultLeading = (

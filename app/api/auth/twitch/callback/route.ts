@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeTwitchCode, getTwitchUserInfo } from "@/lib/twitch-auth";
-import { createStreamer, getStreamerByTwitchId } from "@/lib/db-queries";
+import { upsertStreamerFromTwitch } from "@/lib/db-queries";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -29,25 +29,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/auth?error=no_user", request.url));
     }
 
-    // Persistir streamer se não existir
-    const existing = await getStreamerByTwitchId(userInfo.id);
-    if (!existing) {
-      await createStreamer({
-        id: userInfo.id,
-        twitchId: userInfo.id,
-        name: userInfo.display_name || userInfo.login,
-        twitchUsername: userInfo.login,
-        avatar: userInfo.profile_image_url,
-        bio: userInfo.description || "",
-        twitchUrl: `https://twitch.tv/${userInfo.login}`,
-        followers: userInfo.view_count?.toString() || "0",
-      });
-    }
+    const dbStreamer = await upsertStreamerFromTwitch({
+      id: userInfo.id,
+      twitchId: userInfo.id,
+      name: userInfo.display_name || userInfo.login,
+      twitchUsername: userInfo.login,
+      avatar: userInfo.profile_image_url,
+      bio: userInfo.description || "",
+      twitchUrl: `https://twitch.tv/${userInfo.login}`,
+      followers: userInfo.view_count?.toString() || "0",
+    });
 
-    // Criar resposta com dados do usuário e redirecionar
     const response = NextResponse.redirect(new URL("/admin", request.url));
 
-    // Armazenar dados na sessão (em um app real, use JWT ou cookies seguros)
     const sessionData = {
       id: userInfo.id,
       name: userInfo.display_name || userInfo.login,
@@ -58,6 +52,8 @@ export async function GET(request: NextRequest) {
       followers: userInfo.view_count?.toString() || "0",
       accessToken: access_token,
       broadcasterType: userInfo.broadcaster_type,
+      partner: dbStreamer?.partner ?? false,
+      premium: dbStreamer?.premium ?? false,
       createdAt: userInfo.created_at,
     };
 

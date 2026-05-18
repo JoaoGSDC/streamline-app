@@ -1,3 +1,5 @@
+export type StreamerSocialLink = { label: string; url: string };
+
 export function getStreamerSocialLinks(bio: string, twitchUrl: string) {
   const links: { label: string; url: string }[] = [
     { label: "Twitch", url: twitchUrl },
@@ -18,4 +20,16 @@ export function getStreamerSocialLinks(bio: string, twitchUrl: string) {
   }
 
   return links;
+}
+
+/** Links customizados do painel têm prioridade; senão, extrai da bio da Twitch */
+export function resolveStreamerSocialLinks(
+  customLinks: StreamerSocialLink[] | null | undefined,
+  bio: string,
+  twitchUrl: string
+): StreamerSocialLink[] {
+  if (customLinks && customLinks.length > 0) {
+    return customLinks;
+  }
+  return getStreamerSocialLinks(bio, twitchUrl);
 }

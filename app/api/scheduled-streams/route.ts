@@ -3,11 +3,13 @@ import {
   createScheduledStream,
   getScheduledStreamsByStreamer,
 } from "@/lib/db-queries";
+import { resolveActingStreamerId } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
+      streamerId: bodyStreamerId,
       gameId,
       igdbGameId,
       gameTitle,
@@ -20,22 +22,14 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    // Derivar streamerId da sessão (cookie)
-    const sessionCookie = request.cookies.get("twitch_session")?.value;
-    let sessionStreamerId: string | null = null;
-    if (sessionCookie) {
-      try {
-        const parsed = JSON.parse(sessionCookie);
-        sessionStreamerId = parsed?.id || null;
-      } catch {
-        sessionStreamerId = null;
-      }
-    }
-
-    if (!sessionStreamerId) {
+    const resolved = await resolveActingStreamerId(
+      request,
+      bodyStreamerId ?? null
+    );
+    if ("error" in resolved) {
       return NextResponse.json(
-        { error: "Unauthorized: missing session" },
-        { status: 401 }
+        { error: resolved.error },
+        { status: resolved.status }
       );
     }
 
@@ -48,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const stream = await createScheduledStream({
       id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      streamerId: sessionStreamerId,
+      streamerId: resolved.streamerId,
       gameId: gameId || null,
       igdbGameId: igdbGameId ?? null,
       gameTitle: gameTitle ?? null,

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import { GameCard } from "@/components/GameCard";
-import { isSameDay, parseISO } from "date-fns";
+import { getGamesForDay, getGamesForMonth } from "@/lib/schedule-dates";
 import { ptBR } from "date-fns/locale";
 
 interface CalendarViewProps {
@@ -17,28 +17,23 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
     new Date()
   );
 
-  // Função para agrupar jogos por data
-  const getGamesForDate = (date: Date) => {
-    return games.filter((game) => {
-      if (!game.raw?.scheduledDate) return false;
-      try {
-        const gameDate = parseISO(game.raw.scheduledDate);
-        return isSameDay(gameDate, date);
-      } catch (e) {
-        return false;
-      }
-    });
-  };
+  const gamesForSelectedDate = useMemo(
+    () => (selectedDate ? getGamesForDay(games, selectedDate) : []),
+    [games, selectedDate]
+  );
 
-  // Obter jogos para a data selecionada
-  const gamesForSelectedDate = selectedDate
-    ? getGamesForDate(selectedDate)
-    : [];
+  const gamesForMonth = useMemo(
+    () => (selectedDate ? getGamesForMonth(games, selectedDate) : []),
+    [games, selectedDate]
+  );
+
+  const monthTitle = selectedDate
+    ? selectedDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+    : "este mês";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Componente de calendário */}
         <div className="flex w-full shrink-0 justify-center lg:w-auto lg:justify-start">
           <Calendar
             mode="single"
@@ -49,7 +44,6 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
           />
         </div>
 
-        {/* Lista de jogos para a data selecionada */}
         <div className="flex min-w-0 w-full flex-1 flex-col">
           <div className="mb-4">
             <h3 className="text-xl font-bold">
@@ -68,24 +62,13 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
           </div>
 
           {gamesForSelectedDate.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {gamesForSelectedDate.map((game) => (
-                <div key={game.id} onClick={() => onGameClick(game)}>
-                  <GameCard
-                    game={{
-                      ...game,
-                      id: game.id,
-                      title: game.title,
-                      image: game.image,
-                      scheduledTime: game.scheduledTime,
-                      duration: game.duration,
-                      platform: game.platform,
-                      synopsis: game.synopsis,
-                      streamUrl: game.streamUrl,
-                    }}
-                    onClick={() => onGameClick(game)}
-                  />
-                </div>
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  onClick={() => onGameClick(game)}
+                />
               ))}
             </div>
           ) : (
@@ -98,28 +81,18 @@ export const CalendarView = ({ games, onGameClick }: CalendarViewProps) => {
         </div>
       </div>
 
-      {/* Mostrar todos os jogos do mês abaixo do calendário */}
       <div className="mt-8">
-        <h3 className="text-xl font-bold mb-4">Todos os jogos deste mês</h3>
-        {games.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {games.map((game) => (
-              <div key={game.id} onClick={() => onGameClick(game)}>
-                <GameCard
-                  game={{
-                    ...game,
-                    id: game.id,
-                    title: game.title,
-                    image: game.image,
-                    scheduledTime: game.scheduledTime,
-                    duration: game.duration,
-                    platform: game.platform,
-                    synopsis: game.synopsis,
-                    streamUrl: game.streamUrl,
-                  }}
-                  onClick={() => onGameClick(game)}
-                />
-              </div>
+        <h3 className="mb-4 text-xl font-bold capitalize">
+          Todos os jogos de {monthTitle}
+        </h3>
+        {gamesForMonth.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {gamesForMonth.map((game) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                onClick={() => onGameClick(game)}
+              />
             ))}
           </div>
         ) : (

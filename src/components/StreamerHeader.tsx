@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Share2, Star, Twitch, UserRound } from "lucide-react";
+import { Crown, Share2, Star, Twitch, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -14,8 +14,10 @@ export interface StreamerHeaderProps {
   bio: string;
   twitchUrl: string;
   followers?: string;
-  /** Partner da aplicação Streamline (não status Partner da Twitch) */
+  /** Parceiro Streamline (benefícios premium + extras) */
   partner?: boolean;
+  /** Assinatura premium */
+  premium?: boolean;
   loading?: boolean;
   /** TabsList de Agenda/Jogos — card direito, layout vertical */
   navigation?: React.ReactNode;
@@ -78,6 +80,7 @@ export const StreamerHeader = ({
   twitchUrl,
   followers,
   partner = false,
+  premium = false,
   loading = false,
   navigation,
 }: StreamerHeaderProps) => {
@@ -128,6 +131,12 @@ export const StreamerHeader = ({
               <h1 className="font-headline text-headline-lg text-foreground sm:text-display-md">
                 {name}
               </h1>
+              {premium && !partner && (
+                <span className="premium-badge">
+                  <Crown className="h-3 w-3 fill-current" aria-hidden />
+                  Premium
+                </span>
+              )}
               {partner && (
                 <span className="partner-badge">
                   <Star className="h-3 w-3 fill-current" aria-hidden />

@@ -1,36 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { LogOut, Calendar } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  useAdminChannelOptions,
+  resolveStreamerIdsForFilter,
+  type AdminViewFilter,
+} from "@/hooks/useAdminChannelOptions";
+import { fetchMergedByStreamerIds } from "@/lib/admin-fetch";
 import { ScheduleForm } from "@/components/ScheduleForm";
 import { EnhancedGameModal } from "@/components/EnhancedGameModal";
-import { Trash2 } from "lucide-react";
-import { StorageService, StreamerService } from "@/services";
-import { STORAGE_KEYS } from "@/constants";
-import { Streamer } from "@/types";
-import Link from "next/link";
-import { Header } from "@/components/Header";
+import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
+import { AdminSection } from "@/components/admin/shared/AdminSection";
+import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
+import {
+  ScheduledStreamCard,
+  type ScheduledStreamItem,
+} from "@/components/admin/schedule/ScheduledStreamCard";
+import { ScheduleListToolbar } from "@/components/admin/schedule/ScheduleListToolbar";
+import {
+  filterStreamsByDateRange,
+  getDefaultSchedulePeriod,
+} from "@/lib/schedule-period";
+import { Button } from "@/components/ui/button";
 
-interface ScheduledStream {
-  id: string;
-  scheduledDate: Date;
-  scheduledTime: string;
-  duration: string;
+const PAGE_SIZE = 10;
+
+interface ScheduledStream extends ScheduledStreamItem {
+  streamerId?: string;
   links?: Array<{ url: string; name?: string }>;
   notes?: string;
   igdbGameId?: number | null;
-  gameTitle?: string | null;
-  gameImage?: string | null;
   gameSynopsis?: string | null;
   game?: {
     title: string;
@@ -42,143 +43,128 @@ interface ScheduledStream {
   } | null;
 }
 
-export default function Admin() {
-  const router = useRouter();
+export default function AdminSchedulePage() {
   const { toast } = useToast();
-  const [streamer, setStreamer] = useState<any>(null);
+  const {
+    ownerChannel,
+    moderatedChannels,
+    viewFilterOptions,
+    resolveFormStreamerId,
+    channels,
+    userId,
+  } = useAdminChannelOptions();
+
+  const channelKey = useMemo(
+    () => channels.map((c) => c.id).sort().join(","),
+    [channels]
+  );
+
   const [streams, setStreams] = useState<ScheduledStream[]>([]);
-  const [showForm, setShowForm] = useState(false);
   const [selectedStream, setSelectedStream] = useState<ScheduledStream | null>(
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewFilter, setViewFilter] = useState<AdminViewFilter>("mine");
+  const [formTarget, setFormTarget] = useState("");
+  const [period, setPeriod] = useState(getDefaultSchedulePeriod);
+  const [page, setPage] = useState(1);
+
+  const streamerLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of channels) {
+      map[c.id] = c.twitchUsername;
+    }
+    return map;
+  }, [channels]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Tenta obter dados da sessão Twitch
-      const twitchSession = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("twitch_session="))
-        ?.split("=")[1];
+    if (!channelKey) return;
 
-      if (twitchSession) {
-        try {
-          const sessionData = JSON.parse(decodeURIComponent(twitchSession));
-          setStreamer(sessionData);
-          loadStreams(sessionData.id);
+    let cancelled = false;
 
-          // Persistir no localStorage: adicionar em 'streamers' e setar 'currentStreamer'
-          try {
-            const streamers =
-              StorageService.get<Streamer[]>(STORAGE_KEYS.STREAMERS) || [];
-
-            const exists = streamers.some(
-              (s) =>
-                s.id === sessionData.id ||
-                s.twitchId === sessionData.id ||
-                s.twitchUsername === sessionData.twitchUsername
-            );
-
-            const streamerItem: Streamer = {
-              id: sessionData.id,
-              twitchId: sessionData.id,
-              name: sessionData.name,
-              twitchUsername: sessionData.twitchUsername,
-              avatar: sessionData.avatar,
-              bio: sessionData.bio,
-              twitchUrl: sessionData.twitchUrl,
-              followers: sessionData.followers,
-              createdAt: new Date(),
-            };
-
-            if (!exists) {
-              const updated = [...streamers, streamerItem];
-              StorageService.set(STORAGE_KEYS.STREAMERS, updated);
-            }
-
-            StreamerService.setCurrent(streamerItem);
-          } catch (e) {
-            console.error("Error persisting Twitch session to localStorage:", e);
-          }
-        } catch (e) {
-          console.error("Error parsing session:", e);
+    (async () => {
+      try {
+        const ids = resolveStreamerIdsForFilter(viewFilter, channels, userId);
+        const data = await fetchMergedByStreamerIds<ScheduledStream>(
+          ids,
+          (id) => `/api/scheduled-streams?streamerId=${id}`
+        );
+        data.sort(
+          (a, b) =>
+            new Date(a.scheduledDate).getTime() -
+            new Date(b.scheduledDate).getTime()
+        );
+        if (!cancelled) {
+          setStreams(data);
+          setPage(1);
+        }
+      } catch (error) {
+        console.error("Error loading streams:", error);
+        if (!cancelled) {
+          toast({
+            title: "Erro!",
+            description: "Não foi possível carregar a agenda.",
+            variant: "destructive",
+          });
         }
       }
+    })();
 
-      // Fallback para localStorage (dados antigos)
-      const currentStreamer = localStorage.getItem("currentStreamer");
-      if (!twitchSession && currentStreamer) {
-        const streamerData = JSON.parse(currentStreamer);
-        setStreamer(streamerData);
-      }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewFilter, channelKey, userId]);
 
-      if (!twitchSession && !currentStreamer) {
-        router.push("/auth");
-        return;
-      }
-    }
-  }, [router]);
+  const filteredStreams = useMemo(() => {
+    return filterStreamsByDateRange(streams, period);
+  }, [streams, period]);
 
-  const loadStreams = async (streamerId: string) => {
-    try {
-      const response = await fetch(
-        `/api/scheduled-streams?streamerId=${streamerId}`
-      );
-      const data = await response.json();
+  const totalPages = Math.max(1, Math.ceil(filteredStreams.length / PAGE_SIZE));
 
-      if (data.error) {
-        toast({
-          title: "Erro!",
-          description: data.error,
-          variant: "destructive",
-        });
+  const paginatedStreams = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredStreams.slice(start, start + PAGE_SIZE);
+  }, [filteredStreams, page]);
 
-        return;
-      }
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
-      setStreams(data);
-    } catch (error) {
-      console.error("Error loading streams:", error);
-    }
-  };
-
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      // Limpar cookie
-      document.cookie =
-        "twitch_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      localStorage.removeItem("currentStreamer");
-
-      toast({
-        title: "Logout realizado",
-        description: "Até logo!",
-      });
-      router.push("/");
-    }
-  };
+  const reloadStreams = useCallback(async () => {
+    const ids = resolveStreamerIdsForFilter(viewFilter, channels, userId);
+    const data = await fetchMergedByStreamerIds<ScheduledStream>(
+      ids,
+      (id) => `/api/scheduled-streams?streamerId=${id}`
+    );
+    data.sort(
+      (a, b) =>
+        new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+    );
+    setStreams(data);
+    setPage(1);
+  }, [viewFilter, channels, userId]);
 
   const handleSuccess = () => {
-    if (streamer) {
-      loadStreams(streamer.id);
-      setShowForm(false);
-      toast({
-        title: "Stream agendada!",
-        description: "Sua stream foi agendada com sucesso.",
-      });
-    }
+    void reloadStreams();
+    toast({
+      title: "Stream agendada!",
+      description: "Sua stream foi agendada com sucesso.",
+    });
   };
 
   const handleDeleteStream = async (streamId: string) => {
     try {
-      await fetch(`/api/scheduled-streams/${streamId}`, {
+      const res = await fetch(`/api/scheduled-streams/${streamId}`, {
         method: "DELETE",
       });
+      if (!res.ok) throw new Error();
 
-      setStreams(streams.filter((s) => s.id !== streamId));
+      setStreams((prev) => prev.filter((s) => s.id !== streamId));
 
       toast({
         title: "Stream removida",
-        description: "A stream foi removida da sua agenda.",
+        description: "A stream foi removida da agenda.",
       });
     } catch (error) {
       console.error("Error deleting stream:", error);
@@ -195,152 +181,123 @@ export default function Admin() {
     setIsModalOpen(true);
   };
 
-  if (!streamer) {
-    return null;
-  }
+  if (!ownerChannel && channels.length === 0) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header
-        title="Painel do Streamer"
-        trailing={
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
-        }
+    <>
+      <AdminPageHeader
+        title="Agendar Stream"
+        description="Planeje transmissões com clareza. Filtre por canal e período para encontrar eventos rapidamente."
       />
 
-      <main className="container-cinematic py-6">
-        <Card className="mb-6 border-primary/20">
-          <CardHeader>
-            <CardTitle>Bem-vindo, {streamer.name}!</CardTitle>
-            <CardDescription>Gerencie sua agenda de streams</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button asChild>
-                <Link href={`/${streamer.twitchUsername}`} prefetch>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Ver Minha Agenda Pública
-                </Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/admin/games" prefetch>
-                  Gerenciar Jogos
-                </Link>
-              </Button>
-              <Button onClick={() => setShowForm(!showForm)} variant="outline">
-                {showForm ? "Cancelar" : "Agendar Stream"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {showForm && (
-          <Card className="mb-6 border-primary/20">
-            <CardHeader>
-              <CardTitle>Agendar Nova Stream</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScheduleForm
-                streamerId={streamer.id}
-                onSuccess={handleSuccess}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className="border-primary/20">
-          <CardHeader>
-            <CardTitle>Minhas Streams Agendadas ({streams.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {streams.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                Nenhuma stream agendada ainda. Agende sua primeira stream!
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {streams &&
-                  streams?.map((stream) => (
-                    <div
-                      key={stream.id}
-                      className="glass-panel flex cursor-pointer items-center gap-4 rounded-md border border-outline-variant/40 p-4 transition-all duration-fast hover:border-primary/50 hover:shadow-glow-purple"
-                      onClick={() => handleStreamClick(stream)}
-                    >
-                      {(() => {
-                        const raw = stream.game?.image || stream.gameImage || null;
-                        const img = raw
-                          ? (() => {
-                              const full = raw.startsWith("//") ? `https:${raw}` : raw;
-                              let url = full.replace("/t_thumb/", "/t_1080p/");
-                              if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-                              return url;
-                            })()
-                          : null;
-                        const title = stream.game?.title || stream.gameTitle || "";
-                        if (!img) return null;
-                        return (
-                          <img
-                            src={img}
-                            alt={title || "Jogo"}
-                            className="w-20 h-20 object-cover rounded"
-                          />
-                        );
-                      })()}
-                      <div className="flex-1">
-                        <h3 className="font-semibold">
-                          {stream.game?.title || stream.gameTitle || "Jogo"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(stream.scheduledDate).toLocaleDateString(
-                            "pt-BR"
-                          )}{" "}
-                          • {stream.scheduledTime} • {stream.duration}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteStream(stream.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
-
-      {(() => {
-        const streamForModal = selectedStream
-          ? {
-              ...selectedStream,
-              game:
-                selectedStream.game ||
-                (selectedStream.gameTitle
-                  ? {
-                      title: selectedStream.gameTitle || "Jogo",
-                      image: selectedStream.gameImage || undefined,
-                      synopsis: selectedStream.gameSynopsis || undefined,
-                    }
-                  : null),
-            }
-          : null;
-        return (
-          <EnhancedGameModal
-            open={isModalOpen}
-            onOpenChange={setIsModalOpen}
-            streamData={streamForModal as any}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <AdminSection
+          title="Nova transmissão"
+          description="Busque o jogo, defina data e horário. Leva menos de um minuto."
+        >
+          <ScheduleForm
+            formTarget={formTarget}
+            onFormTargetChange={setFormTarget}
+            ownerChannel={ownerChannel}
+            moderatedChannels={moderatedChannels}
+            resolveStreamerId={resolveFormStreamerId}
+            onSuccess={handleSuccess}
           />
-        );
-      })()}
-    </div>
+        </AdminSection>
+
+        <AdminSection
+          title={`Agenda (${filteredStreams.length})`}
+          description="Clique em um evento para ver detalhes. Use filtros para navegar entre canais e datas."
+          contentClassName="space-y-4"
+        >
+          <ScheduleListToolbar
+            viewFilter={viewFilter}
+            onViewFilterChange={setViewFilter}
+            viewFilterOptions={viewFilterOptions}
+            period={period}
+            onPeriodChange={(p) => {
+              setPeriod(p);
+              setPage(1);
+            }}
+          />
+
+          {filteredStreams.length === 0 ? (
+            <AdminEmptyState
+              icon={CalendarPlus}
+              title="Nenhuma stream neste filtro"
+              description="Ajuste o período ou o canal exibido, ou crie uma nova transmissão ao lado."
+            />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {paginatedStreams.map((stream) => (
+                  <ScheduledStreamCard
+                    key={stream.id}
+                    stream={stream}
+                    streamerLabel={
+                      viewFilter === "all" && stream.streamerId
+                        ? streamerLabels[stream.streamerId]
+                        : undefined
+                    }
+                    onClick={() => handleStreamClick(stream)}
+                    onDelete={handleDeleteStream}
+                  />
+                ))}
+              </div>
+
+              {totalPages > 1 ? (
+                <div className="flex items-center justify-between gap-2 border-t border-outline-variant/25 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <span className="text-body-sm text-muted-foreground">
+                    Página {page} de {totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Próxima
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </AdminSection>
+      </div>
+
+      <EnhancedGameModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        streamData={
+          selectedStream
+            ? {
+                ...selectedStream,
+                scheduledDate: new Date(selectedStream.scheduledDate),
+                game:
+                  selectedStream.game ||
+                  (selectedStream.gameTitle
+                    ? {
+                        title: selectedStream.gameTitle || "Jogo",
+                        image: selectedStream.gameImage || undefined,
+                        synopsis: selectedStream.gameSynopsis || undefined,
+                      }
+                    : null),
+              }
+            : null
+        }
+      />
+    </>
   );
 }

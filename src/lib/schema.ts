@@ -10,6 +10,11 @@ export const streamers = sqliteTable("streamers", {
   bio: text("bio"),
   twitchUrl: text("twitch_url"),
   followers: text("followers"),
+  socialLinks: text("social_links"), // JSON array of { label, url }
+  /** Parceiro Streamline — inclui benefícios premium e extras */
+  partner: integer("partner", { mode: "boolean" }).notNull().default(false),
+  /** Assinatura premium paga */
+  premium: integer("premium", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
@@ -41,6 +46,8 @@ export const streamerGames = sqliteTable("streamer_games", {
   status: text("status").notNull(), // to_play | playing | finished
   startedAt: integer("started_at", { mode: "timestamp" }),
   finishedAt: integer("finished_at", { mode: "timestamp" }),
+  /** Nota de 0 a 10 (Concluídos / Droppados) */
+  rating: real("rating"),
   notes: text("notes"),
   sortOrder: integer("sort_order"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
@@ -65,4 +72,15 @@ export const scheduledStreams = sqliteTable("scheduled_streams", {
   notes: text("notes"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Moderadores autorizados a gerenciar o canal de um streamer */
+export const streamerModerators = sqliteTable("streamer_moderators", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  moderatorId: text("moderator_id").notNull(),
+  moderatorUsername: text("moderator_username").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });

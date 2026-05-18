@@ -123,7 +123,7 @@ export const EnhancedGameModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-primary/20">
+      <DialogContent className="streamline-scrollbar max-h-[90vh] max-w-2xl overflow-y-auto border-primary/20 bg-card">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
             {title}

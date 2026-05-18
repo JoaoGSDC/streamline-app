@@ -8,7 +8,8 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getStreamerSocialLinks } from "@/lib/streamer-social";
+import { resolveStreamerSocialLinks } from "@/lib/streamer-social";
+import type { StreamerSocialLink } from "@/lib/streamer-social";
 
 export default function StreamerLinksPage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function StreamerLinksPage() {
     twitchUrl: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [links, setLinks] = useState<StreamerSocialLink[]>([]);
 
   useEffect(() => {
     if (!slug) return;
@@ -60,13 +62,39 @@ export default function StreamerLinksPage() {
           return;
         }
 
+        const twitchUrl = `https://twitch.tv/${apiUser.login}`;
         setStreamer({
           name: apiUser.display_name || apiUser.login,
           twitchUsername: apiUser.login,
           avatar: apiUser.profile_image_url,
           bio: apiUser.description || "",
-          twitchUrl: `https://twitch.tv/${apiUser.login}`,
+          twitchUrl,
         });
+
+        try {
+          const linksRes = await fetch(
+            `/api/streamers/public/${encodeURIComponent(slug)}/social-links`
+          );
+          const linksData = await linksRes.json();
+          const customLinks = Array.isArray(linksData.links)
+            ? linksData.links
+            : [];
+          setLinks(
+            resolveStreamerSocialLinks(
+              customLinks,
+              apiUser.description || "",
+              twitchUrl
+            )
+          );
+        } catch {
+          setLinks(
+            resolveStreamerSocialLinks(
+              [],
+              apiUser.description || "",
+              twitchUrl
+            )
+          );
+        }
       } catch {
         router.push("/");
       } finally {
@@ -76,11 +104,6 @@ export default function StreamerLinksPage() {
 
     fetchStreamer();
   }, [slug, router]);
-
-  const links =
-    streamer?.twitchUrl && streamer.bio !== undefined
-      ? getStreamerSocialLinks(streamer.bio, streamer.twitchUrl)
-      : [];
 
   return (
     <div className="relative z-10 min-h-screen">

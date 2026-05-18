@@ -105,7 +105,11 @@ export async function searchTwitchChannels(
   const data = await res.json();
   const channels = Array.isArray(data?.data) ? data.data : [];
 
-  return channels.map((channel: Record<string, unknown>) => ({
+  return channels.map((channel: Record<string, unknown>) => mapChannel(channel));
+}
+
+function mapChannel(channel: Record<string, unknown>): TwitchChannelResult {
+  return {
     id: String(channel.id ?? ""),
     login: String(channel.broadcaster_login ?? "").toLowerCase(),
     displayName: String(
@@ -117,5 +121,124 @@ export async function searchTwitchChannels(
     ),
     isLive: Boolean(channel.is_live),
     gameName: String(channel.game_name ?? ""),
-  }));
+  };
+}
+
+export interface TwitchUserResult {
+  id: string;
+  login: string;
+  displayName: string;
+  profileImageUrl: string;
+}
+
+export async function getTwitchUserByLogin(
+  login: string,
+  retried = false
+): Promise<TwitchUserResult | null> {
+  const normalized = login.trim().toLowerCase().replace(/^@/, "");
+  if (!normalized) return null;
+
+  const { clientId } = getTwitchCredentials();
+  const token = await ensureTwitchAppToken();
+  const params = new URLSearchParams({ login: normalized });
+
+  const res = await fetch(`https://api.twitch.tv/helix/users?${params}`, {
+    headers: {
+      "Client-ID": clientId,
+      Authorization: `Bearer ${token}`,
+    },
+    next: { revalidate: 0 },
+  });
+
+  if (res.status === 401 && !retried) {
+    await ensureTwitchAppToken(true);
+    return getTwitchUserByLogin(login, true);
+  }
+
+  if (!res.ok) {
+    throw new Error(`Twitch users lookup failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const user = Array.isArray(data?.data) ? data.data[0] : null;
+  if (!user) return null;
+
+  return {
+    id: String(user.id ?? ""),
+    login: String(user.login ?? "").toLowerCase(),
+    displayName: String(user.display_name ?? user.login ?? ""),
+    profileImageUrl: String(user.profile_image_url ?? ""),
+  };
+}
+
+export type TwitchLiveInfo = {
+  login: string;
+  isLive: boolean;
+  gameName: string;
+  title: string;
+};
+
+/** Status ao vivo em lote por login Twitch (máx. 100). */
+export async function getTwitchLiveByLogins(
+  logins: string[],
+  retried = false
+): Promise<Map<string, TwitchLiveInfo>> {
+  const unique = [
+    ...new Set(
+      logins.map((l) => l.trim().toLowerCase().replace(/^@/, "")).filter(Boolean)
+    ),
+  ].slice(0, 100);
+
+  const map = new Map<string, TwitchLiveInfo>();
+  if (unique.length === 0) return map;
+
+  const { clientId } = getTwitchCredentials();
+  const token = await ensureTwitchAppToken();
+  const params = new URLSearchParams();
+  for (const login of unique) {
+    params.append("user_login", login);
+  }
+
+  const res = await fetch(
+    `https://api.twitch.tv/helix/streams?${params.toString()}`,
+    {
+      headers: {
+        "Client-ID": clientId,
+        Authorization: `Bearer ${token}`,
+      },
+      next: { revalidate: 60 },
+    }
+  );
+
+  if (res.status === 401 && !retried) {
+    await ensureTwitchAppToken(true);
+    return getTwitchLiveByLogins(logins, true);
+  }
+
+  if (!res.ok) {
+    for (const login of unique) {
+      map.set(login, { login, isLive: false, gameName: "", title: "" });
+    }
+    return map;
+  }
+
+  const data = await res.json();
+  const liveList = Array.isArray(data?.data) ? data.data : [];
+
+  for (const login of unique) {
+    map.set(login, { login, isLive: false, gameName: "", title: "" });
+  }
+
+  for (const stream of liveList) {
+    const login = String(stream.user_login ?? "").toLowerCase();
+    if (!login) continue;
+    map.set(login, {
+      login,
+      isLive: true,
+      gameName: String(stream.game_name ?? ""),
+      title: String(stream.title ?? ""),
+    });
+  }
+
+  return map;
 }
