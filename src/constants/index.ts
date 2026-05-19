@@ -1,6 +1,6 @@
 // Configurações da aplicação
 export const APP_CONFIG = {
-  name: "Streamline",
+  name: "Streaminhub",
   description: "Agenda de Jogos para Streamers",
   version: "1.0.0",
 } as const;

@@ -1,4 +1,4 @@
-# Streamline - Refatorado com Clean Code
+# Streaminhub - Refatorado com Clean Code
 
 ## 🏗️ Arquitetura Refatorada
 

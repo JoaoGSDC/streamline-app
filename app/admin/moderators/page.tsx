@@ -169,7 +169,7 @@ export default function AdminModeratorsPage() {
           <CardTitle className="text-title-md">Adicionar moderador</CardTitle>
           <CardDescription>
             Busque o canal na Twitch e selecione na lista. A pessoa precisa ter
-            conta na Twitch; ao fazer login no Streamline, verá seu canal no
+            conta na Twitch; ao fazer login no Streaminhub, verá seu canal no
             painel.
           </CardDescription>
         </CardHeader>

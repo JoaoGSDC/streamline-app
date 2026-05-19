@@ -3,98 +3,97 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveStreamerSocialLinks } from "@/lib/streamer-social";
 import type { StreamerSocialLink } from "@/lib/streamer-social";
+import type { LinkPageConfig } from "@/types/link-page";
+import { getDefaultLinkPageConfig } from "@/lib/link-page-config";
+import { LinkPageRenderer } from "@/components/link-page/LinkPageRenderer";
+import type { LinkPageStreamer } from "@/components/link-page/LinkPageBlockView";
 
 export default function StreamerLinksPage() {
   const params = useParams();
   const slug = params?.slug as string;
   const router = useRouter();
-  const [streamer, setStreamer] = useState<{
-    name: string;
-    twitchUsername: string;
-    avatar: string;
-    bio: string;
-    twitchUrl: string;
-  } | null>(null);
+  const [streamer, setStreamer] = useState<LinkPageStreamer | null>(null);
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<StreamerSocialLink[]>([]);
+  const [pageConfig, setPageConfig] = useState<LinkPageConfig>(
+    getDefaultLinkPageConfig()
+  );
 
   useEffect(() => {
     if (!slug) return;
 
-    const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || "";
-    const clientSecret = process.env.NEXT_PUBLIC_TWITCH_CLIENT_SECRET || "";
-
-    if (!clientId || !clientSecret) {
-      router.push("/");
-      return;
-    }
-
-    const fetchStreamer = async () => {
+    const fetchPage = async () => {
       setLoading(true);
       try {
-        const tokenRes = await fetch(
-          `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
-          { method: "POST" }
+        const res = await fetch(
+          `/api/streamers/public/${encodeURIComponent(slug)}/social-links`
         );
-        const tokenData = await tokenRes.json();
-        const accessToken = tokenData.access_token;
+        const data = await res.json();
 
-        const userRes = await fetch(
-          `https://api.twitch.tv/helix/users?login=${encodeURIComponent(slug)}`,
-          {
-            headers: {
-              "Client-ID": clientId,
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        const userData = await userRes.json();
-        const apiUser = userData.data?.[0];
-        if (!apiUser) {
+        const apiStreamer = data.streamer;
+        if (!apiStreamer?.twitchUsername) {
           router.push("/");
           return;
         }
 
-        const twitchUrl = `https://twitch.tv/${apiUser.login}`;
+        const twitchUrl =
+          apiStreamer.twitchUrl ||
+          `https://twitch.tv/${apiStreamer.twitchUsername}`;
+
+        let avatar = apiStreamer.avatar;
+        let name = apiStreamer.name;
+        let bio = apiStreamer.bio || "";
+
+        const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || "";
+        const clientSecret = process.env.NEXT_PUBLIC_TWITCH_CLIENT_SECRET || "";
+
+        if (clientId && clientSecret) {
+          try {
+            const tokenRes = await fetch(
+              `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
+              { method: "POST" }
+            );
+            const tokenData = await tokenRes.json();
+            const userRes = await fetch(
+              `https://api.twitch.tv/helix/users?login=${encodeURIComponent(slug)}`,
+              {
+                headers: {
+                  "Client-ID": clientId,
+                  Authorization: `Bearer ${tokenData.access_token}`,
+                },
+              }
+            );
+            const userData = await userRes.json();
+            const apiUser = userData.data?.[0];
+            if (apiUser) {
+              avatar = apiUser.profile_image_url || avatar;
+              name = apiUser.display_name || name;
+              bio = apiUser.description || bio;
+            }
+          } catch {
+            /* usa dados do DB */
+          }
+        }
+
         setStreamer({
-          name: apiUser.display_name || apiUser.login,
-          twitchUsername: apiUser.login,
-          avatar: apiUser.profile_image_url,
-          bio: apiUser.description || "",
+          name,
+          twitchUsername: apiStreamer.twitchUsername,
+          avatar,
+          bio,
           twitchUrl,
         });
 
-        try {
-          const linksRes = await fetch(
-            `/api/streamers/public/${encodeURIComponent(slug)}/social-links`
-          );
-          const linksData = await linksRes.json();
-          const customLinks = Array.isArray(linksData.links)
-            ? linksData.links
-            : [];
-          setLinks(
-            resolveStreamerSocialLinks(
-              customLinks,
-              apiUser.description || "",
-              twitchUrl
-            )
-          );
-        } catch {
-          setLinks(
-            resolveStreamerSocialLinks(
-              [],
-              apiUser.description || "",
-              twitchUrl
-            )
-          );
-        }
+        const customLinks = Array.isArray(data.links) ? data.links : [];
+        setLinks(
+          resolveStreamerSocialLinks(customLinks, bio, twitchUrl)
+        );
+        setPageConfig(data.pageConfig ?? getDefaultLinkPageConfig());
       } catch {
         router.push("/");
       } finally {
@@ -102,11 +101,17 @@ export default function StreamerLinksPage() {
       }
     };
 
-    fetchStreamer();
+    fetchPage();
   }, [slug, router]);
 
   return (
-    <div className="relative z-10 min-h-screen">
+    <div
+      className={
+        !loading && pageConfig.theme.templateId === "noble"
+          ? "relative z-10 min-h-screen bg-[#050816]"
+          : "relative z-10 min-h-screen bg-background"
+      }
+    >
       <Header
         hideLeadingOnMobile
         leading={
@@ -120,51 +125,22 @@ export default function StreamerLinksPage() {
         trailing={<div className="hidden w-24 md:block" aria-hidden />}
       />
 
-      <main className="container-cinematic py-10">
-        {loading ? (
-          <div className="mx-auto max-w-md space-y-4">
-            <Skeleton className="mx-auto h-20 w-20 rounded-lg" />
-            <Skeleton className="mx-auto h-8 w-48" />
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
-        ) : streamer ? (
-          <div className="mx-auto max-w-md text-center">
-            <div className="relative mx-auto mb-4 h-20 w-20 overflow-hidden rounded-lg border-2 border-primary/40 shadow-glow-purple">
-              <Image
-                src={streamer.avatar}
-                alt={streamer.name}
-                fill
-                className="object-cover"
-                sizes="80px"
-              />
-            </div>
-            <h1 className="mb-1 font-headline text-headline-lg text-foreground">
-              {streamer.name}
-            </h1>
-            <p className="mb-8 text-body-sm text-muted-foreground">
-              Links e redes sociais
-            </p>
-
-            <ul className="flex flex-col gap-3">
-              {links.map((link) => (
-                <li key={link.url}>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="streamer-linktree-item flex w-full items-center justify-between gap-3 rounded-md px-5 py-4 text-body-md font-medium text-foreground transition-colors duration-200 hover:text-primary"
-                  >
-                    <span>{link.label}</span>
-                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </main>
+      {loading ? (
+        <div className="mx-auto max-w-md space-y-4 px-4 py-10">
+          <Skeleton className="mx-auto h-20 w-20 rounded-lg" />
+          <Skeleton className="mx-auto h-8 w-48" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
+      ) : streamer ? (
+        <LinkPageRenderer
+          config={pageConfig}
+          streamer={streamer}
+          links={links}
+          className="min-h-[calc(100vh-4rem)]"
+        />
+      ) : null}
     </div>
   );
 }

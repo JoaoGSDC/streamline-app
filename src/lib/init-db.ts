@@ -108,6 +108,7 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE streamers ADD COLUMN social_links TEXT`,
     `ALTER TABLE streamers ADD COLUMN partner INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE streamers ADD COLUMN premium INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE streamers ADD COLUMN link_page_config TEXT`,
     `ALTER TABLE streamer_games ADD COLUMN rating REAL`,
   ];
 

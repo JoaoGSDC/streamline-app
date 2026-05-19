@@ -1,4 +1,4 @@
-# Streamline
+# Streaminhub
 
 Sua agenda gamer, simples e compartilhável.
 
@@ -6,7 +6,7 @@ Sua agenda gamer, simples e compartilhável.
 
 ## Sobre o projeto
 
-O **Streamline** facilita a organização e o compartilhamento da sua agenda de lives e jogos na Twitch. Gerencie horários, jogos e mantenha sua comunidade sempre informada do que vai rolar!
+O **Streaminhub** facilita a organização e o compartilhamento da sua agenda de lives e jogos na Twitch. Gerencie horários, jogos e mantenha sua comunidade sempre informada do que vai rolar!
 
 ---
 
@@ -80,4 +80,4 @@ Veja instruções completas em [CONFIGURATION.md](./CONFIGURATION.md).
 
 ---
 
-Siga, compartilhe e torne seu streaming mais organizado com o **Streamline**!
+Siga, compartilhe e torne seu streaming mais organizado com o **Streaminhub**!

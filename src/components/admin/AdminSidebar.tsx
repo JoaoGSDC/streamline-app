@@ -37,7 +37,7 @@ const baseNavItems = [
   },
   {
     href: "/admin/links",
-    label: "Redes Sociais",
+    label: "Link Page",
     icon: Link2,
     match: (path: string) => path.startsWith("/admin/links"),
   },

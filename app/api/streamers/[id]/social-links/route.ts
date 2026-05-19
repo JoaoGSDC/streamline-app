@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getStreamerById,
-  updateStreamerSocialLinks,
-  type StreamerSocialLink,
+  updateStreamerLinkPage,
 } from "@/lib/db-queries";
+import type { StreamerSocialLink } from "@/lib/streamer-social";
+import { sanitizeLinkPageConfig } from "@/lib/link-page-config";
 import { assertCanManageStreamer } from "@/lib/admin-auth";
 
 export async function GET(
@@ -22,7 +23,10 @@ export async function GET(
       return NextResponse.json({ error: "Streamer não encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json({ links: streamer.socialLinks ?? [] });
+    return NextResponse.json({
+      links: streamer.socialLinks ?? [],
+      pageConfig: streamer.linkPageConfig,
+    });
   } catch (error) {
     console.error("GET social-links error:", error);
     return NextResponse.json(
@@ -44,37 +48,75 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const links = Array.isArray(body?.links) ? body.links : [];
-    const sanitized: StreamerSocialLink[] = links
-      .map((l: { label?: string; url?: string }) => ({
-        label: String(l.label ?? "").trim(),
-        url: String(l.url ?? "").trim(),
-      }))
-      .filter((l: StreamerSocialLink) => l.label && l.url);
+    const hasLinks = Array.isArray(body?.links);
+    const hasPageConfig =
+      body?.pageConfig && typeof body.pageConfig === "object";
 
-    for (const link of sanitized) {
-      try {
-        const parsed = new URL(link.url);
-        if (!["http:", "https:"].includes(parsed.protocol)) {
+    if (!hasLinks && !hasPageConfig) {
+      return NextResponse.json(
+        { error: "Envie links e/ou pageConfig" },
+        { status: 400 }
+      );
+    }
+
+    let sanitizedLinks: StreamerSocialLink[] | undefined;
+    if (hasLinks) {
+      sanitizedLinks = (
+        body.links as {
+          label?: string;
+          url?: string;
+          platformId?: string;
+          iconColor?: string;
+        }[]
+      )
+        .map((l) => {
+          const entry: StreamerSocialLink = {
+            label: String(l.label ?? "").trim(),
+            url: String(l.url ?? "").trim(),
+          };
+          const platformId = String(l.platformId ?? "").trim();
+          const iconColor = String(l.iconColor ?? "").trim();
+          if (platformId) entry.platformId = platformId;
+          if (iconColor) entry.iconColor = iconColor;
+          return entry;
+        })
+        .filter((l) => l.label && l.url);
+
+      for (const link of sanitizedLinks) {
+        try {
+          const parsed = new URL(link.url);
+          if (!["http:", "https:"].includes(parsed.protocol)) {
+            return NextResponse.json(
+              { error: "URLs devem usar http ou https" },
+              { status: 400 }
+            );
+          }
+        } catch {
           return NextResponse.json(
-            { error: "URLs devem usar http ou https" },
+            { error: `URL inválida: ${link.label}` },
             { status: 400 }
           );
         }
-      } catch {
-        return NextResponse.json(
-          { error: `URL inválida: ${link.label}` },
-          { status: 400 }
-        );
       }
     }
 
-    const updated = await updateStreamerSocialLinks(id, sanitized);
+    let pageConfig;
+    if (hasPageConfig) {
+      pageConfig = sanitizeLinkPageConfig(body.pageConfig);
+    }
+
+    const updated = await updateStreamerLinkPage(id, {
+      links: sanitizedLinks,
+      pageConfig,
+    });
     if (!updated) {
       return NextResponse.json({ error: "Streamer não encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json({ links: updated.socialLinks ?? [] });
+    return NextResponse.json({
+      links: updated.socialLinks ?? [],
+      pageConfig: updated.linkPageConfig,
+    });
   } catch (error) {
     console.error("PUT social-links error:", error);
     return NextResponse.json(

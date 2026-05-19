@@ -1,4 +1,11 @@
-export type StreamerSocialLink = { label: string; url: string };
+export type StreamerSocialLink = {
+  label: string;
+  url: string;
+  /** Plataforma escolhida no builder (sobrescreve detecção automática) */
+  platformId?: string;
+  /** Cor do ícone (hex ou css) */
+  iconColor?: string;
+};
 
 export function getStreamerSocialLinks(bio: string, twitchUrl: string) {
   const links: { label: string; url: string }[] = [

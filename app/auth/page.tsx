@@ -14,6 +14,7 @@ import { Twitch, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTwitchAuthUrl } from "@/lib/twitch-auth";
 import Link from "next/link";
+import { BrandLogo, BRAND_NAME } from "@/components/BrandLogo";
 
 function AuthInner() {
   const router = useRouter();
@@ -58,12 +59,10 @@ function AuthInner() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-primary/20 shadow-glow-purple">
         <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Twitch className="h-8 w-8 text-primary" />
-            </div>
+          <div className="mb-4 flex justify-center">
+            <BrandLogo variant="full" href={null} className="h-10 md:h-11" priority />
           </div>
-          <CardTitle className="gradient-text-primary">Streamline</CardTitle>
+          <CardTitle className="sr-only">{BRAND_NAME}</CardTitle>
           <CardDescription>Conecte-se com sua conta Twitch</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -84,7 +83,7 @@ function AuthInner() {
           </Button>
 
           <div className="text-center text-sm text-muted-foreground">
-            <p className="mb-2">Ao entrar, você autoriza a Streamline a:</p>
+            <p className="mb-2">Ao entrar, você autoriza o {BRAND_NAME} a:</p>
             <ul className="text-left space-y-1 mb-4">
               <li>• Ver seu nome de usuário da Twitch</li>
               <li>• Ver sua foto de perfil</li>

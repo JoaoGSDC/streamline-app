@@ -10,9 +10,13 @@ import { ChannelSearch } from "@/components/ChannelSearch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { isStreamerProfilePath } from "@/lib/streamer-profile-routes";
+import { BrandLogo, BrandLogoHeader } from "@/components/BrandLogo";
 
 interface HeaderProps {
+  /** Texto alternativo quando não usa logo (ex.: painel admin) */
   title?: string;
+  /** false = logo da marca no lugar do título */
+  showBrandLogo?: boolean;
   leading?: ReactNode;
   trailing?: ReactNode;
   showSearch?: boolean;
@@ -23,11 +27,12 @@ interface HeaderProps {
 const headerShell = "app-header sticky top-0 z-50 px-4 py-3";
 
 export const Header = ({
-  title = "Streamline",
+  title = "Painel",
   leading,
   trailing,
   showSearch = true,
   hideLeadingOnMobile = false,
+  showBrandLogo = true,
 }: HeaderProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -48,7 +53,9 @@ export const Header = ({
     return isStreamerProfilePath(pathname, user.twitchUsername);
   };
 
-  const defaultLeading = (
+  const defaultLeading = showBrandLogo ? (
+    <BrandLogoHeader />
+  ) : (
     <Link
       href="/"
       prefetch

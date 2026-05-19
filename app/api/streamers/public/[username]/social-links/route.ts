@@ -20,7 +20,19 @@ export async function GET(
       streamer.twitchUrl || `https://twitch.tv/${username}`
     );
 
-    return NextResponse.json({ links });
+    return NextResponse.json({
+      links,
+      pageConfig: streamer.linkPageConfig,
+      streamer: {
+        name: streamer.name,
+        twitchUsername: streamer.twitchUsername,
+        avatar: streamer.avatar,
+        bio: streamer.bio,
+        twitchUrl: streamer.twitchUrl,
+        partner: streamer.partner,
+        premium: streamer.premium,
+      },
+    });
   } catch (error) {
     console.error("GET public social-links error:", error);
     return NextResponse.json(

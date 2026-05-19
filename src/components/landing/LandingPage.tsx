@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
+import { BRAND_NAME } from "@/components/BrandLogo";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingCreatorsSection } from "@/components/landing/LandingCreatorsSection";
 import { LandingFeatures } from "@/components/landing/LandingFeatures";
@@ -51,16 +52,7 @@ export function LandingPage() {
   return (
     <div className="landing-page relative min-h-screen bg-background">
       <Header
-        leading={
-          <Link
-            href="/"
-            prefetch
-            className="gradient-text-primary font-headline text-lg font-bold hover:opacity-90 md:text-xl"
-          >
-            <span className="md:hidden">SL</span>
-            <span className="hidden md:inline">Streamline</span>
-          </Link>
-        }
+        showBrandLogo
         trailing={
           <Button size="sm" variant="nav-login" asChild>
             {currentStreamer ? (
@@ -87,7 +79,7 @@ export function LandingPage() {
       <LandingCreatorsSection
         id="parceiros"
         title="Streamers parceiros"
-        subtitle="Creators oficiais da plataforma — vitrine premium, máximo destaque e presença de marca Streamline."
+        subtitle={`Creators oficiais da plataforma — vitrine premium, máximo destaque e presença de marca ${BRAND_NAME}.`}
         creators={partners}
         variant="partner"
         loading={loading}
@@ -110,7 +102,7 @@ export function LandingPage() {
       <footer className="border-t border-outline-variant/30 py-8">
         <div className="container-cinematic flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
           <p className="text-caption text-muted-foreground">
-            © {new Date().getFullYear()} Streamline — hub premium para streamers
+            © {new Date().getFullYear()} {BRAND_NAME} — hub premium para streamers
           </p>
           <Link
             href="/auth"

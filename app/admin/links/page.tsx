@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Link2, Plus, Save } from "lucide-react";
+import { ExternalLink, Save } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -10,12 +10,16 @@ import {
   type AdminViewFilter,
 } from "@/hooks/useAdminChannelOptions";
 import type { StreamerSocialLink } from "@/lib/streamer-social";
+import type { LinkPageConfig } from "@/types/link-page";
+import { getDefaultLinkPageConfig } from "@/lib/link-page-config";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
-import { AdminSection } from "@/components/admin/shared/AdminSection";
 import { AdminStreamerViewFilter } from "@/components/admin/shared/AdminStreamerViewFilter";
 import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
-import { SocialLinkEditorCard } from "@/components/admin/links/SocialLinkEditorCard";
-import { isValidHttpUrl } from "@/components/admin/links/social-platform";
+import {
+  LinkPageBuilder,
+  type LinkPageBuilderSaveHandlers,
+} from "@/components/admin/links/LinkPageBuilder";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const emptyLink = (): StreamerSocialLink => ({ label: "", url: "" });
 
@@ -33,8 +37,13 @@ export default function AdminLinksPage() {
   const [viewFilter, setViewFilter] = useState<AdminViewFilter>("mine");
   const [formTarget, setFormTarget] = useState("");
   const [links, setLinks] = useState<StreamerSocialLink[]>([]);
+  const [pageConfig, setPageConfig] = useState<LinkPageConfig>(
+    getDefaultLinkPageConfig()
+  );
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loadedForId, setLoadedForId] = useState<string | null>(null);
+  const [saveHandlers, setSaveHandlers] =
+    useState<LinkPageBuilderSaveHandlers | null>(null);
 
   const editStreamerId = resolveFormStreamerId(formTarget);
 
@@ -52,14 +61,18 @@ export default function AdminLinksPage() {
 
         const loaded = Array.isArray(data.links) ? data.links : [];
         setLinks(loaded.length > 0 ? loaded : [emptyLink()]);
+        setPageConfig(data.pageConfig ?? getDefaultLinkPageConfig());
+        setLoadedForId(streamerId);
       } catch (e) {
         console.error(e);
         toast({
           title: "Erro",
-          description: "Não foi possível carregar os links.",
+          description: "Não foi possível carregar a página de links.",
           variant: "destructive",
         });
         setLinks([emptyLink()]);
+        setPageConfig(getDefaultLinkPageConfig());
+        setLoadedForId(streamerId);
       } finally {
         setLoading(false);
       }
@@ -81,85 +94,49 @@ export default function AdminLinksPage() {
     load(viewFilter);
   }, [viewFilter, formTarget, load, resolveFormStreamerId]);
 
-  const updateLink = (
-    index: number,
-    field: keyof StreamerSocialLink,
-    value: string
-  ) => {
-    setLinks((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
-  };
-
-  const addLink = () => setLinks((prev) => [...prev, emptyLink()]);
-
-  const removeLink = (index: number) => {
-    setLinks((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      return next.length > 0 ? next : [emptyLink()];
-    });
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const streamerId = resolveFormStreamerId(formTarget);
-    if (!streamerId) return;
-
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/streamers/${streamerId}/social-links`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
-
-      setLinks(data.links?.length ? data.links : [emptyLink()]);
-      toast({
-        title: "Links salvos",
-        description: "Sua página de links foi atualizada.",
-      });
-    } catch (e) {
-      toast({
-        title: "Erro ao salvar",
-        description:
-          e instanceof Error ? e.message : "Não foi possível salvar os links.",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleStreamerChange = (id: string) => {
-    setFormTarget(id);
-  };
-
   if (!ownerChannel && channels.length === 0) return null;
 
   const previewUrl = activeChannel
     ? `/${activeChannel.twitchUsername}/links`
     : "#";
-  const validCount = links.filter(
-    (l) => l.url.trim() && isValidHttpUrl(l.url.trim())
-  ).length;
+
+  const streamerPreview = activeChannel
+    ? {
+        name: activeChannel.name,
+        twitchUsername: activeChannel.twitchUsername,
+        avatar: activeChannel.avatar,
+        twitchUrl: `https://twitch.tv/${activeChannel.twitchUsername}`,
+      }
+    : null;
 
   return (
     <>
       <AdminPageHeader
-        title="Redes Sociais"
-        description="Monte a página de links de cada canal."
+        title="Link Page Builder"
+        description="Monte sua vitrine premium — templates, blocos e identidade visual."
       >
         <Button variant="outline" size="sm" asChild>
           <Link href={previewUrl} target="_blank">
             <ExternalLink className="mr-2 h-4 w-4" />
-            Pré-visualizar
+            Abrir página pública
           </Link>
+        </Button>
+        <Button
+          size="sm"
+          disabled={
+            loading ||
+            !saveHandlers ||
+            saveHandlers.saving ||
+            loadedForId !== editStreamerId
+          }
+          onClick={() => void saveHandlers?.save()}
+        >
+          <Save className="mr-2 h-4 w-4" />
+          {saveHandlers?.saving ? "Salvando..." : "Salvar página"}
         </Button>
       </AdminPageHeader>
 
-      <div className="mb-6">
+      <div className="mb-6 space-y-4">
         <AdminStreamerViewFilter
           value={viewFilter}
           onChange={(v) => {
@@ -172,69 +149,33 @@ export default function AdminLinksPage() {
           }}
           options={viewFilterOptions}
         />
+
+        {canModerateOthers ? (
+          <AdminStreamerFormSelect
+            value={formTarget}
+            onChange={setFormTarget}
+            ownerChannel={ownerChannel}
+            moderatedChannels={moderatedChannels}
+          />
+        ) : null}
       </div>
 
-      <AdminSection
-        title={
-          activeChannel
-            ? `Links de @${activeChannel.twitchUsername}`
-            : "Seus links"
-        }
-        description={`${validCount} link${validCount === 1 ? "" : "s"} prontos`}
-        contentClassName="space-y-4"
-      >
-        <form onSubmit={handleSave} className="space-y-4">
-          {canModerateOthers ? (
-            <AdminStreamerFormSelect
-              value={formTarget}
-              onChange={handleStreamerChange}
-              ownerChannel={ownerChannel}
-              moderatedChannels={moderatedChannels}
-            />
-          ) : null}
-
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-36 animate-pulse rounded-xl bg-surface-container-low/60"
-                />
-              ))}
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-4">
-                {links.map((link, index) => (
-                  <SocialLinkEditorCard
-                    key={index}
-                    link={link}
-                    index={index}
-                    onChange={updateLink}
-                    onRemove={removeLink}
-                  />
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-2 border-t border-outline-variant/30 pt-4">
-                <Button type="button" variant="outline" onClick={addLink}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar rede
-                </Button>
-                <Button type="submit" disabled={saving}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? "Salvando..." : "Salvar alterações"}
-                </Button>
-              </div>
-            </>
-          )}
-        </form>
-      </AdminSection>
-
-      <div className="mt-6 flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-low/40 px-4 py-3 text-body-sm text-muted-foreground">
-        <Link2 className="h-4 w-4 shrink-0 text-primary" />
-        Se você não cadastrar links aqui, usamos automaticamente os da bio da Twitch.
-      </div>
+      {loading || !activeChannel || loadedForId !== editStreamerId ? (
+        <div className="link-builder w-full space-y-4">
+          <Skeleton className="h-[400px] w-full rounded-xl" />
+          <Skeleton className="h-[500px] w-full rounded-xl" />
+        </div>
+      ) : streamerPreview ? (
+        <LinkPageBuilder
+          key={editStreamerId}
+          streamerId={editStreamerId}
+          twitchUsername={activeChannel.twitchUsername}
+          streamer={streamerPreview}
+          initialLinks={links}
+          initialConfig={pageConfig}
+          onSaveReady={setSaveHandlers}
+        />
+      ) : null}
     </>
   );
 }

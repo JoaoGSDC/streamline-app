@@ -25,7 +25,7 @@ export function FeaturedCreatorCard({
     creator.bio?.trim() ||
     (creator.isLive && creator.gameName
       ? `Ao vivo jogando ${creator.gameName}`
-      : "Criador na Streamline");
+      : "Criador no Streaminhub");
 
   return (
     <article

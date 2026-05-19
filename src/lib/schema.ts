@@ -11,7 +11,9 @@ export const streamers = sqliteTable("streamers", {
   twitchUrl: text("twitch_url"),
   followers: text("followers"),
   socialLinks: text("social_links"), // JSON array of { label, url }
-  /** Parceiro Streamline — inclui benefícios premium e extras */
+  /** Visual builder config for /[slug]/links */
+  linkPageConfig: text("link_page_config"),
+  /** Parceiro Streaminhub — inclui benefícios premium e extras */
   partner: integer("partner", { mode: "boolean" }).notNull().default(false),
   /** Assinatura premium paga */
   premium: integer("premium", { mode: "boolean" }).notNull().default(false),

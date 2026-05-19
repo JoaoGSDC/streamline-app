@@ -14,7 +14,7 @@ export interface StreamerHeaderProps {
   bio: string;
   twitchUrl: string;
   followers?: string;
-  /** Parceiro Streamline (benefícios premium + extras) */
+  /** Parceiro Streaminhub (benefícios premium + extras) */
   partner?: boolean;
   /** Assinatura premium */
   premium?: boolean;

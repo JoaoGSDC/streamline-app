@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Twitch } from "lucide-react";
+import { BrandLogo, BRAND_NAME } from "@/components/BrandLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useAuth, useFormValidation } from "@/hooks";
@@ -132,12 +133,10 @@ export const AuthForm = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-primary/20 shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Twitch className="h-8 w-8 text-primary" />
-            </div>
+          <div className="mb-4 flex justify-center">
+            <BrandLogo variant="full" href={null} className="h-10" priority />
           </div>
-          <CardTitle className="text-2xl font-bold">Streamline</CardTitle>
+          <CardTitle className="sr-only">{BRAND_NAME}</CardTitle>
           <CardDescription>Gerencie a agenda dos seus jogos</CardDescription>
         </CardHeader>
         <CardContent>

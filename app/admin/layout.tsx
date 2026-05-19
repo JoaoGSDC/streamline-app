@@ -30,7 +30,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="Painel do Streamer" showSearch={false} />
+        <Header
+          title="Painel do Streamer"
+          showBrandLogo={false}
+          showSearch={false}
+        />
         <div className="flex gap-6 p-6">
           <Skeleton className="hidden h-[400px] w-56 shrink-0 md:block" />
           <Skeleton className="h-[400px] flex-1" />
@@ -54,6 +58,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background">
       <Header
         title="Painel do Streamer"
+        showBrandLogo={false}
         showSearch={false}
         hideLeadingOnMobile
         leading={

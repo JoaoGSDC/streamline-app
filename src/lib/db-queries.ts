@@ -7,24 +7,52 @@ import {
   streamerGames,
   streamerModerators,
 } from "./schema";
+import {
+  parseLinkPageConfig,
+  resolveLinkPageConfig,
+} from "./link-page-config";
+import type { LinkPageConfig } from "@/types/link-page";
 
-export type StreamerSocialLink = { label: string; url: string };
+export type { StreamerSocialLink } from "@/lib/streamer-social";
+import type { StreamerSocialLink } from "@/lib/streamer-social";
 
 function parseStreamerRow(row: typeof streamers.$inferSelect) {
   let socialLinks: StreamerSocialLink[] = [];
   try {
     const parsed = JSON.parse(row.socialLinks || "[]");
     if (Array.isArray(parsed)) {
-      socialLinks = parsed.filter(
-        (l) => l && typeof l.label === "string" && typeof l.url === "string"
-      );
+      socialLinks = parsed
+        .filter(
+          (l) => l && typeof l.label === "string" && typeof l.url === "string"
+        )
+        .map((l) => ({
+          label: l.label,
+          url: l.url,
+          ...(typeof l.platformId === "string" && l.platformId
+            ? { platformId: l.platformId }
+            : {}),
+          ...(typeof l.iconColor === "string" && l.iconColor
+            ? { iconColor: l.iconColor }
+            : {}),
+        }));
     }
   } catch {
     socialLinks = [];
   }
+
+  let linkPageConfig: LinkPageConfig;
+  try {
+    const storedPageConfig = parseLinkPageConfig(row.linkPageConfig);
+    linkPageConfig = resolveLinkPageConfig(storedPageConfig ?? undefined);
+  } catch (e) {
+    console.error("linkPageConfig inválido, usando padrão:", e);
+    linkPageConfig = resolveLinkPageConfig(undefined);
+  }
+
   return {
     ...row,
     socialLinks,
+    linkPageConfig,
     partner: Boolean(row.partner),
     premium: Boolean(row.premium),
   };
@@ -149,15 +177,72 @@ export async function updateStreamerSocialLinks(
   links: StreamerSocialLink[]
 ) {
   const sanitized = links
-    .map((l) => ({
-      label: l.label.trim(),
-      url: l.url.trim(),
-    }))
+    .map((l) => {
+      const entry: StreamerSocialLink = {
+        label: l.label.trim(),
+        url: l.url.trim(),
+      };
+      if (l.platformId?.trim()) entry.platformId = l.platformId.trim();
+      if (l.iconColor?.trim()) entry.iconColor = l.iconColor.trim();
+      return entry;
+    })
     .filter((l) => l.label && l.url);
 
   const result = await db
     .update(streamers)
     .set({ socialLinks: JSON.stringify(sanitized) })
+    .where(eq(streamers.id, streamerId))
+    .returning();
+  return result[0] ? parseStreamerRow(result[0]) : null;
+}
+
+export async function updateStreamerLinkPageConfig(
+  streamerId: string,
+  pageConfig: LinkPageConfig
+) {
+  const result = await db
+    .update(streamers)
+    .set({ linkPageConfig: JSON.stringify(pageConfig) })
+    .where(eq(streamers.id, streamerId))
+    .returning();
+  return result[0] ? parseStreamerRow(result[0]) : null;
+}
+
+export async function updateStreamerLinkPage(
+  streamerId: string,
+  data: {
+    links?: StreamerSocialLink[];
+    pageConfig?: LinkPageConfig;
+  }
+) {
+  const updates: Partial<typeof streamers.$inferInsert> = {};
+
+  if (data.links !== undefined) {
+    const sanitized = data.links
+      .map((l) => {
+        const entry: StreamerSocialLink = {
+          label: l.label.trim(),
+          url: l.url.trim(),
+        };
+        if (l.platformId?.trim()) entry.platformId = l.platformId.trim();
+        if (l.iconColor?.trim()) entry.iconColor = l.iconColor.trim();
+        return entry;
+      })
+      .filter((l) => l.label && l.url);
+    updates.socialLinks = JSON.stringify(sanitized);
+  }
+
+  if (data.pageConfig !== undefined) {
+    updates.linkPageConfig = JSON.stringify(data.pageConfig);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return getStreamerById(streamerId);
+  }
+
+  const result = await db
+    .update(streamers)
+    .set(updates)
     .where(eq(streamers.id, streamerId))
     .returning();
   return result[0] ? parseStreamerRow(result[0]) : null;

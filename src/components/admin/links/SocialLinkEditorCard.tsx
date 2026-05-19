@@ -3,14 +3,29 @@
 import { ExternalLink, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { StreamerSocialLink } from "@/lib/streamer-social";
-import { detectSocialPlatform, isValidHttpUrl } from "./social-platform";
+import {
+  SOCIAL_PLATFORMS,
+  getPlatformById,
+  resolveSocialPlatform,
+  isValidHttpUrl,
+  type SocialPlatformId,
+} from "./social-platform";
+import { ColorPickerField } from "@/components/admin/shared/ColorPickerField";
 
 interface SocialLinkEditorCardProps {
   link: StreamerSocialLink;
   index: number;
-  onChange: (index: number, field: keyof StreamerSocialLink, value: string) => void;
+  onChange: (index: number, patch: Partial<StreamerSocialLink>) => void;
   onRemove: (index: number) => void;
 }
 
@@ -20,10 +35,20 @@ export function SocialLinkEditorCard({
   onChange,
   onRemove,
 }: SocialLinkEditorCardProps) {
-  const platform = detectSocialPlatform(link);
+  const platform = resolveSocialPlatform(link);
   const Icon = platform.icon;
   const hasUrl = link.url.trim().length > 0;
   const valid = hasUrl && isValidHttpUrl(link.url.trim());
+  const selectedId = (link.platformId as SocialPlatformId) || platform.id;
+
+  const handlePlatformChange = (platformId: string) => {
+    const meta = getPlatformById(platformId);
+    onChange(index, {
+      platformId,
+      label: link.label.trim() || meta.label,
+      iconColor: link.iconColor?.trim() || meta.color,
+    });
+  };
 
   return (
     <div
@@ -82,6 +107,39 @@ export function SocialLinkEditorCard({
         </div>
       </div>
 
+      <div className="mb-3 grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Ícone / rede</Label>
+          <Select value={selectedId} onValueChange={handlePlatformChange}>
+            <SelectTrigger className="input-cinematic h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SOCIAL_PLATFORMS.map((p) => {
+                const PIcon = p.icon;
+                return (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-2">
+                      <PIcon
+                        className="h-4 w-4 shrink-0"
+                        style={{ color: p.color }}
+                        aria-hidden
+                      />
+                      {p.label}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+        <ColorPickerField
+          label="Cor do ícone"
+          value={link.iconColor ?? platform.color}
+          onChange={(iconColor) => onChange(index, { iconColor })}
+        />
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-caption font-medium text-muted-foreground">
@@ -90,7 +148,7 @@ export function SocialLinkEditorCard({
           <Input
             placeholder="Ex.: Instagram"
             value={link.label}
-            onChange={(e) => onChange(index, "label", e.target.value)}
+            onChange={(e) => onChange(index, { label: e.target.value })}
             className="input-cinematic"
           />
         </div>
@@ -102,7 +160,7 @@ export function SocialLinkEditorCard({
             type="url"
             placeholder="https://..."
             value={link.url}
-            onChange={(e) => onChange(index, "url", e.target.value)}
+            onChange={(e) => onChange(index, { url: e.target.value })}
             className={cn(
               "input-cinematic",
               hasUrl && !valid && "border-destructive/50"

@@ -22,7 +22,7 @@ Este guia explica como configurar as credenciais necessárias para usar a autent
 2. Faça login com sua conta Twitch
 3. Clique em "Register Your Application"
 4. Preencha os dados:
-   - **Name**: Streamline (ou o nome que preferir)
+   - **Name**: Streaminhub (ou o nome que preferir)
    - **OAuth Redirect URLs**: `http://localhost:3000/api/auth/twitch/callback`
    - **Category**: Choose "Application Integration"
 5. Clique em "Create"

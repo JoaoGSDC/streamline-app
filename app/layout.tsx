@@ -22,12 +22,21 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Streamline - Agenda Gamer Compartilhável",
+  title: {
+    default: "Streaminhub - Agenda Gamer Compartilhável",
+    template: "%s | Streaminhub",
+  },
   description:
     "Organize e compartilhe sua agenda de jogos e lives na Twitch. Veja o que vai rolar hoje, na semana ou no mês.",
-  authors: [{ name: "Streamline" }],
+  applicationName: "Streaminhub",
+  authors: [{ name: "Streaminhub" }],
+  icons: {
+    icon: "/assets/images/logo-v1.png",
+    shortcut: "/assets/images/logo-v1.png",
+    apple: "/assets/images/logo-v1.png",
+  },
   openGraph: {
-    title: "Streamline - Agenda Gamer Compartilhável",
+    title: "Streaminhub - Agenda Gamer Compartilhável",
     description:
       "Organize e compartilhe sua agenda de jogos e lives na Twitch.",
     type: "website",
