@@ -12,6 +12,10 @@ import {
 import type { StreamerSocialLink } from "@/lib/streamer-social";
 import type { LinkPageConfig } from "@/types/link-page";
 import { getDefaultLinkPageConfig } from "@/lib/link-page-config";
+import {
+  emptySocialLink,
+  ensureSocialLinkIds,
+} from "@/lib/link-builder-utils";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminStreamerViewFilter } from "@/components/admin/shared/AdminStreamerViewFilter";
 import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
@@ -20,8 +24,6 @@ import {
   type LinkPageBuilderSaveHandlers,
 } from "@/components/admin/links/LinkPageBuilder";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const emptyLink = (): StreamerSocialLink => ({ label: "", url: "" });
 
 export default function AdminLinksPage() {
   const { toast } = useToast();
@@ -60,7 +62,11 @@ export default function AdminLinksPage() {
         if (!res.ok) throw new Error(data.error || "Erro ao carregar");
 
         const loaded = Array.isArray(data.links) ? data.links : [];
-        setLinks(loaded.length > 0 ? loaded : [emptyLink()]);
+        setLinks(
+          ensureSocialLinkIds(
+            loaded.length > 0 ? loaded : [emptySocialLink()]
+          )
+        );
         setPageConfig(data.pageConfig ?? getDefaultLinkPageConfig());
         setLoadedForId(streamerId);
       } catch (e) {
@@ -70,7 +76,7 @@ export default function AdminLinksPage() {
           description: "Não foi possível carregar a página de links.",
           variant: "destructive",
         });
-        setLinks([emptyLink()]);
+        setLinks([emptySocialLink()]);
         setPageConfig(getDefaultLinkPageConfig());
         setLoadedForId(streamerId);
       } finally {
@@ -136,7 +142,19 @@ export default function AdminLinksPage() {
         </Button>
       </AdminPageHeader>
 
-      <div className="mb-6 space-y-4">
+      <div className="mb-6 space-y-4 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 p-4">
+        <p className="text-body-sm text-muted-foreground">
+          {activeChannel ? (
+            <>
+              Editando a página de links de{" "}
+              <span className="font-medium text-foreground">
+                @{activeChannel.twitchUsername}
+              </span>
+            </>
+          ) : (
+            "Selecione o canal abaixo."
+          )}
+        </p>
         <AdminStreamerViewFilter
           value={viewFilter}
           onChange={(v) => {
@@ -150,14 +168,16 @@ export default function AdminLinksPage() {
           options={viewFilterOptions}
         />
 
-        {canModerateOthers ? (
-          <AdminStreamerFormSelect
-            value={formTarget}
-            onChange={setFormTarget}
-            ownerChannel={ownerChannel}
-            moderatedChannels={moderatedChannels}
-          />
-        ) : null}
+        <AdminStreamerFormSelect
+          value={formTarget}
+          onChange={setFormTarget}
+          ownerChannel={ownerChannel}
+          moderatedChannels={moderatedChannels}
+          alwaysShow
+          label="Canal da página"
+          disabledHint="A página de links será do seu perfil."
+          enabledHint="Escolha para qual streamer esta página de links será salva."
+        />
       </div>
 
       {loading || !activeChannel || loadedForId !== editStreamerId ? (

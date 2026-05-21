@@ -9,7 +9,10 @@ import {
   type AdminViewFilter,
 } from "@/hooks/useAdminChannelOptions";
 import { fetchMergedByStreamerIds } from "@/lib/admin-fetch";
-import { ScheduleForm } from "@/components/ScheduleForm";
+import {
+  ScheduleForm,
+  type ScheduleFormEditStream,
+} from "@/components/ScheduleForm";
 import { EnhancedGameModal } from "@/components/EnhancedGameModal";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminSection } from "@/components/admin/shared/AdminSection";
@@ -66,6 +69,9 @@ export default function AdminSchedulePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewFilter, setViewFilter] = useState<AdminViewFilter>("mine");
   const [formTarget, setFormTarget] = useState("");
+  const [editingStream, setEditingStream] = useState<ScheduleFormEditStream | null>(
+    null
+  );
   const [period, setPeriod] = useState(getDefaultSchedulePeriod);
   const [page, setPage] = useState(1);
 
@@ -146,11 +152,41 @@ export default function AdminSchedulePage() {
   }, [viewFilter, channels, userId]);
 
   const handleSuccess = () => {
+    const wasEditing = Boolean(editingStream);
     void reloadStreams();
+    setEditingStream(null);
     toast({
-      title: "Stream agendada!",
-      description: "Sua stream foi agendada com sucesso.",
+      title: wasEditing ? "Agenda atualizada!" : "Stream agendada!",
+      description: wasEditing
+        ? "As alterações foram salvas com sucesso."
+        : "Sua stream foi agendada com sucesso.",
     });
+  };
+
+  const handleEditStream = (stream: ScheduledStream) => {
+    setSelectedStream(null);
+    setIsModalOpen(false);
+    setEditingStream({
+      id: stream.id,
+      streamerId: stream.streamerId || resolveFormStreamerId(formTarget),
+      igdbGameId: stream.igdbGameId,
+      gameTitle: stream.gameTitle,
+      gameImage: stream.gameImage,
+      gameSynopsis: stream.gameSynopsis,
+      scheduledDate: stream.scheduledDate,
+      scheduledTime: stream.scheduledTime,
+      duration: stream.duration,
+      links: stream.links,
+      notes: stream.notes,
+    });
+    if (stream.streamerId) {
+      setFormTarget(stream.streamerId);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingStream(null);
   };
 
   const handleDeleteStream = async (streamId: string) => {
@@ -161,6 +197,9 @@ export default function AdminSchedulePage() {
       if (!res.ok) throw new Error();
 
       setStreams((prev) => prev.filter((s) => s.id !== streamId));
+      if (editingStream?.id === streamId) {
+        setEditingStream(null);
+      }
 
       toast({
         title: "Stream removida",
@@ -192,8 +231,12 @@ export default function AdminSchedulePage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <AdminSection
-          title="Nova transmissão"
-          description="Busque o jogo, defina data e horário. Leva menos de um minuto."
+          title={editingStream ? "Editar transmissão" : "Nova transmissão"}
+          description={
+            editingStream
+              ? "Altere data, horário, jogo ou qualquer outro campo e salve."
+              : "Busque o jogo, defina data e horário. Leva menos de um minuto."
+          }
         >
           <ScheduleForm
             formTarget={formTarget}
@@ -201,6 +244,8 @@ export default function AdminSchedulePage() {
             ownerChannel={ownerChannel}
             moderatedChannels={moderatedChannels}
             resolveStreamerId={resolveFormStreamerId}
+            editingStream={editingStream}
+            onCancelEdit={handleCancelEdit}
             onSuccess={handleSuccess}
           />
         </AdminSection>
@@ -240,6 +285,7 @@ export default function AdminSchedulePage() {
                         : undefined
                     }
                     onClick={() => handleStreamClick(stream)}
+                    onEdit={() => handleEditStream(stream)}
                     onDelete={handleDeleteStream}
                   />
                 ))}
@@ -280,6 +326,11 @@ export default function AdminSchedulePage() {
       <EnhancedGameModal
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
+        onEdit={
+          selectedStream
+            ? () => handleEditStream(selectedStream)
+            : undefined
+        }
         streamData={
           selectedStream
             ? {

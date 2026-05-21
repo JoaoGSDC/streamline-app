@@ -43,18 +43,36 @@ export function LinkPageBlockView({
       const rawAlign = String(block.props.avatarAlign ?? "center");
       const avatarAlign =
         rawAlign === "left" || rawAlign === "right" ? rawAlign : "center";
+      const headerAlignStyle = {
+        alignItems:
+          avatarAlign === "left"
+            ? "flex-start"
+            : avatarAlign === "right"
+              ? "flex-end"
+              : "center",
+        textAlign: avatarAlign,
+      } as const;
+      const avatarWrapStyle =
+        avatarAlign === "center"
+          ? { marginInline: "auto" as const }
+          : avatarAlign === "right"
+            ? { marginInlineStart: "auto" as const }
+            : undefined;
       return (
         <header
           className={cn(
             "link-page__header",
             `link-page__header--avatar-${avatarAlign}`
           )}
+          style={headerAlignStyle}
+          data-avatar-align={avatarAlign}
         >
           <div
             className={cn(
               "link-page__avatar-wrap",
               `link-page__avatar-wrap--${avatarAlign}`
             )}
+            style={avatarWrapStyle}
           >
             {streamer.avatar ? (
               <Image

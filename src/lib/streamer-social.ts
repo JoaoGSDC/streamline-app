@@ -1,4 +1,6 @@
 export type StreamerSocialLink = {
+  /** Identificador estável no editor (persistido no JSON) */
+  id?: string;
   label: string;
   url: string;
   /** Plataforma escolhida no builder (sobrescreve detecção automática) */

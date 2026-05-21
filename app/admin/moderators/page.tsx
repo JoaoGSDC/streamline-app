@@ -1,18 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
-import { useAdminContext } from "@/components/admin/AdminProvider";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminChannelOptions } from "@/hooks/useAdminChannelOptions";
 import { Button } from "@/components/ui/button";
 import { ModeratorUserSearch } from "@/components/admin/ModeratorUserSearch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
+import { AdminSection } from "@/components/admin/shared/AdminSection";
+import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
 
 interface ModeratorRow {
   id: string;
@@ -23,25 +19,40 @@ interface ModeratorRow {
 
 export default function AdminModeratorsPage() {
   const { toast } = useToast();
-  const { actingAs, userId, loading: contextLoading } = useAdminContext();
+  const { ownerChannel, resolveFormStreamerId, userId, channels } =
+    useAdminChannelOptions();
+
+  const [manageTarget, setManageTarget] = useState("");
   const [moderators, setModerators] = useState<ModeratorRow[]>([]);
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const isOwner =
-    Boolean(actingAs && userId && actingAs.id === userId) ||
-    actingAs?.role === "owner";
+  const targetStreamerId = useMemo(
+    () => resolveFormStreamerId(manageTarget),
+    [manageTarget, resolveFormStreamerId]
+  );
+
+  const targetChannel = useMemo(
+    () => channels.find((c) => c.id === targetStreamerId) ?? ownerChannel,
+    [channels, targetStreamerId, ownerChannel]
+  );
+
+  /** Apenas o dono do canal pode gerenciar moderadores */
+  const canManageModerators = Boolean(
+    userId && targetStreamerId && userId === targetStreamerId
+  );
 
   const loadModerators = useCallback(async () => {
-    if (!actingAs?.id || !isOwner) {
+    if (!targetStreamerId || !canManageModerators) {
+      setModerators([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/streamers/${actingAs.id}/moderators`);
+      const res = await fetch(`/api/streamers/${targetStreamerId}/moderators`);
       const data = await res.json();
       if (!res.ok) {
         toast({
@@ -55,55 +66,42 @@ export default function AdminModeratorsPage() {
     } finally {
       setLoading(false);
     }
-  }, [actingAs?.id, isOwner, toast]);
+  }, [targetStreamerId, canManageModerators, toast]);
 
   useEffect(() => {
-    if (!contextLoading) {
-      loadModerators();
-    }
-  }, [contextLoading, loadModerators]);
+    void loadModerators();
+  }, [loadModerators]);
 
-  if (contextLoading) {
+  if (!ownerChannel && channels.length === 0) {
     return (
-      <p className="text-body-sm text-muted-foreground">Carregando painel…</p>
+      <AdminPageHeader
+        title="Moderadores"
+        description="Faça login para gerenciar moderadores do seu canal."
+      />
     );
   }
 
-  if (!actingAs) {
+  if (!ownerChannel || !canManageModerators) {
     return (
-      <Card className="glass-panel border-outline-variant/30">
-        <CardHeader>
-          <CardTitle>Moderadores</CardTitle>
-          <CardDescription>
-            Faça login para gerenciar moderadores do seu canal.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <AdminPageHeader
+        title="Moderadores"
+        description="Apenas o dono do canal pode adicionar ou remover moderadores."
+      />
     );
   }
 
-  if (!isOwner) {
-    return (
-      <Card className="glass-panel border-outline-variant/30">
-        <CardHeader>
-          <CardTitle>Moderadores</CardTitle>
-          <CardDescription>
-            Apenas o dono do canal pode gerenciar moderadores. Volte ao seu canal
-            no seletor da sidebar.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  const channelLabel = targetChannel?.twitchUsername
+    ? `@${targetChannel.twitchUsername}`
+    : "seu canal";
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const login = username.trim().toLowerCase().replace(/^@/, "");
-    if (!actingAs.id || !login) return;
+    if (!targetStreamerId || !login) return;
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/streamers/${actingAs.id}/moderators`, {
+      const res = await fetch(`/api/streamers/${targetStreamerId}/moderators`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: login }),
@@ -123,7 +121,7 @@ export default function AdminModeratorsPage() {
       await loadModerators();
       toast({
         title: "Moderador adicionado",
-        description: `@${data.moderator.moderatorUsername} pode gerenciar seu canal.`,
+        description: `@${data.moderator.moderatorUsername} pode gerenciar ${channelLabel}.`,
       });
     } finally {
       setSubmitting(false);
@@ -131,10 +129,12 @@ export default function AdminModeratorsPage() {
   };
 
   const handleRemove = async (moderatorId: string, modUsername: string) => {
-    if (!confirm(`Remover @${modUsername} como moderador?`)) return;
+    if (!confirm(`Remover @${modUsername} como moderador de ${channelLabel}?`)) {
+      return;
+    }
 
     const res = await fetch(
-      `/api/streamers/${actingAs.id}/moderators?moderatorId=${encodeURIComponent(moderatorId)}`,
+      `/api/streamers/${targetStreamerId}/moderators?moderatorId=${encodeURIComponent(moderatorId)}`,
       { method: "DELETE" }
     );
 
@@ -154,89 +154,92 @@ export default function AdminModeratorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-headline text-display-sm font-bold text-foreground">
-          Moderadores
-        </h1>
-        <p className="mt-1 text-body-md text-muted-foreground">
-          Pessoas que podem agendar streams, gerenciar jogos e editar links do
-          seu canal no painel admin.
-        </p>
-      </div>
+      <AdminPageHeader
+        title="Moderadores"
+        description="Pessoas que podem agendar streams, gerenciar jogos e editar links do canal no painel admin."
+      />
 
-      <Card className="relative z-10 overflow-visible border-outline-variant/30">
-        <CardHeader>
-          <CardTitle className="text-title-md">Adicionar moderador</CardTitle>
-          <CardDescription>
-            Busque o canal na Twitch e selecione na lista. A pessoa precisa ter
-            conta na Twitch; ao fazer login no Streaminhub, verá seu canal no
-            painel.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-visible">
-          <form onSubmit={handleAdd} className="flex flex-col gap-3 sm:flex-row">
-            <ModeratorUserSearch
-              value={username}
-              onChange={setUsername}
-              disabled={submitting}
-              className="sm:flex-1"
-              excludeLogins={[
-                actingAs.twitchUsername,
-                ...moderators.map((m) => m.moderatorUsername),
-              ]}
-            />
-            <Button type="submit" disabled={submitting || !username.trim()}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Adicionar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <AdminSection
+        title="Canal"
+        description="Selecione para qual streamer você está configurando moderadores."
+        contentClassName="space-y-4"
+      >
+        <AdminStreamerFormSelect
+          value={manageTarget}
+          onChange={setManageTarget}
+          ownerChannel={ownerChannel}
+          moderatedChannels={[]}
+          alwaysShow
+          label="Streamer"
+          disabledHint="Os moderadores serão adicionados ao seu canal."
+          enabledHint="Canal para o qual você deseja adicionar moderadores."
+        />
+      </AdminSection>
 
-      <Card className="glass-panel border-outline-variant/30">
-        <CardHeader>
-          <CardTitle className="text-title-md">Moderadores ativos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-body-sm text-muted-foreground">Carregando…</p>
-          ) : moderators.length === 0 ? (
-            <p className="text-body-sm text-muted-foreground">
-              Nenhum moderador cadastrado ainda.
-            </p>
-          ) : (
-            <ul className="divide-y divide-outline-variant/30">
-              {moderators.map((mod) => (
-                <li
-                  key={mod.id}
-                  className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+      <AdminSection
+        title="Adicionar moderador"
+        description={`Busque o canal na Twitch e adicione à lista de ${channelLabel}. A pessoa precisa ter conta na Twitch; ao fazer login no Streaminhub, verá o canal no painel.`}
+      >
+        <form onSubmit={handleAdd} className="flex flex-col gap-3 sm:flex-row">
+          <ModeratorUserSearch
+            value={username}
+            onChange={setUsername}
+            disabled={submitting}
+            className="sm:flex-1"
+            excludeLogins={[
+              targetChannel?.twitchUsername ?? "",
+              ...moderators.map((m) => m.moderatorUsername),
+            ]}
+          />
+          <Button type="submit" disabled={submitting || !username.trim()}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Adicionar
+          </Button>
+        </form>
+      </AdminSection>
+
+      <AdminSection
+        title={`Moderadores ativos (${channelLabel})`}
+        description="Quem pode gerenciar este canal no painel admin."
+      >
+        {loading ? (
+          <p className="text-body-sm text-muted-foreground">Carregando…</p>
+        ) : moderators.length === 0 ? (
+          <p className="text-body-sm text-muted-foreground">
+            Nenhum moderador cadastrado ainda.
+          </p>
+        ) : (
+          <ul className="divide-y divide-outline-variant/30">
+            {moderators.map((mod) => (
+              <li
+                key={mod.id}
+                className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+              >
+                <div>
+                  <p className="font-medium text-foreground">
+                    @{mod.moderatorUsername}
+                  </p>
+                  <p className="text-caption text-muted-foreground">
+                    Desde{" "}
+                    {new Date(mod.createdAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remover @${mod.moderatorUsername}`}
+                  onClick={() =>
+                    handleRemove(mod.moderatorId, mod.moderatorUsername)
+                  }
                 >
-                  <div>
-                    <p className="font-medium text-foreground">
-                      @{mod.moderatorUsername}
-                    </p>
-                    <p className="text-caption text-muted-foreground">
-                      Desde{" "}
-                      {new Date(mod.createdAt).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remover @${mod.moderatorUsername}`}
-                    onClick={() =>
-                      handleRemove(mod.moderatorId, mod.moderatorUsername)
-                    }
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminSection>
     </div>
   );
 }

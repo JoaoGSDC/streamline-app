@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GameSearch } from "./GameSearch";
-import { Plus, Trash2, ExternalLink } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Trash2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
+import type { AdminChannel } from "@/components/admin/AdminProvider";
 
 interface Game {
   id: number;
@@ -21,8 +23,19 @@ interface Link {
   name: string;
 }
 
-import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
-import type { AdminChannel } from "@/components/admin/AdminProvider";
+export interface ScheduleFormEditStream {
+  id: string;
+  streamerId: string;
+  igdbGameId?: number | null;
+  gameTitle?: string | null;
+  gameImage?: string | null;
+  gameSynopsis?: string | null;
+  scheduledDate: Date | string;
+  scheduledTime: string;
+  duration: string;
+  links?: Array<{ url: string; name?: string }>;
+  notes?: string | null;
+}
 
 interface ScheduleFormProps {
   formTarget: string;
@@ -30,7 +43,49 @@ interface ScheduleFormProps {
   ownerChannel: AdminChannel | null;
   moderatedChannels: AdminChannel[];
   resolveStreamerId: (formTarget: string) => string;
+  editingStream?: ScheduleFormEditStream | null;
+  onCancelEdit?: () => void;
   onSuccess: () => void;
+}
+
+function formatDateForInput(value: Date | string): string {
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function coverUrlFromStored(image?: string | null): string | undefined {
+  if (!image?.trim()) return undefined;
+  if (image.startsWith("//")) return image;
+  if (image.startsWith("http")) {
+    try {
+      const u = new URL(image);
+      return u.pathname + u.search;
+    } catch {
+      return image;
+    }
+  }
+  return image.startsWith("/") ? image : `//${image.replace(/^\/+/, "")}`;
+}
+
+function resetFormState(setters: {
+  setSelectedGame: (g: Game | null) => void;
+  setIsCustomGame: (v: boolean) => void;
+  setCustomGameTitle: (v: string) => void;
+  setScheduledDate: (v: string) => void;
+  setScheduledTime: (v: string) => void;
+  setDuration: (v: string) => void;
+  setLinks: (v: Link[]) => void;
+  setNotes: (v: string) => void;
+}) {
+  setters.setSelectedGame(null);
+  setters.setIsCustomGame(false);
+  setters.setCustomGameTitle("");
+  setters.setScheduledDate("");
+  setters.setScheduledTime("");
+  setters.setDuration("");
+  setters.setLinks([{ url: "", name: "" }]);
+  setters.setNotes("");
 }
 
 export const ScheduleForm = ({
@@ -39,8 +94,11 @@ export const ScheduleForm = ({
   ownerChannel,
   moderatedChannels,
   resolveStreamerId,
+  editingStream,
+  onCancelEdit,
   onSuccess,
 }: ScheduleFormProps) => {
+  const isEditing = Boolean(editingStream?.id);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isCustomGame, setIsCustomGame] = useState(false);
   const [customGameTitle, setCustomGameTitle] = useState("");
@@ -50,6 +108,60 @@ export const ScheduleForm = ({
   const [links, setLinks] = useState<Link[]>([{ url: "", name: "" }]);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!editingStream) {
+      resetFormState({
+        setSelectedGame,
+        setIsCustomGame,
+        setCustomGameTitle,
+        setScheduledDate,
+        setScheduledTime,
+        setDuration,
+        setLinks,
+        setNotes,
+      });
+      return;
+    }
+
+    if (editingStream.streamerId) {
+      onFormTargetChange(editingStream.streamerId);
+    }
+
+    if (editingStream.igdbGameId) {
+      setSelectedGame({
+        id: editingStream.igdbGameId,
+        name: editingStream.gameTitle || "Jogo",
+        cover: editingStream.gameImage
+          ? { url: coverUrlFromStored(editingStream.gameImage) || "" }
+          : undefined,
+        summary: editingStream.gameSynopsis || undefined,
+      });
+      setIsCustomGame(false);
+      setCustomGameTitle("");
+    } else if (editingStream.gameTitle) {
+      setSelectedGame(null);
+      setIsCustomGame(true);
+      setCustomGameTitle(editingStream.gameTitle);
+    } else {
+      setSelectedGame(null);
+      setIsCustomGame(false);
+      setCustomGameTitle("");
+    }
+
+    setScheduledDate(formatDateForInput(editingStream.scheduledDate));
+    setScheduledTime(editingStream.scheduledTime);
+    setDuration(editingStream.duration || "");
+    setLinks(
+      editingStream.links?.length
+        ? editingStream.links.map((l) => ({
+            url: l.url,
+            name: l.name || "",
+          }))
+        : [{ url: "", name: "" }]
+    );
+    setNotes(editingStream.notes || "");
+  }, [editingStream, onFormTargetChange]);
 
   const handleGameSelect = (game: Game) => {
     setSelectedGame(game);
@@ -80,7 +192,6 @@ export const ScheduleForm = ({
     setIsSubmitting(true);
 
     try {
-      // Validar seleção de jogo ou nome customizado
       if (!isCustomGame && !selectedGame) {
         alert(
           "Por favor, selecione um jogo ou informe o nome do jogo customizado"
@@ -89,48 +200,70 @@ export const ScheduleForm = ({
         return;
       }
 
-      // Criar stream agendada
       const validLinks = links.filter((link) => link.url.trim());
       const streamerId = resolveStreamerId(formTarget);
-      const res = await fetch("/api/scheduled-streams", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          streamerId,
-          gameId: null, // não persistimos jogos
-          igdbGameId: !isCustomGame && selectedGame ? selectedGame.id : null,
-          gameTitle: isCustomGame ? customGameTitle : selectedGame?.name,
-          gameImage:
-            !isCustomGame && selectedGame?.cover?.url
-              ? `https:${selectedGame.cover.url}`
-              : undefined,
-          gameSynopsis: !isCustomGame ? selectedGame?.summary : undefined,
-          scheduledDate: `${scheduledDate}T${scheduledTime}:00`,
-          scheduledTime,
-          duration,
-          links: validLinks.length > 0 ? validLinks : undefined,
-          notes: notes.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Erro ao agendar");
+
+      let gameImage: string | null = null;
+      if (!isCustomGame && selectedGame?.cover?.url) {
+        gameImage = `https:${selectedGame.cover.url}`;
+      } else if (isEditing && editingStream?.gameImage) {
+        gameImage = editingStream.gameImage;
       }
 
-      // Limpar formulário
-      setSelectedGame(null);
-      setCustomGameTitle("");
-      setIsCustomGame(false);
-      setScheduledDate("");
-      setScheduledTime("");
-      setDuration("");
-      setLinks([{ url: "", name: "" }]);
-      setNotes("");
+      const payload = {
+        streamerId,
+        gameId: null as string | null,
+        igdbGameId: !isCustomGame && selectedGame ? selectedGame.id : null,
+        gameTitle: isCustomGame ? customGameTitle : selectedGame?.name,
+        gameImage,
+        gameSynopsis: !isCustomGame
+          ? selectedGame?.summary ?? editingStream?.gameSynopsis ?? null
+          : null,
+        scheduledDate: `${scheduledDate}T${scheduledTime}:00`,
+        scheduledTime,
+        duration,
+        links: validLinks.length > 0 ? validLinks : [],
+        notes: notes.trim() || null,
+      };
+
+      const res = isEditing
+        ? await fetch(`/api/scheduled-streams/${editingStream!.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/scheduled-streams", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro ao salvar");
+      }
+
+      if (!isEditing) {
+        resetFormState({
+          setSelectedGame,
+          setIsCustomGame,
+          setCustomGameTitle,
+          setScheduledDate,
+          setScheduledTime,
+          setDuration,
+          setLinks,
+          setNotes,
+        });
+      }
 
       onSuccess();
     } catch (error) {
       console.error("Error submitting schedule:", error);
-      alert("Erro ao agendar stream. Tente novamente.");
+      alert(
+        isEditing
+          ? "Erro ao atualizar a agenda. Tente novamente."
+          : "Erro ao agendar stream. Tente novamente."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +282,6 @@ export const ScheduleForm = ({
         enabledHint="Escolha em qual canal esta agenda será registrada."
       />
 
-      {/* Busca de Jogo */}
       <div className="space-y-2">
         <Label>Jogo</Label>
         {!isCustomGame ? (
@@ -159,6 +291,7 @@ export const ScheduleForm = ({
               <Card className="mt-2 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={
                         selectedGame.cover?.url
@@ -166,12 +299,12 @@ export const ScheduleForm = ({
                           : "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80"
                       }
                       alt={selectedGame.name}
-                      className="w-16 h-20 object-cover rounded"
+                      className="h-20 w-16 rounded object-cover"
                     />
                     <div>
                       <p className="font-semibold">{selectedGame.name}</p>
                       {selectedGame.summary && (
-                        <p className="text-sm text-muted-foreground line-clamp-3 mt-1">
+                        <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
                           {selectedGame.summary}
                         </p>
                       )}
@@ -199,6 +332,7 @@ export const ScheduleForm = ({
               value={customGameTitle}
               onChange={(e) => setCustomGameTitle(e.target.value)}
               required={isCustomGame}
+              className="input-cinematic"
             />
             <Button
               type="button"
@@ -215,7 +349,6 @@ export const ScheduleForm = ({
         )}
       </div>
 
-      {/* Data e Hora */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="date">Data da Stream</Label>
@@ -252,7 +385,6 @@ export const ScheduleForm = ({
         />
       </div>
 
-      {/* Links (opcional) */}
       <div className="space-y-2">
         <Label>Links (Twitch de outros streamers, etc.)</Label>
         {links.map((link, index) => (
@@ -262,12 +394,14 @@ export const ScheduleForm = ({
               placeholder="URL"
               value={link.url}
               onChange={(e) => handleLinkChange(index, "url", e.target.value)}
+              className="input-cinematic"
             />
             <Input
               type="text"
               placeholder="Nome (opcional)"
               value={link.name}
               onChange={(e) => handleLinkChange(index, "name", e.target.value)}
+              className="input-cinematic"
             />
             {links.length > 1 && (
               <Button
@@ -288,12 +422,11 @@ export const ScheduleForm = ({
           onClick={handleAddLink}
           className="w-full"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Adicionar Link
         </Button>
       </div>
 
-      {/* Observações */}
       <div className="space-y-2">
         <Label htmlFor="notes">Observações</Label>
         <Textarea
@@ -302,12 +435,36 @@ export const ScheduleForm = ({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
+          className="input-cinematic"
         />
       </div>
 
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? "Agendando..." : "Agendar Stream"}
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {isEditing && onCancelEdit ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={onCancelEdit}
+            disabled={isSubmitting}
+          >
+            Cancelar edição
+          </Button>
+        ) : null}
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className={isEditing && onCancelEdit ? "flex-1" : "w-full"}
+        >
+          {isSubmitting
+            ? isEditing
+              ? "Salvando..."
+              : "Agendando..."
+            : isEditing
+              ? "Salvar alterações"
+              : "Agendar Stream"}
+        </Button>
+      </div>
     </form>
   );
 };

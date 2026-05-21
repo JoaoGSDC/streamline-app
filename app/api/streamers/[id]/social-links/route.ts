@@ -74,8 +74,10 @@ export async function PUT(
             label: String(l.label ?? "").trim(),
             url: String(l.url ?? "").trim(),
           };
+          const id = String((l as { id?: string }).id ?? "").trim();
           const platformId = String(l.platformId ?? "").trim();
           const iconColor = String(l.iconColor ?? "").trim();
+          if (id) entry.id = id;
           if (platformId) entry.platformId = platformId;
           if (iconColor) entry.iconColor = iconColor;
           return entry;

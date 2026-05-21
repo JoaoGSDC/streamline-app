@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Clock, Trash2 } from "lucide-react";
+import { Calendar, Clock, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,7 @@ function normalizeGameImage(raw?: string | null) {
 interface ScheduledStreamCardProps {
   stream: ScheduledStreamItem;
   onClick: () => void;
+  onEdit: () => void;
   onDelete: (id: string) => void;
   streamerLabel?: string;
   className?: string;
@@ -33,6 +34,7 @@ interface ScheduledStreamCardProps {
 export function ScheduledStreamCard({
   stream,
   onClick,
+  onEdit,
   onDelete,
   streamerLabel,
   className,
@@ -91,18 +93,32 @@ export function ScheduledStreamCard({
           </span>
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="shrink-0 opacity-60 transition-opacity hover:opacity-100"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(stream.id);
-        }}
-        aria-label="Remover stream"
-      >
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="opacity-60 transition-opacity hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          aria-label="Editar stream"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="opacity-60 transition-opacity hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(stream.id);
+          }}
+          aria-label="Remover stream"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
     </article>
   );
 }

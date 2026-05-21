@@ -28,6 +28,7 @@ function parseStreamerRow(row: typeof streamers.$inferSelect) {
         .map((l) => ({
           label: l.label,
           url: l.url,
+          ...(typeof l.id === "string" && l.id ? { id: l.id } : {}),
           ...(typeof l.platformId === "string" && l.platformId
             ? { platformId: l.platformId }
             : {}),
@@ -182,6 +183,7 @@ export async function updateStreamerSocialLinks(
         label: l.label.trim(),
         url: l.url.trim(),
       };
+      if (l.id?.trim()) entry.id = l.id.trim();
       if (l.platformId?.trim()) entry.platformId = l.platformId.trim();
       if (l.iconColor?.trim()) entry.iconColor = l.iconColor.trim();
       return entry;
@@ -224,6 +226,7 @@ export async function updateStreamerLinkPage(
           label: l.label.trim(),
           url: l.url.trim(),
         };
+        if (l.id?.trim()) entry.id = l.id.trim();
         if (l.platformId?.trim()) entry.platformId = l.platformId.trim();
         if (l.iconColor?.trim()) entry.iconColor = l.iconColor.trim();
         return entry;
@@ -384,21 +387,30 @@ export async function deleteScheduledStream(id: string) {
 export async function updateScheduledStream(
   id: string,
   data: {
+    streamerId?: string;
+    gameId?: string | null;
+    igdbGameId?: number | null;
+    gameTitle?: string | null;
+    gameImage?: string | null;
+    gameSynopsis?: string | null;
     scheduledDate?: Date;
     scheduledTime?: string;
     duration?: string;
     links?: Array<{ url: string; name?: string }>;
-    notes?: string;
+    notes?: string | null;
   }
 ) {
+  const { links, ...rest } = data;
   await db
     .update(scheduledStreams)
     .set({
-      ...data,
-      links: data.links ? JSON.stringify(data.links) : undefined,
+      ...rest,
+      ...(links !== undefined ? { links: JSON.stringify(links) } : {}),
       updatedAt: new Date(),
     })
     .where(eq(scheduledStreams.id, id));
+
+  return getScheduledStreamById(id);
 }
 
 // ========== STREAMER GAMES (to_play | playing | finished) ==========

@@ -18,6 +18,7 @@ import type {
   NobleFeaturedItem,
   NobleItemVariant,
   NobleSocialButtonShape,
+  NobleTextAlign,
 } from "@/types/link-page";
 import { createEmptyNobleFeaturedItem } from "@/lib/link-page-noble";
 import { ColorPickerField } from "@/components/admin/shared/ColorPickerField";
@@ -282,6 +283,28 @@ function FeaturedItemEditor({
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Alinhamento do texto</Label>
+        <Select
+          value={item.textAlign ?? "center"}
+          onValueChange={(v) =>
+            onChange({ textAlign: v as NobleTextAlign })
+          }
+        >
+          <SelectTrigger className="input-cinematic h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="left">Esquerda</SelectItem>
+            <SelectItem value="center">Centro</SelectItem>
+            <SelectItem value="right">Direita</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-caption text-muted-foreground">
+          Título e subtítulo do botão principal.
+        </p>
       </div>
 
       <div className="space-y-1.5">

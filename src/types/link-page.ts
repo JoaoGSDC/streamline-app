@@ -15,6 +15,8 @@ export type NobleItemVariant = "featured" | "simple";
 
 export type NobleAccentTone = "blue" | "purple" | "gold";
 
+export type NobleTextAlign = "left" | "center" | "right";
+
 export interface NobleFeaturedItem {
   id: string;
   visible: boolean;
@@ -27,6 +29,8 @@ export interface NobleFeaturedItem {
   variant: NobleItemVariant;
   /** Texto do CTA interno (cards de destaque) */
   cta?: string;
+  /** Alinhamento do título e subtítulo no botão/card */
+  textAlign?: NobleTextAlign;
 }
 
 /** Layout premium inspirado no modelo Fanton Lord */

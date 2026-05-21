@@ -4,6 +4,7 @@ import {
   type NobleFeaturedItem,
   type NobleItemVariant,
   type NobleSocialButtonShape,
+  type NobleTextAlign,
 } from "@/types/link-page";
 
 export function createNobleItemId(): string {
@@ -83,6 +84,11 @@ function sanitizeAccent(a: unknown): NobleAccentTone {
   return "gold";
 }
 
+function sanitizeTextAlign(a: unknown): NobleTextAlign {
+  if (a === "left" || a === "right") return a;
+  return "center";
+}
+
 function sanitizeFeaturedItem(raw: Partial<NobleFeaturedItem>): NobleFeaturedItem {
   return {
     id: String(raw.id || createNobleItemId()),
@@ -95,6 +101,7 @@ function sanitizeFeaturedItem(raw: Partial<NobleFeaturedItem>): NobleFeaturedIte
     accent: sanitizeAccent(raw.accent),
     variant: sanitizeVariant(raw.variant),
     cta: raw.cta ? String(raw.cta).trim() : undefined,
+    textAlign: sanitizeTextAlign(raw.textAlign),
   };
 }
 
@@ -140,5 +147,44 @@ export function createEmptyNobleFeaturedItem(): NobleFeaturedItem {
     imageUrl: "",
     accent: "blue",
     variant: "featured",
+    textAlign: "center",
+  };
+}
+
+export function nobleTextAlignClass(
+  align: NobleTextAlign,
+  prefix: "noble-simple-btn" | "noble-featured-card__body"
+): string {
+  return `${prefix}--align-${align}`;
+}
+
+/** Estilos inline para garantir alinhamento (evita conflito com flex no CSS) */
+export function nobleFeaturedBodyAlignStyle(
+  align: NobleTextAlign,
+  isHighlight: boolean
+): { textAlign: NobleTextAlign; alignItems?: "flex-start" | "center" | "flex-end" } {
+  const textAlign = align;
+  if (!isHighlight) return { textAlign };
+  return {
+    textAlign,
+    alignItems:
+      align === "left"
+        ? "flex-start"
+        : align === "right"
+          ? "flex-end"
+          : "center",
+  };
+}
+
+export function nobleSimpleBtnAlignStyle(align: NobleTextAlign): {
+  justifyContent: "flex-start" | "center" | "flex-end";
+} {
+  return {
+    justifyContent:
+      align === "left"
+        ? "flex-start"
+        : align === "right"
+          ? "flex-end"
+          : "center",
   };
 }

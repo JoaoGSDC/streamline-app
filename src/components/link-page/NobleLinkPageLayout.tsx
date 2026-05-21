@@ -8,7 +8,14 @@ import type {
   NobleFeaturedItem,
 } from "@/types/link-page";
 import type { StreamerSocialLink } from "@/lib/streamer-social";
-import { NOBLE_ACCENT_COLORS, sanitizeNobleLayout } from "@/lib/link-page-noble";
+import {
+  NOBLE_ACCENT_COLORS,
+  nobleFeaturedBodyAlignStyle,
+  nobleSimpleBtnAlignStyle,
+  nobleTextAlignClass,
+  sanitizeNobleLayout,
+} from "@/lib/link-page-noble";
+import type { NobleTextAlign } from "@/types/link-page";
 import { resolveSocialPlatform } from "@/components/admin/links/social-platform";
 import {
   LinkPageBlockView,
@@ -176,18 +183,31 @@ function NobleFeaturedCard({
   const href = url || (preview ? "#" : undefined);
   const colors = NOBLE_ACCENT_COLORS[item.accent];
   const hasImage = Boolean(item.imageUrl.trim());
+  const textAlign: NobleTextAlign = item.textAlign ?? "center";
+  const simpleAlignClass = nobleTextAlignClass(textAlign, "noble-simple-btn");
+  const simpleAlignStyle = nobleSimpleBtnAlignStyle(textAlign);
 
   if (item.variant === "simple") {
+    const textBlock = (
+      <span className="noble-simple-btn__content">
+        <span className="noble-simple-btn__label">{item.title}</span>
+        {item.subtitle ? (
+          <span className="noble-simple-btn__sub">{item.subtitle}</span>
+        ) : null}
+      </span>
+    );
     if (!href) {
       return (
         <div
-          className="noble-simple-btn noble-featured-card--disabled"
+          className={cn(
+            "noble-simple-btn noble-featured-card--disabled",
+            simpleAlignClass
+          )}
+          style={simpleAlignStyle}
+          data-text-align={textAlign}
           aria-disabled
         >
-          <span className="noble-simple-btn__label">{item.title}</span>
-          {item.subtitle ? (
-            <span className="noble-simple-btn__sub">{item.subtitle}</span>
-          ) : null}
+          {textBlock}
         </div>
       );
     }
@@ -196,18 +216,15 @@ function NobleFeaturedCard({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="noble-simple-btn"
+        className={cn("noble-simple-btn", simpleAlignClass)}
         onClick={preview && !url ? (e) => e.preventDefault() : undefined}
         style={{
           borderColor: colors.border,
           boxShadow: `0 0 calc(16px * var(--lp-glow)) ${colors.glow}`,
         }}
       >
-        <span className="noble-simple-btn__label">{item.title}</span>
-        {item.subtitle ? (
-          <span className="noble-simple-btn__sub">{item.subtitle}</span>
-        ) : null}
-        <ExternalLink className="ml-auto h-4 w-4 shrink-0 opacity-60" />
+        {textBlock}
+        <ExternalLink className="noble-simple-btn__icon h-4 w-4 shrink-0 opacity-60" />
       </a>
     );
   }
@@ -220,6 +237,11 @@ function NobleFeaturedCard({
         : "radial-gradient(120% 90% at 70% 8%, rgba(37,99,255,0.5) 0%, transparent 72%)";
 
   const isHighlight = Boolean(item.cta);
+  const bodyAlignStyle = nobleFeaturedBodyAlignStyle(textAlign, isHighlight);
+  const bodyAlignClass = nobleTextAlignClass(
+    textAlign,
+    "noble-featured-card__body"
+  );
   const cardClass = cn(
     "noble-featured-card group",
     isHighlight && "noble-featured-card--highlight",
@@ -272,8 +294,11 @@ function NobleFeaturedCard({
       <div
         className={cn(
           "noble-featured-card__body",
-          isHighlight && "noble-featured-card__body--highlight"
+          isHighlight && "noble-featured-card__body--highlight",
+          bodyAlignClass
         )}
+        style={bodyAlignStyle}
+        data-text-align={textAlign}
       >
         <h3 className="noble-featured-card__title">{item.title}</h3>
         {item.subtitle ? (
@@ -358,6 +383,7 @@ export function NobleLinkPageLayout({
           "--lp-primary": theme.primaryColor,
           "--lp-accent": theme.accentColor,
           "--lp-glow": String(theme.glowIntensity / 100),
+          "--lp-text-align": theme.alignment,
           "--noble-secondary": layout.secondaryColor,
           "--noble-bg": theme.backgroundValue || "#050816",
         } as React.CSSProperties

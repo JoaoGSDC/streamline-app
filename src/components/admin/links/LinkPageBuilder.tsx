@@ -34,22 +34,25 @@ import {
   createDefaultLinkPageBlocks,
   getBlockLabel,
 } from "@/lib/link-page-config";
-import {
-  getDefaultNobleLayout,
-  sanitizeNobleLayout,
-} from "@/lib/link-page-noble";
+import { getDefaultNobleLayout } from "@/lib/link-page-noble";
 import { NobleLayoutEditor } from "@/components/admin/links/NobleLayoutEditor";
 import {
   LINK_PAGE_TEMPLATES,
-  getTemplateTheme,
+  applyTemplateTheme,
 } from "@/lib/link-page-templates";
+import {
+  BACKGROUND_VALUE_HINTS,
+  BACKGROUND_VALUE_LABELS,
+  blockHasPropsEditor,
+  emptySocialLink,
+  ensureSocialLinkIds,
+} from "@/lib/link-builder-utils";
 import { LinkPageRenderer } from "@/components/link-page/LinkPageRenderer";
 import { SocialLinkEditorCard } from "@/components/admin/links/SocialLinkEditorCard";
 import { isValidHttpUrl } from "@/components/admin/links/social-platform";
 import { ColorPickerField } from "@/components/admin/shared/ColorPickerField";
 import type { LinkPageStreamer } from "@/components/link-page/LinkPageBlockView";
 
-const emptyLink = (): StreamerSocialLink => ({ label: "", url: "" });
 
 export interface LinkPageBuilderSaveHandlers {
   save: () => Promise<void>;
@@ -74,35 +77,53 @@ export function LinkPageBuilder({
   onSaveReady,
 }: LinkPageBuilderProps) {
   const { toast } = useToast();
-  const [links, setLinks] = useState<StreamerSocialLink[]>(
-    initialLinks.length > 0 ? initialLinks : [emptyLink()]
+  const [links, setLinks] = useState<StreamerSocialLink[]>(() =>
+    ensureSocialLinkIds(
+      initialLinks.length > 0 ? initialLinks : [emptySocialLink()]
+    )
   );
   const [config, setConfig] = useState<LinkPageConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
+  const [editorTab, setEditorTab] = useState("templates");
+  const [addBlockKey, setAddBlockKey] = useState(0);
 
-  const previewLinks = useMemo(
-    () =>
-      links.filter((l) => l.url.trim() && isValidHttpUrl(l.url.trim())),
-    [links]
-  );
+  const previewLinks = useMemo(() => {
+    const withUrl = links.filter((l) => l.url.trim());
+    const valid = withUrl.filter((l) => isValidHttpUrl(l.url.trim()));
+    if (valid.length > 0) return valid;
+    if (withUrl.length > 0) return withUrl;
+    return [
+      {
+        id: "preview-twitch",
+        label: "Twitch",
+        url: streamer.twitchUrl || `https://twitch.tv/${twitchUsername}`,
+      },
+    ];
+  }, [links, streamer.twitchUrl, twitchUsername]);
 
   const updateTheme = useCallback(
     (patch: Partial<LinkPageConfig["theme"]>) => {
-      setConfig((prev) => ({
-        ...prev,
-        theme: { ...prev.theme, ...patch },
-      }));
+      setConfig((prev) => {
+        const theme = { ...prev.theme, ...patch };
+        const alignment = patch.alignment;
+        const blocks =
+          alignment && prev.blocks.some((b) => b.type === "header")
+            ? prev.blocks.map((b) =>
+                b.type === "header"
+                  ? { ...b, props: { ...b.props, avatarAlign: alignment } }
+                  : b
+              )
+            : prev.blocks;
+        return { ...prev, theme, blocks };
+      });
     },
     []
   );
 
   const isNoble = config.theme.templateId === "noble";
-  const nobleLayout = sanitizeNobleLayout(
-    config.nobleLayout ?? getDefaultNobleLayout()
-  );
 
   const applyTemplate = (templateId: LinkPageTemplateId) => {
     setConfig((prev) => {
@@ -112,7 +133,9 @@ export function LinkPageBuilder({
 
       return {
         ...prev,
-        theme: getTemplateTheme(templateId),
+        pageTitle: prev.pageTitle,
+        pageSubtitle: prev.pageSubtitle,
+        theme: applyTemplateTheme(prev.theme, templateId),
         blocks:
           isNowNoble && !wasNoble
             ? fresh.blocks
@@ -121,11 +144,14 @@ export function LinkPageBuilder({
               : prev.blocks,
         nobleLayout: isNowNoble
           ? wasNoble && prev.nobleLayout
-            ? sanitizeNobleLayout(prev.nobleLayout)
+            ? prev.nobleLayout
             : fresh.nobleLayout
           : undefined,
       };
     });
+    if (templateId === "noble") {
+      setEditorTab("noble");
+    }
   };
 
   const reorderBlocks = (fromId: string, toId: string) => {
@@ -152,7 +178,7 @@ export function LinkPageBuilder({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
 
-      if (data.links?.length) setLinks(data.links);
+      if (data.links?.length) setLinks(ensureSocialLinkIds(data.links));
       if (data.pageConfig) setConfig(data.pageConfig);
 
       toast({
@@ -177,7 +203,11 @@ export function LinkPageBuilder({
   }, [handleSave, saving, onSaveReady]);
 
   const editorPanel = (
-    <Tabs defaultValue="templates" className="w-full max-w-none">
+    <Tabs
+      value={editorTab}
+      onValueChange={setEditorTab}
+      className="w-full max-w-none"
+    >
       <TabsList
         className={cn(
           "mb-4 grid w-full",
@@ -237,8 +267,9 @@ export function LinkPageBuilder({
 
       {isNoble ? (
         <TabsContent value="noble" className="w-full space-y-4">
+          <PageMetaFields config={config} setConfig={setConfig} streamer={streamer} />
           <NobleLayoutEditor
-            layout={nobleLayout}
+            layout={config.nobleLayout ?? getDefaultNobleLayout()}
             onChange={(layout) =>
               setConfig((p) => ({ ...p, nobleLayout: layout }))
             }
@@ -247,28 +278,7 @@ export function LinkPageBuilder({
       ) : null}
 
       <TabsContent value="style" className="w-full space-y-4">
-        <div className="space-y-2">
-          <Label>Título da página</Label>
-          <Input
-            className="input-cinematic"
-            placeholder={streamer.name}
-            value={config.pageTitle ?? ""}
-            onChange={(e) =>
-              setConfig((p) => ({ ...p, pageTitle: e.target.value }))
-            }
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Subtítulo</Label>
-          <Input
-            className="input-cinematic"
-            placeholder="Links e redes sociais"
-            value={config.pageSubtitle ?? ""}
-            onChange={(e) =>
-              setConfig((p) => ({ ...p, pageSubtitle: e.target.value }))
-            }
-          />
-        </div>
+        <PageMetaFields config={config} setConfig={setConfig} streamer={streamer} />
 
         <ColorPickerField
           label="Cor primária"
@@ -281,7 +291,7 @@ export function LinkPageBuilder({
           onChange={(accentColor) => updateTheme({ accentColor })}
         />
 
-        {config.blocks.some((b) => b.type === "header") ? (
+        {!isNoble && config.blocks.some((b) => b.type === "header") ? (
           <div className="space-y-2 rounded-lg border border-outline-variant/30 p-3">
             <Label>Avatar do perfil</Label>
             <Select
@@ -316,7 +326,7 @@ export function LinkPageBuilder({
         ) : null}
 
         <div className="space-y-2">
-          <Label>Intensidade do glow ({config.theme.glowIntensity}%)</Label>
+          <Label>Intensidade do brilho ({config.theme.glowIntensity}%)</Label>
           <Slider
             value={[config.theme.glowIntensity]}
             min={0}
@@ -326,7 +336,7 @@ export function LinkPageBuilder({
           />
         </div>
         <div className="space-y-2">
-          <Label>Blur glass ({config.theme.blurIntensity}%)</Label>
+          <Label>Blur dos cards ({config.theme.blurIntensity}px)</Label>
           <Slider
             value={[config.theme.blurIntensity]}
             min={0}
@@ -430,9 +440,12 @@ export function LinkPageBuilder({
               <SelectItem value="particles">Partículas</SelectItem>
             </SelectContent>
           </Select>
+          <Label className="text-caption text-muted-foreground">
+            {BACKGROUND_VALUE_LABELS[config.theme.backgroundType]}
+          </Label>
           <Input
             className="input-cinematic font-mono text-caption"
-            placeholder="CSS gradient, cor ou URL da imagem"
+            placeholder={BACKGROUND_VALUE_HINTS[config.theme.backgroundType]}
             value={config.theme.backgroundValue}
             onChange={(e) => updateTheme({ backgroundValue: e.target.value })}
           />
@@ -440,17 +453,33 @@ export function LinkPageBuilder({
       </TabsContent>
 
       <TabsContent value="blocks" className="w-full space-y-3">
-        <div className="flex flex-wrap gap-2">
+        {isNoble ? (
+          <p className="rounded-lg border border-outline-variant/30 bg-surface-container-low/30 px-3 py-2 text-caption text-muted-foreground">
+            No template Noble, links e redes vêm das abas{" "}
+            <strong className="text-foreground">Links</strong> e{" "}
+            <strong className="text-foreground">Noble</strong>. Os blocos abaixo
+            são extras (bio, embeds, agenda).
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
           <Select
+            key={addBlockKey}
             onValueChange={(type) => {
               setConfig((p) => ({
                 ...p,
-                blocks: [...p.blocks, createBlockOfType(type as typeof ADDABLE_BLOCK_TYPES[number])],
+                blocks: [
+                  ...p.blocks,
+                  createBlockOfType(
+                    type as (typeof ADDABLE_BLOCK_TYPES)[number]
+                  ),
+                ],
               }));
+              setAddBlockKey((k) => k + 1);
             }}
           >
-            <SelectTrigger className="h-9 w-[10rem] input-cinematic">
-              <SelectValue placeholder="Adicionar bloco" />
+            <SelectTrigger className="h-9 w-full max-w-[14rem] input-cinematic">
+              <SelectValue placeholder="Adicionar bloco…" />
             </SelectTrigger>
             <SelectContent>
               {ADDABLE_BLOCK_TYPES.map((type) => (
@@ -466,93 +495,99 @@ export function LinkPageBuilder({
           {config.blocks.map((block) => (
             <li
               key={block.id}
-              draggable
-              onDragStart={() => setDragId(block.id)}
-              onDragEnd={() => {
-                setDragId(null);
-                setDropTargetId(null);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDropTargetId(block.id);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragId) reorderBlocks(dragId, block.id);
-                setDropTargetId(null);
-              }}
               className={cn(
-                "link-builder-block",
-                dragId === block.id && "link-builder-block--dragging",
-                dropTargetId === block.id &&
-                  dragId !== block.id &&
-                  "link-builder-block--drop-target"
+                "link-builder-block-card",
+                !block.visible && "link-builder-block-card--hidden"
               )}
             >
-              <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-body-sm font-medium">
-                {getBlockLabel(block.type)}
-              </span>
-              <Switch
-                checked={block.visible}
-                onCheckedChange={(checked) =>
-                  setConfig((p) => ({
-                    ...p,
-                    blocks: p.blocks.map((b) =>
-                      b.id === block.id ? { ...b, visible: checked } : b
-                    ),
-                  }))
-                }
-                aria-label={`Exibir ${getBlockLabel(block.type)}`}
-              />
-              {config.blocks.length > 1 && block.type !== "header" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-destructive"
-                  onClick={() =>
+              <div
+                draggable
+                onDragStart={() => setDragId(block.id)}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setDropTargetId(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDropTargetId(block.id);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId) reorderBlocks(dragId, block.id);
+                  setDropTargetId(null);
+                }}
+                className={cn(
+                  "link-builder-block",
+                  dragId === block.id && "link-builder-block--dragging",
+                  dropTargetId === block.id &&
+                    dragId !== block.id &&
+                    "link-builder-block--drop-target"
+                )}
+              >
+                <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="flex-1 text-body-sm font-medium">
+                  {getBlockLabel(block.type)}
+                </span>
+                <Switch
+                  checked={block.visible}
+                  onCheckedChange={(checked) =>
                     setConfig((p) => ({
                       ...p,
-                      blocks: p.blocks.filter((b) => b.id !== block.id),
+                      blocks: p.blocks.map((b) =>
+                        b.id === block.id ? { ...b, visible: checked } : b
+                      ),
                     }))
                   }
-                >
-                  ×
-                </Button>
+                  aria-label={`Exibir ${getBlockLabel(block.type)}`}
+                />
+                {config.blocks.length > 1 && block.type !== "header" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-destructive"
+                    onClick={() =>
+                      setConfig((p) => ({
+                        ...p,
+                        blocks: p.blocks.filter((b) => b.id !== block.id),
+                      }))
+                    }
+                  >
+                    ×
+                  </Button>
+                ) : null}
+              </div>
+              {blockHasPropsEditor(block.type) ? (
+                <div className="link-builder-block-props">
+                  <BlockPropsEditor
+                    block={block}
+                    streamer={streamer}
+                    onChange={(props) =>
+                      setConfig((p) => ({
+                        ...p,
+                        blocks: p.blocks.map((b) =>
+                          b.id === block.id ? { ...b, props } : b
+                        ),
+                      }))
+                    }
+                  />
+                </div>
               ) : null}
             </li>
           ))}
         </ul>
-
-        {config.blocks.some((b) => b.type === "bio" || b.type === "about") ? (
-          <div className="space-y-3 rounded-lg border border-outline-variant/30 p-3">
-            {config.blocks
-              .filter((b) => b.type === "bio" || b.type === "about" || b.type === "cta" || b.type === "banner" || b.type === "donate")
-              .map((block) => (
-                <BlockPropsEditor
-                  key={block.id}
-                  block={block}
-                  streamer={streamer}
-                  onChange={(props) =>
-                    setConfig((p) => ({
-                      ...p,
-                      blocks: p.blocks.map((b) =>
-                        b.id === block.id ? { ...b, props } : b
-                      ),
-                    }))
-                  }
-                />
-              ))}
-          </div>
-        ) : null}
       </TabsContent>
 
       <TabsContent value="links" className="w-full space-y-4">
+        <p className="text-body-sm text-muted-foreground">
+          {isNoble
+            ? "Estes links alimentam os botões redondos no topo e podem ser reutilizados em outros templates."
+            : "Redes e links exibidos nos blocos «Links principais» e «Redes sociais»."}
+        </p>
         <div className="grid gap-4">
           {links.map((link, index) => (
             <SocialLinkEditorCard
-              key={index}
+              key={link.id ?? `link-${index}`}
               link={link}
               index={index}
               onChange={(i, patch) =>
@@ -565,13 +600,17 @@ export function LinkPageBuilder({
               onRemove={(i) =>
                 setLinks((prev) => {
                   const next = prev.filter((_, j) => j !== i);
-                  return next.length > 0 ? next : [emptyLink()];
+                  return next.length > 0 ? next : [emptySocialLink()];
                 })
               }
             />
           ))}
         </div>
-        <Button type="button" variant="outline" onClick={() => setLinks((p) => [...p, emptyLink()])}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setLinks((p) => [...p, emptySocialLink()])}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Adicionar rede
         </Button>
@@ -588,11 +627,7 @@ export function LinkPageBuilder({
         <LinkPageRenderer
           config={config}
           streamer={streamer}
-          links={
-            previewLinks.length > 0
-              ? previewLinks
-              : [{ label: "Twitch", url: streamer.twitchUrl || `https://twitch.tv/${twitchUsername}` }]
-          }
+          links={previewLinks}
           preview
           className="min-h-full"
         />
@@ -636,6 +671,43 @@ export function LinkPageBuilder({
         )}
       >
         {previewPanel}
+      </div>
+    </div>
+  );
+}
+
+function PageMetaFields({
+  config,
+  setConfig,
+  streamer,
+}: {
+  config: LinkPageConfig;
+  setConfig: React.Dispatch<React.SetStateAction<LinkPageConfig>>;
+  streamer: LinkPageStreamer;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-2 sm:col-span-2">
+        <Label>Título da página</Label>
+        <Input
+          className="input-cinematic"
+          placeholder={streamer.name}
+          value={config.pageTitle ?? ""}
+          onChange={(e) =>
+            setConfig((p) => ({ ...p, pageTitle: e.target.value }))
+          }
+        />
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <Label>Subtítulo</Label>
+        <Input
+          className="input-cinematic"
+          placeholder="Links e redes sociais"
+          value={config.pageSubtitle ?? ""}
+          onChange={(e) =>
+            setConfig((p) => ({ ...p, pageSubtitle: e.target.value }))
+          }
+        />
       </div>
     </div>
   );

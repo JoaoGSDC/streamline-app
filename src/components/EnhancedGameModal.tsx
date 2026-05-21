@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink, Calendar, Clock, Users } from "lucide-react";
+import { ExternalLink, Calendar, Clock, Users, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 interface GameModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
   streamData: {
     id: string;
     scheduledDate: Date;
@@ -40,6 +41,7 @@ interface GameModalProps {
 export const EnhancedGameModal = ({
   open,
   onOpenChange,
+  onEdit,
   streamData,
 }: GameModalProps) => {
   const [storeLinks, setStoreLinks] = useState<
@@ -257,6 +259,15 @@ export const EnhancedGameModal = ({
               </div>
             </div>
           )}
+
+          {onEdit ? (
+            <div className="flex justify-end border-t border-outline-variant/25 pt-4">
+              <Button type="button" onClick={onEdit}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Editar agenda
+              </Button>
+            </div>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

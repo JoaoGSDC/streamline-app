@@ -102,6 +102,82 @@ function StreamerGameMetaSection({ game }: { game: GameWithStreamerMeta }) {
   );
 }
 
+type AgendaScheduleGame = GameWithStreamerMeta & {
+  scheduledAt: number;
+};
+
+function isAgendaScheduleItem(
+  game: GameWithStreamerMeta
+): game is AgendaScheduleGame {
+  return (
+    !game.status &&
+    typeof (game as AgendaScheduleGame).scheduledAt === "number" &&
+    Number.isFinite((game as AgendaScheduleGame).scheduledAt)
+  );
+}
+
+/** Destaque da agenda — data, horário, duração e observações (somente /[slug] agenda) */
+function StreamerAgendaHighlightPanel({ game }: { game: AgendaScheduleGame }) {
+  const scheduleDate = new Date(game.scheduledAt);
+  const dateLabel = scheduleDate.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeLabel = game.scheduledTime?.trim();
+  const duration = game.duration?.trim();
+  const notes = game.notes?.trim();
+
+  return (
+    <section className="glass-panel space-y-4 rounded-lg border border-outline-variant/40 p-4">
+      <h3 className="font-headline text-body-sm font-semibold text-foreground">
+        Detalhes da stream
+      </h3>
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <dt className="text-caption font-medium text-muted-foreground">
+            Data
+          </dt>
+          <dd className="text-body-sm font-medium text-foreground">
+            {dateLabel}
+          </dd>
+        </div>
+        {timeLabel ? (
+          <div>
+            <dt className="flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
+              <Calendar className="h-3.5 w-3.5" aria-hidden />
+              Horário
+            </dt>
+            <dd className="text-body-sm font-medium text-foreground">
+              {timeLabel}
+            </dd>
+          </div>
+        ) : null}
+        {duration ? (
+          <div>
+            <dt className="flex items-center gap-1.5 text-caption font-medium text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" aria-hidden />
+              Duração
+            </dt>
+            <dd className="text-body-sm font-medium text-foreground">
+              {duration}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      {notes ? (
+        <div className="border-t border-outline-variant/25 pt-3">
+          <h4 className="mb-1 text-caption font-medium text-muted-foreground">
+            Observações do streamer
+          </h4>
+          <p className="text-body-sm leading-relaxed text-foreground">{notes}</p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export const GameModal = memo(
   ({ open, onOpenChange, game }: GameModalProps) => {
     const [storeLinks, setStoreLinks] = useState<
@@ -174,7 +250,7 @@ export const GameModal = memo(
       return url || fallback;
     })();
 
-    const hasSchedule = Boolean(game.scheduledTime || game.duration);
+    const isAgenda = isAgendaScheduleItem(game);
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -207,30 +283,11 @@ export const GameModal = memo(
               <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
             </div>
 
-            {game.status ? <StreamerGameMetaSection game={game} /> : null}
-
-            {hasSchedule && (
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {game.scheduledTime && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4 text-accent" />
-                    <div>
-                      <p className="font-semibold text-foreground">Horário</p>
-                      <p>{game.scheduledTime}</p>
-                    </div>
-                  </div>
-                )}
-                {game.duration && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="h-4 w-4 text-accent" />
-                    <div>
-                      <p className="font-semibold text-foreground">Duração</p>
-                      <p>{game.duration}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {isAgenda ? (
+              <StreamerAgendaHighlightPanel game={game} />
+            ) : game.status ? (
+              <StreamerGameMetaSection game={game} />
+            ) : null}
 
             {game.genre && game.genre.length > 0 && (
               <div className="flex flex-wrap gap-2">
