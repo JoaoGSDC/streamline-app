@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TabsContent } from "@/components/ui/tabs";
 import { StreamerGamesTab } from "@/components/streamer-profile/StreamerGamesTab";
 import { useStreamerProfile } from "@/contexts/StreamerProfileContext";
+import { services } from "@services";
 
 export function StreamerGamesPanel() {
   const {
@@ -49,19 +50,17 @@ export function StreamerGamesPanel() {
     const t = setTimeout(async () => {
       try {
         setGamesFetching(true);
-        const params = new URLSearchParams({ streamerId: streamer.id });
-        const q = gamesQuery.trim();
-        const status = statusFilter !== "all" ? statusFilter : "";
-        if (q) params.set("q", q);
-        if (status) params.set("status", status);
-        if (finishedYear && finishedYear !== "all") {
-          params.set("finishedYear", finishedYear);
-        }
-        const res = await fetch(`/api/streamer-games?${params.toString()}`, {
-          signal: controller.signal,
+        const loadedGames = await services.streamerGames.findAll.byParams({
+          streamerId: streamer.id,
+          q: gamesQuery.trim() || undefined,
+          status:
+            statusFilter !== "all"
+              ? (statusFilter as "to_play" | "playing" | "finished" | "dropped")
+              : undefined,
+          finishedYear:
+            finishedYear && finishedYear !== "all" ? finishedYear : undefined,
         });
-        const data = await res.json();
-        if (Array.isArray(data)) setStreamerGames(data);
+        setStreamerGames(loadedGames);
       } catch {
         /* ignore aborts */
       } finally {

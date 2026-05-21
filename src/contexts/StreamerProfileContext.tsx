@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { services } from "@services";
 
 export type StreamerProfileData = {
   id: string;
@@ -145,25 +146,17 @@ export function StreamerProfileProvider({ children }: { children: ReactNode }) {
         let premium = false;
 
         try {
-          const syncRes = await fetch("/api/streamers/sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: apiStreamer.id,
-              twitchId: apiStreamer.id,
-              name: apiStreamer.display_name || apiStreamer.login,
-              twitchUsername: apiStreamer.login,
-              avatar: apiStreamer.profile_image_url,
-              bio: apiStreamer.description || "",
-              twitchUrl: `https://twitch.tv/${apiStreamer.login}`,
-              followers: "",
-            }),
+          const flags = await services.streamers.sync({
+            twitchId: apiStreamer.id,
+            twitchUsername: apiStreamer.login,
+            name: apiStreamer.display_name || apiStreamer.login,
+            avatar: apiStreamer.profile_image_url,
+            bio: apiStreamer.description || "",
+            twitchUrl: `https://twitch.tv/${apiStreamer.login}`,
+            followers: "",
           });
-          if (syncRes.ok) {
-            const flags = await syncRes.json();
-            partner = Boolean(flags.partner);
-            premium = Boolean(flags.premium);
-          }
+          partner = Boolean(flags.partner);
+          premium = Boolean(flags.premium);
         } catch {
           /* ignore */
         }
@@ -186,19 +179,18 @@ export function StreamerProfileProvider({ children }: { children: ReactNode }) {
         setStreamer(normalizedStreamer);
 
         const [streams, sgdata] = await Promise.allSettled([
-          fetch(`/api/scheduled-streams?streamerId=${normalizedStreamer.id}`).then(
-            (r) => r.json()
-          ),
-          fetch(`/api/streamer-games?streamerId=${normalizedStreamer.id}`).then(
-            (r) => r.json()
-          ),
+          services.scheduledStreams.findAll.byStreamerId(normalizedStreamer.id),
+          services.streamerGames.findAll.byParams({
+            streamerId: normalizedStreamer.id,
+          }),
         ]);
 
         if (cancelled) return;
 
         if (streams.status === "fulfilled") {
-          const baseMapped = (Array.isArray(streams.value) ? streams.value : []).map(
-            (s: Record<string, unknown>) => {
+          const streamRecords = Array.isArray(streams.value) ? streams.value : [];
+          const baseMapped = streamRecords.map((streamRecord) => {
+              const s = streamRecord as unknown as Record<string, unknown>;
               const game = s.game as Record<string, unknown> | undefined;
               const igdbId =
                 (game?.igdbId as number) ||
@@ -240,8 +232,7 @@ export function StreamerProfileProvider({ children }: { children: ReactNode }) {
                 igdbId,
                 raw: s,
               } satisfies ScheduledGameItem;
-            }
-          );
+            });
           setScheduleGames(
             baseMapped.sort((a, b) => a.scheduledAt - b.scheduledAt)
           );

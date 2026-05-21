@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLinkPageBuilder } from "@features/links/components/link-page-builder/link-page-builder.hook";
 import {
   Eye,
   GripVertical,
@@ -23,50 +23,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { LinkPageConfig, LinkPageTemplateId } from "@/types/link-page";
-import type { StreamerSocialLink } from "@/lib/streamer-social";
+import type { LinkPageConfig } from "@/types/link-page";
 import {
   ADDABLE_BLOCK_TYPES,
-  createBlockOfType,
-  createConfigFromTemplate,
-  createDefaultLinkPageBlocks,
   getBlockLabel,
 } from "@/lib/link-page-config";
-import { getDefaultNobleLayout } from "@/lib/link-page-noble";
 import { NobleLayoutEditor } from "@/components/admin/links/NobleLayoutEditor";
-import {
-  LINK_PAGE_TEMPLATES,
-  applyTemplateTheme,
-} from "@/lib/link-page-templates";
 import {
   BACKGROUND_VALUE_HINTS,
   BACKGROUND_VALUE_LABELS,
   blockHasPropsEditor,
-  emptySocialLink,
-  ensureSocialLinkIds,
 } from "@/lib/link-builder-utils";
 import { LinkPageRenderer } from "@/components/link-page/LinkPageRenderer";
 import { SocialLinkEditorCard } from "@/components/admin/links/SocialLinkEditorCard";
-import { isValidHttpUrl } from "@/components/admin/links/social-platform";
 import { ColorPickerField } from "@/components/admin/shared/ColorPickerField";
 import type { LinkPageStreamer } from "@/components/link-page/LinkPageBlockView";
+import {
+  LINK_PAGE_TEMPLATES,
+} from "@/lib/link-page-templates";
+import type {
+  LinkPageBuilderProps,
+  LinkPageBuilderSaveHandlers,
+} from "@features/links/types/links.types";
 
-
-export interface LinkPageBuilderSaveHandlers {
-  save: () => Promise<void>;
-  saving: boolean;
-}
-
-interface LinkPageBuilderProps {
-  streamerId: string;
-  twitchUsername: string;
-  streamer: LinkPageStreamer;
-  initialLinks: StreamerSocialLink[];
-  initialConfig: LinkPageConfig;
-  onSaveReady?: (handlers: LinkPageBuilderSaveHandlers | null) => void;
-}
+export type { LinkPageBuilderSaveHandlers };
 
 export function LinkPageBuilder({
   streamerId,
@@ -76,131 +57,36 @@ export function LinkPageBuilder({
   initialConfig,
   onSaveReady,
 }: LinkPageBuilderProps) {
-  const { toast } = useToast();
-  const [links, setLinks] = useState<StreamerSocialLink[]>(() =>
-    ensureSocialLinkIds(
-      initialLinks.length > 0 ? initialLinks : [emptySocialLink()]
-    )
-  );
-  const [config, setConfig] = useState<LinkPageConfig>(initialConfig);
-  const [saving, setSaving] = useState(false);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
-  const [editorTab, setEditorTab] = useState("templates");
-  const [addBlockKey, setAddBlockKey] = useState(0);
-
-  const previewLinks = useMemo(() => {
-    const withUrl = links.filter((l) => l.url.trim());
-    const valid = withUrl.filter((l) => isValidHttpUrl(l.url.trim()));
-    if (valid.length > 0) return valid;
-    if (withUrl.length > 0) return withUrl;
-    return [
-      {
-        id: "preview-twitch",
-        label: "Twitch",
-        url: streamer.twitchUrl || `https://twitch.tv/${twitchUsername}`,
-      },
-    ];
-  }, [links, streamer.twitchUrl, twitchUsername]);
-
-  const updateTheme = useCallback(
-    (patch: Partial<LinkPageConfig["theme"]>) => {
-      setConfig((prev) => {
-        const theme = { ...prev.theme, ...patch };
-        const alignment = patch.alignment;
-        const blocks =
-          alignment && prev.blocks.some((b) => b.type === "header")
-            ? prev.blocks.map((b) =>
-                b.type === "header"
-                  ? { ...b, props: { ...b.props, avatarAlign: alignment } }
-                  : b
-              )
-            : prev.blocks;
-        return { ...prev, theme, blocks };
-      });
-    },
-    []
-  );
-
-  const isNoble = config.theme.templateId === "noble";
-
-  const applyTemplate = (templateId: LinkPageTemplateId) => {
-    setConfig((prev) => {
-      const fresh = createConfigFromTemplate(templateId);
-      const wasNoble = prev.theme.templateId === "noble";
-      const isNowNoble = templateId === "noble";
-
-      return {
-        ...prev,
-        pageTitle: prev.pageTitle,
-        pageSubtitle: prev.pageSubtitle,
-        theme: applyTemplateTheme(prev.theme, templateId),
-        blocks:
-          isNowNoble && !wasNoble
-            ? fresh.blocks
-            : !isNowNoble && wasNoble
-              ? createDefaultLinkPageBlocks()
-              : prev.blocks,
-        nobleLayout: isNowNoble
-          ? wasNoble && prev.nobleLayout
-            ? prev.nobleLayout
-            : fresh.nobleLayout
-          : undefined,
-      };
-    });
-    if (templateId === "noble") {
-      setEditorTab("noble");
-    }
-  };
-
-  const reorderBlocks = (fromId: string, toId: string) => {
-    if (fromId === toId) return;
-    setConfig((prev) => {
-      const blocks = [...prev.blocks];
-      const fromIdx = blocks.findIndex((b) => b.id === fromId);
-      const toIdx = blocks.findIndex((b) => b.id === toId);
-      if (fromIdx < 0 || toIdx < 0) return prev;
-      const [moved] = blocks.splice(fromIdx, 1);
-      blocks.splice(toIdx, 0, moved);
-      return { ...prev, blocks };
-    });
-  };
-
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/streamers/${streamerId}/social-links`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ links, pageConfig: config }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
-
-      if (data.links?.length) setLinks(ensureSocialLinkIds(data.links));
-      if (data.pageConfig) setConfig(data.pageConfig);
-
-      toast({
-        title: "Página salva",
-        description: "Sua vitrine de links foi atualizada.",
-      });
-    } catch (e) {
-      toast({
-        title: "Erro ao salvar",
-        description:
-          e instanceof Error ? e.message : "Não foi possível salvar.",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }, [streamerId, links, config, toast]);
-
-  useEffect(() => {
-    onSaveReady?.({ save: handleSave, saving });
-    return () => onSaveReady?.(null);
-  }, [handleSave, saving, onSaveReady]);
+  const {
+    links,
+    setLinks,
+    config,
+    setConfig,
+    dragId,
+    setDragId,
+    dropTargetId,
+    setDropTargetId,
+    mobileView,
+    setMobileView,
+    editorTab,
+    setEditorTab,
+    addBlockKey,
+    previewLinks,
+    isNoble,
+    updateTheme,
+    applyTemplate,
+    reorderBlocks,
+    addBlock,
+    emptySocialLink,
+    getDefaultNobleLayout,
+  } = useLinkPageBuilder({
+    streamerId,
+    twitchUsername,
+    streamer,
+    initialLinks,
+    initialConfig,
+    onSaveReady,
+  });
 
   const editorPanel = (
     <Tabs
@@ -465,18 +351,7 @@ export function LinkPageBuilder({
         <div className="flex flex-wrap items-center gap-2">
           <Select
             key={addBlockKey}
-            onValueChange={(type) => {
-              setConfig((p) => ({
-                ...p,
-                blocks: [
-                  ...p.blocks,
-                  createBlockOfType(
-                    type as (typeof ADDABLE_BLOCK_TYPES)[number]
-                  ),
-                ],
-              }));
-              setAddBlockKey((k) => k + 1);
-            }}
+            onValueChange={(type) => addBlock(type)}
           >
             <SelectTrigger className="h-9 w-full max-w-[14rem] input-cinematic">
               <SelectValue placeholder="Adicionar bloco…" />

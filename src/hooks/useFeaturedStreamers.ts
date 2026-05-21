@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { services } from "@services";
 import type { FeaturedStreamersResponse } from "@/types/landing";
 
 export function useFeaturedStreamers() {
@@ -16,11 +17,7 @@ export function useFeaturedStreamers() {
 
     (async () => {
       try {
-        const res = await fetch("/api/streamers/public/featured", {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("fetch failed");
-        const json = (await res.json()) as FeaturedStreamersResponse;
+        const json = await services.streamers.featured.findAll();
         if (!cancelled) {
           setData({
             partners: Array.isArray(json.partners) ? json.partners : [],
