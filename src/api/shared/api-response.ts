@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { HttpError, isHttpError } from "@server/utils/http-error";
 
-export function jsonSuccess<T>(payload: T, status = 200): NextResponse {
-  return NextResponse.json(payload, { status });
+export function jsonSuccess<T>(
+  payload: T,
+  status = 200,
+  headers?: HeadersInit
+): NextResponse {
+  return NextResponse.json(payload, { status, headers });
 }
 
 export function jsonError(

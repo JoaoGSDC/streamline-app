@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   CalendarPlus,
   Gamepad2,
   Home,
@@ -57,6 +58,12 @@ export function AdminSidebar({
   const navItems = isOwner
     ? [
         ...baseNavItems,
+        {
+          href: "/admin/bot",
+          label: "Bot",
+          icon: Bot,
+          match: (path: string) => path.startsWith("/admin/bot"),
+        },
         {
           href: "/admin/moderators",
           label: "Moderadores",

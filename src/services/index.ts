@@ -6,6 +6,10 @@ import { scheduledStreams } from "./entities/scheduled-streams.services";
 import { streamerGames } from "./entities/streamer-games.services";
 import { twitch } from "./entities/twitch.services";
 import { streamers } from "./entities/streamers.services";
+import { botCommands } from "./entities/bot-commands.services";
+import { botTimers } from "./entities/bot-timers.services";
+import { botBlacklist } from "./entities/bot-blacklist.services";
+import { botStatus } from "./entities/bot-status.services";
 import {
   GameService,
   ScheduledStreamService,
@@ -34,6 +38,10 @@ export const services = {
   games,
   socialLinks,
   streamers,
+  botCommands,
+  botTimers,
+  botBlacklist,
+  botStatus,
   gamesLegacy: GameService,
   scheduledStreamsLegacy: ScheduledStreamService,
 } as const;

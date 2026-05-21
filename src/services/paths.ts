@@ -32,6 +32,20 @@ export const ENDPOINTS = {
     StreamerModerators: (streamerId: string) =>
       `/api/internal/streamers/${streamerId}/moderators`,
     AdminChannels: "/api/internal/admin/channels",
+    Bot: {
+      Commands: "/api/internal/bot/commands",
+      CommandById: (id: string) => `/api/internal/bot/commands/${id}`,
+      Timers: "/api/internal/bot/timers",
+      TimerById: (id: string) => `/api/internal/bot/timers/${id}`,
+      Blacklist: "/api/internal/bot/blacklist",
+      BlacklistById: (id: string) => `/api/internal/bot/blacklist/${id}`,
+      Variables: "/api/internal/bot/variables",
+      Status: "/api/internal/bot/status",
+      InternalConfig: (streamerId: string) =>
+        `/api/internal/bot/internal/channels/${streamerId}/config`,
+      InternalCommands: (streamerId: string) =>
+        `/api/internal/bot/internal/channels/${streamerId}/commands`,
+    },
   },
   Auth: {
     TwitchCallback: "/api/auth/twitch/callback",

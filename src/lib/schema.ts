@@ -86,3 +86,58 @@ export const streamerModerators = sqliteTable("streamer_moderators", {
   moderatorUsername: text("moderator_username").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
+
+/** Versão monotônica da config do bot por canal (sync com serviço Bot) */
+export const botChannelConfig = sqliteTable("bot_channel_config", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  configVersion: integer("config_version").notNull().default(1),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Comandos personalizados do chat Twitch */
+export const botCommands = sqliteTable("bot_commands", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  trigger: text("trigger").notNull(),
+  response: text("response").notNull(),
+  cooldownSeconds: integer("cooldown_seconds").notNull().default(0),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Timers automáticos de mensagens no chat */
+export const botTimers = sqliteTable("bot_timers", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  name: text("name"),
+  intervalMinutes: integer("interval_minutes").notNull(),
+  message: text("message").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Blacklist de termos para moderação simples */
+export const botBlacklistTerms = sqliteTable("bot_blacklist_terms", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  term: text("term").notNull(),
+  matchType: text("match_type").notNull().default("contains"),
+  action: text("action").notNull().default("delete"),
+  timeoutSeconds: integer("timeout_seconds"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
