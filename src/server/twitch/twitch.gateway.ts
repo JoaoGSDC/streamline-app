@@ -1,8 +1,10 @@
 import {
+  fetchChannelEmotes,
   fetchLiveStreamsByLogins,
   fetchSearchChannels,
   fetchUserByLogin,
 } from "./twitch.client";
+import type { TwitchEmoteDto } from "./twitch-emotes.types";
 import {
   createOfflineLiveStatus,
   mapHelixChannelToDto,
@@ -55,5 +57,21 @@ export const twitchGateway = {
     }
 
     return statusMap;
+  },
+
+  getChannelEmotesByBroadcasterId: async (
+    broadcasterId: string
+  ): Promise<TwitchEmoteDto[]> => {
+    if (!broadcasterId.trim()) return [];
+    const raw = await fetchChannelEmotes(broadcasterId);
+    return raw.map((emote) => ({
+      id: emote.id,
+      name: emote.name,
+      imageUrl1x: emote.images.url_1x,
+      imageUrl2x: emote.images.url_2x,
+      imageUrl4x: emote.images.url_4x,
+      emoteType: emote.emote_type ?? "channel",
+      code: emote.name,
+    }));
   },
 };

@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BotSubNav } from "@/components/admin/bot/BotSubNav";
 import { useAdminContext } from "@/components/admin/AdminProvider";
+import { BotActivationProvider } from "@features/bot/context/BotActivationContext";
+import { BotActivationPanel } from "@features/bot/components/BotActivationPanel";
+import { BotModuleGate } from "@features/bot/components/BotModuleGate";
 
 export default function BotModuleLayout({
   children,
@@ -26,9 +29,12 @@ export default function BotModuleLayout({
   }
 
   return (
-    <div>
-      <BotSubNav />
-      {children}
-    </div>
+    <BotActivationProvider>
+      <div className="space-y-6">
+        <BotActivationPanel />
+        <BotSubNav />
+        <BotModuleGate>{children}</BotModuleGate>
+      </div>
+    </BotActivationProvider>
   );
 }

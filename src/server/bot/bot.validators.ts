@@ -71,12 +71,18 @@ export const updateBotBlacklistSchema = refineBlacklistTimeout(
   botBlacklistBaseSchema.partial()
 );
 
-export const BOT_VARIABLES = [
-  { key: "{user}", description: "Login do usuário que acionou o comando" },
-  { key: "{displayName}", description: "Nome exibido no chat" },
-  { key: "{channel}", description: "Nome do canal Twitch" },
-  {
-    key: "{count:<nome>}",
-    description: "Valor de um contador (ex.: {count:vitorias})",
-  },
-] as const;
+const updateBotBuiltinCommandBaseSchema = z.object({
+  response: z
+    .string()
+    .min(1, "Resposta é obrigatória")
+    .max(500, "Resposta deve ter no máximo 500 caracteres"),
+  enabled: z.boolean().optional(),
+});
+
+export const updateBotBuiltinCommandSchema = updateBotBuiltinCommandBaseSchema
+  .partial()
+  .refine(
+    (data) =>
+      data.response !== undefined || data.enabled !== undefined,
+    { message: "Informe ao menos um campo para atualizar" }
+  );

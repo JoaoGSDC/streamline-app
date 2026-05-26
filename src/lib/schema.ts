@@ -87,6 +87,17 @@ export const streamerModerators = sqliteTable("streamer_moderators", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+/** Streamers com o bot StreaminHub ativo no chat Twitch */
+export const botActiveChannels = sqliteTable("bot_active_channels", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  twitchUsername: text("twitch_username").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  deactivatedAt: integer("deactivated_at", { mode: "timestamp" }),
+});
+
 /** Versão monotônica da config do bot por canal (sync com serviço Bot) */
 export const botChannelConfig = sqliteTable("bot_channel_config", {
   streamerId: text("streamer_id")
@@ -106,6 +117,8 @@ export const botCommands = sqliteTable("bot_commands", {
   response: text("response").notNull(),
   cooldownSeconds: integer("cooldown_seconds").notNull().default(0),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  /** Chave fixa para comandos padrão (discord, redes, …) — não removíveis */
+  builtinKey: text("builtin_key"),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),

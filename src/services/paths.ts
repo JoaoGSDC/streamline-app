@@ -33,6 +33,7 @@ export const ENDPOINTS = {
       `/api/internal/streamers/${streamerId}/moderators`,
     AdminChannels: "/api/internal/admin/channels",
     Bot: {
+      Activation: "/api/internal/bot/activation",
       Commands: "/api/internal/bot/commands",
       CommandById: (id: string) => `/api/internal/bot/commands/${id}`,
       Timers: "/api/internal/bot/timers",
@@ -40,7 +41,9 @@ export const ENDPOINTS = {
       Blacklist: "/api/internal/bot/blacklist",
       BlacklistById: (id: string) => `/api/internal/bot/blacklist/${id}`,
       Variables: "/api/internal/bot/variables",
+      Emotes: "/api/internal/bot/emotes",
       Status: "/api/internal/bot/status",
+      InternalActiveChannels: "/api/internal/bot/internal/active-channels",
       InternalConfig: (streamerId: string) =>
         `/api/internal/bot/internal/channels/${streamerId}/config`,
       InternalCommands: (streamerId: string) =>

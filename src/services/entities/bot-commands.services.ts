@@ -8,6 +8,8 @@ export interface BotCommandRecord {
   response: string;
   cooldownSeconds: number;
   enabled: boolean;
+  isBuiltin?: boolean;
+  builtinKey?: string | null;
   updatedAt: string | Date;
   createdAt?: string | Date;
   configVersion?: number;

@@ -2,6 +2,7 @@ import { httpClient } from "@services/axios";
 import { ENDPOINTS } from "@services/paths";
 
 export interface BotStatusResponse {
+  botActive: boolean;
   botServiceStatus: "online" | "offline" | "degraded";
   channelConnectionStatus: "online" | "offline" | "reconnecting";
   lastSyncAt: string | null;

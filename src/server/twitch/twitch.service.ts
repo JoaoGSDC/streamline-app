@@ -1,4 +1,5 @@
 import { twitchGateway } from "./twitch.gateway";
+import type { TwitchEmoteDto } from "./twitch-emotes.types";
 import type {
   TwitchChannelDto,
   TwitchLiveStatusDto,
@@ -23,5 +24,11 @@ export const twitchServerService = {
     logins: string[]
   ): Promise<Map<string, TwitchLiveStatusDto>> => {
     return twitchGateway.getLiveStatusByLogins(logins);
+  },
+
+  getChannelEmotes: async (
+    broadcasterId: string
+  ): Promise<TwitchEmoteDto[]> => {
+    return twitchGateway.getChannelEmotesByBroadcasterId(broadcasterId);
   },
 };

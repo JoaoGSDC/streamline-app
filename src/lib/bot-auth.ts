@@ -4,8 +4,10 @@ import {
   resolveActingStreamerId,
   type SessionUser,
 } from "@lib/admin-auth";
+import { isBotChannelActive } from "@lib/bot-db-queries";
 
 export const BOT_ACCESS_OWNER_ONLY = "BOT_ACCESS_OWNER_ONLY";
+export const BOT_CHANNEL_NOT_ACTIVE = "BOT_CHANNEL_NOT_ACTIVE";
 
 export async function resolveBotOwnerStreamerId(
   request: NextRequest,
@@ -28,6 +30,38 @@ export async function resolveBotOwnerStreamerId(
   }
 
   return { streamerId: resolved.streamerId, user: resolved.user };
+}
+
+export async function resolveActiveBotOwnerStreamerId(
+  request: NextRequest,
+  bodyStreamerId?: string | null
+): Promise<
+  | { streamerId: string; user: SessionUser }
+  | { error: string; status: number; code?: string }
+> {
+  const resolved = await resolveBotOwnerStreamerId(request, bodyStreamerId);
+  if ("error" in resolved) {
+    return resolved;
+  }
+
+  const active = await isBotChannelActive(resolved.streamerId);
+  if (!active) {
+    return {
+      error: "Ative o bot no seu canal antes de usar esta funcionalidade.",
+      status: 403,
+      code: BOT_CHANNEL_NOT_ACTIVE,
+    };
+  }
+
+  return resolved;
+}
+
+export function getTwitchBotUsername(): string {
+  return (
+    process.env.TWITCH_BOT_USERNAME?.trim() ||
+    process.env.NEXT_PUBLIC_TWITCH_BOT_USERNAME?.trim() ||
+    "streaminhubbot"
+  );
 }
 
 export function assertBotServiceToken(request: NextRequest): boolean {

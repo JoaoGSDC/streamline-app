@@ -76,6 +76,17 @@ const STREAMER_MODERATORS_TABLE = `
   );
 `;
 
+const BOT_ACTIVE_CHANNELS_TABLE = `
+  CREATE TABLE IF NOT EXISTS bot_active_channels (
+    streamer_id TEXT PRIMARY KEY,
+    twitch_username TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deactivated_at INTEGER,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
 const BOT_CHANNEL_CONFIG_TABLE = `
   CREATE TABLE IF NOT EXISTS bot_channel_config (
     streamer_id TEXT PRIMARY KEY,
@@ -93,6 +104,7 @@ const BOT_COMMANDS_TABLE = `
     response TEXT NOT NULL,
     cooldown_seconds INTEGER NOT NULL DEFAULT 0,
     enabled INTEGER NOT NULL DEFAULT 1,
+    builtin_key TEXT,
     deleted_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -159,12 +171,19 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     /* tabela já existe ou ambiente remoto */
   }
 
+  try {
+    await execute(BOT_ACTIVE_CHANNELS_TABLE);
+  } catch {
+    /* tabela já existe ou ambiente remoto */
+  }
+
   const migrations = [
     `ALTER TABLE streamers ADD COLUMN social_links TEXT`,
     `ALTER TABLE streamers ADD COLUMN partner INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE streamers ADD COLUMN premium INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE streamers ADD COLUMN link_page_config TEXT`,
     `ALTER TABLE streamer_games ADD COLUMN rating REAL`,
+    `ALTER TABLE bot_commands ADD COLUMN builtin_key TEXT`,
   ];
 
   for (const sql of migrations) {
@@ -224,7 +243,7 @@ export async function initializeDatabase() {
     }
 
     await serviceClient.executeMultiple(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
     );
   } else {
     const dbPath = dbUrl.startsWith("file:")
@@ -243,7 +262,7 @@ export async function initializeDatabase() {
     });
 
     sqlite.exec(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
     );
 
     console.log("Local SQLite database initialized ✅");

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { resolveBotOwnerStreamerId } from "@lib/bot-auth";
+import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
 import {
   getBotTimerById,
   softDeleteBotTimer,
@@ -21,7 +21,7 @@ export async function patchBotTimerController(
   context: RouteContext
 ) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -63,7 +63,7 @@ export async function deleteBotTimerController(
   context: RouteContext
 ) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }

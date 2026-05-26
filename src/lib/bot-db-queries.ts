@@ -1,6 +1,8 @@
 import { and, eq, isNull, like, ne } from "drizzle-orm";
+import { BOT_BUILTIN_COMMANDS } from "@server/bot/bot-builtin-commands";
 import { db } from "./db";
 import {
+  botActiveChannels,
   botBlacklistTerms,
   botChannelConfig,
   botCommands,
@@ -55,6 +57,7 @@ export async function touchBotConfig(streamerId: string): Promise<number> {
 }
 
 function mapCommandRow(row: typeof botCommands.$inferSelect) {
+  const builtinKey = row.builtinKey ?? null;
   return {
     id: row.id,
     streamerId: row.streamerId,
@@ -62,15 +65,58 @@ function mapCommandRow(row: typeof botCommands.$inferSelect) {
     response: row.response,
     cooldownSeconds: row.cooldownSeconds,
     enabled: Boolean(row.enabled),
+    builtinKey,
+    isBuiltin: Boolean(builtinKey),
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
   };
+}
+
+export async function ensureBuiltinBotCommands(streamerId: string) {
+  const now = new Date();
+
+  for (const builtin of BOT_BUILTIN_COMMANDS) {
+    const existing = await db
+      .select()
+      .from(botCommands)
+      .where(
+        and(
+          eq(botCommands.streamerId, streamerId),
+          eq(botCommands.builtinKey, builtin.key)
+        )
+      )
+      .limit(1);
+
+    if (existing[0]) continue;
+
+    await db.insert(botCommands).values({
+      id: `builtin-${builtin.key}-${streamerId}`,
+      streamerId,
+      trigger: builtin.trigger,
+      response: builtin.defaultResponse,
+      cooldownSeconds: builtin.defaultCooldownSeconds,
+      enabled: true,
+      builtinKey: builtin.key,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  await touchBotConfig(streamerId);
+}
+
+export function isBuiltinBotCommand(
+  command: { builtinKey?: string | null } | null
+): boolean {
+  return Boolean(command?.builtinKey);
 }
 
 export async function listBotCommands(
   streamerId: string,
   options?: { search?: string; page?: number; limit?: number }
 ) {
+  await ensureBuiltinBotCommands(streamerId);
+
   const page = Math.max(1, options?.page ?? 1);
   const limit = Math.min(100, Math.max(1, options?.limit ?? 50));
   const offset = (page - 1) * limit;
@@ -90,9 +136,10 @@ export async function listBotCommands(
     .from(botCommands)
     .where(and(...conditions));
 
-  const sorted = allRows
-    .map(mapCommandRow)
-    .sort((a, b) => a.trigger.localeCompare(b.trigger));
+  const sorted = allRows.map(mapCommandRow).sort((a, b) => {
+    if (a.isBuiltin !== b.isBuiltin) return a.isBuiltin ? -1 : 1;
+    return a.trigger.localeCompare(b.trigger);
+  });
 
   return {
     items: sorted.slice(offset, offset + limit),
@@ -229,6 +276,11 @@ export async function updateBotCommand(
 }
 
 export async function softDeleteBotCommand(id: string, streamerId: string) {
+  const existing = await getBotCommandById(id, streamerId);
+  if (isBuiltinBotCommand(existing)) {
+    throw new Error("BUILTIN_COMMAND_NOT_DELETABLE");
+  }
+
   await db
     .update(botCommands)
     .set({ deletedAt: new Date(), updatedAt: new Date(), enabled: false })
@@ -579,4 +631,106 @@ export async function countBotTimers(streamerId: string): Promise<number> {
 export async function countBotBlacklist(streamerId: string): Promise<number> {
   const rows = await listActiveBotBlacklistForSnapshot(streamerId);
   return rows.length;
+}
+
+export async function getBotActiveChannel(streamerId: string) {
+  const rows = await db
+    .select()
+    .from(botActiveChannels)
+    .where(eq(botActiveChannels.streamerId, streamerId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function isBotChannelActive(streamerId: string): Promise<boolean> {
+  const row = await getBotActiveChannel(streamerId);
+  return Boolean(row && row.deactivatedAt == null);
+}
+
+export async function listActiveBotChannelsForService() {
+  const rows = await db
+    .select()
+    .from(botActiveChannels)
+    .where(isNull(botActiveChannels.deactivatedAt));
+
+  return rows.map((row) => ({
+    streamerId: row.streamerId,
+    twitchUsername: row.twitchUsername,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
+}
+
+export async function activateBotChannel(
+  streamerId: string,
+  twitchUsername: string
+) {
+  const now = new Date();
+  const normalizedUsername = twitchUsername.trim().toLowerCase();
+  const existing = await getBotActiveChannel(streamerId);
+
+  if (existing) {
+    await db
+      .update(botActiveChannels)
+      .set({
+        twitchUsername: normalizedUsername,
+        deactivatedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(botActiveChannels.streamerId, streamerId));
+
+    await ensureBuiltinBotCommands(streamerId);
+    await touchBotConfig(streamerId);
+
+    return {
+      streamerId,
+      twitchUsername: normalizedUsername,
+      active: true,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+      reactivated: true,
+    };
+  }
+
+  await db.insert(botActiveChannels).values({
+    streamerId,
+    twitchUsername: normalizedUsername,
+    createdAt: now,
+    updatedAt: now,
+    deactivatedAt: null,
+  });
+
+  await ensureBuiltinBotCommands(streamerId);
+  await touchBotConfig(streamerId);
+
+  return {
+    streamerId,
+    twitchUsername: normalizedUsername,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+    reactivated: false,
+  };
+}
+
+export async function deactivateBotChannel(streamerId: string) {
+  const existing = await getBotActiveChannel(streamerId);
+  if (!existing || existing.deactivatedAt != null) {
+    return null;
+  }
+
+  const now = new Date();
+  await db
+    .update(botActiveChannels)
+    .set({ deactivatedAt: now, updatedAt: now })
+    .where(eq(botActiveChannels.streamerId, streamerId));
+
+  await touchBotConfig(streamerId);
+
+  return {
+    streamerId,
+    twitchUsername: existing.twitchUsername,
+    active: false,
+    deactivatedAt: now,
+  };
 }

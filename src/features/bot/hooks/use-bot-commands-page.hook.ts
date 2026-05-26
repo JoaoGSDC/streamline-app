@@ -2,135 +2,426 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { services } from "@services";
-import type {
-  BotCommandRecord,
-  CreateBotCommandPayload,
-} from "@services/entities/bot-commands.services";
+import type { BotCommandRecord } from "@services/entities/bot-commands.services";
+import type { BotVariablesCatalogResponse } from "@services/entities/bot-variables.services";
+import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
+import type { BotCommandRowState } from "@features/bot/components/BotCommandAccordionRow";
+import { createRandomString } from "@utils/factories/create-random-string";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+function recordToRow(
+  record: BotCommandRecord,
+  description?: string
+): BotCommandRowState {
+  return {
+    id: record.id,
+    trigger: record.trigger,
+    response: record.response,
+    cooldownSeconds: record.cooldownSeconds,
+    enabled: record.enabled,
+    isBuiltin: Boolean(record.isBuiltin ?? record.builtinKey),
+    description,
+  };
+}
+
 export function useBotCommandsPage() {
-  const [items, setItems] = useState<BotCommandRecord[]>([]);
+  const [savedRows, setSavedRows] = useState<BotCommandRowState[]>([]);
+  const [draftRows, setDraftRows] = useState<BotCommandRowState[]>([]);
+  const [localEdits, setLocalEdits] = useState<Record<string, Partial<BotCommandRowState>>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<BotCommandRecord | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<BotCommandRecord | null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [catalog, setCatalog] = useState<BotVariablesCatalogResponse | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [emotes, setEmotes] = useState<TwitchChannelEmote[]>([]);
+  const [emotesLoading, setEmotesLoading] = useState(true);
+  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+
+  const builtinDescriptions = useMemo(() => {
+    const map = new Map<string, string>();
+    catalog?.builtinCommands.forEach((item) => {
+      map.set(item.trigger, item.description);
+    });
+    return map;
+  }, [catalog]);
+
+  const allVariables = useMemo(
+    () =>
+      catalog
+        ? [...catalog.globals, ...catalog.counters, ...catalog.timers]
+        : [],
+    [catalog]
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
     try {
-      const result = await services.botCommands.list({
-        search: debouncedSearch || undefined,
-        limit: 100,
-      });
-      setItems(result.items);
+      const data = await services.botVariables.getCatalog();
+      setCatalog(data);
     } catch {
-      setItems([]);
+      setCatalog(null);
     } finally {
-      setLoading(false);
+      setCatalogLoading(false);
     }
-  }, [debouncedSearch]);
+  }, []);
+
+  const loadEmotes = useCallback(async () => {
+    setEmotesLoading(true);
+    try {
+      const data = await services.botEmotes.listChannel();
+      setEmotes(data.emotes);
+    } catch {
+      setEmotes([]);
+    } finally {
+      setEmotesLoading(false);
+    }
+  }, []);
+
+  const mapRecordsToRows = useCallback(
+    (items: BotCommandRecord[]) =>
+      items.map((item) =>
+        recordToRow(item, builtinDescriptions.get(item.trigger))
+      ),
+    [builtinDescriptions]
+  );
+
+  const upsertSavedRow = useCallback(
+    (record: BotCommandRecord) => {
+      const row = recordToRow(record, builtinDescriptions.get(record.trigger));
+      setSavedRows((prev) => {
+        const index = prev.findIndex((item) => item.id === row.id);
+        if (index === -1) {
+          return [...prev, row].sort((a, b) => {
+            if (a.isBuiltin !== b.isBuiltin) return a.isBuiltin ? -1 : 1;
+            return a.trigger.localeCompare(b.trigger);
+          });
+        }
+        const next = [...prev];
+        next[index] = row;
+        return next;
+      });
+    },
+    [builtinDescriptions]
+  );
+
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      try {
+        const result = await services.botCommands.list({
+          search: debouncedSearch || undefined,
+          limit: 100,
+        });
+        setSavedRows(mapRecordsToRows(result.items));
+        if (!options?.silent) {
+          setLocalEdits({});
+          setDirtyIds(new Set());
+        }
+      } catch {
+        if (!options?.silent) {
+          setSavedRows([]);
+        }
+      } finally {
+        if (!options?.silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [debouncedSearch, mapRecordsToRows]
+  );
+
+  useEffect(() => {
+    void loadCatalog();
+    void loadEmotes();
+  }, [loadCatalog, loadEmotes]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const openCreate = useCallback(() => {
-    setEditing(null);
-    setDialogOpen(true);
+  const getRowState = useCallback(
+    (row: BotCommandRowState): BotCommandRowState => ({
+      ...row,
+      ...localEdits[row.id],
+    }),
+    [localEdits]
+  );
+
+  const markDirty = useCallback((id: string) => {
+    setDirtyIds((prev) => new Set(prev).add(id));
   }, []);
 
-  const openEdit = useCallback((command: BotCommandRecord) => {
-    setEditing(command);
-    setDialogOpen(true);
+  const clearDirty = useCallback((id: string) => {
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }, []);
 
-  const closeDialog = useCallback(() => {
-    setDialogOpen(false);
-    setEditing(null);
-  }, []);
+  const patchLocal = useCallback(
+    (id: string, patch: Partial<BotCommandRowState>) => {
+      setLocalEdits((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], ...patch },
+      }));
+      markDirty(id);
+    },
+    [markDirty]
+  );
 
-  const saveCommand = useCallback(
-    async (payload: CreateBotCommandPayload) => {
-      setSubmitting(true);
+  const isRowDirty = useCallback(
+    (id: string) => {
+      const edits = localEdits[id];
+      if (!edits && !dirtyIds.has(id)) return false;
+      const keys = Object.keys(edits ?? {});
+      if (keys.length === 0) return dirtyIds.has(id);
+      const contentKeys = keys.filter((key) => key !== "enabled");
+      return contentKeys.length > 0;
+    },
+    [dirtyIds, localEdits]
+  );
+
+  const persistRow = useCallback(
+    async (row: BotCommandRowState) => {
+      const merged: BotCommandRowState = {
+        ...row,
+        ...localEdits[row.id],
+      };
+
+      setSavingIds((prev) => new Set(prev).add(row.id));
       try {
-        if (editing) {
-          await services.botCommands.update(editing.id, payload);
-        } else {
-          await services.botCommands.create(payload);
+        if (merged.isDraft || merged.isNew) {
+          const created = await services.botCommands.create({
+            trigger: merged.trigger,
+            response: merged.response,
+            cooldownSeconds: merged.cooldownSeconds,
+            enabled: merged.enabled,
+          });
+          setDraftRows((prev) => prev.filter((draft) => draft.id !== merged.id));
+          upsertSavedRow(created);
+          setOpenAccordion((prev) =>
+            prev.map((value) => (value === merged.id ? created.id : value))
+          );
+          setLocalEdits((prev) => {
+            const next = { ...prev };
+            delete next[merged.id];
+            return next;
+          });
+          clearDirty(merged.id);
+          return true;
         }
-        closeDialog();
-        await load();
+
+        const updated = merged.isBuiltin
+          ? await services.botCommands.update(merged.id, {
+              response: merged.response,
+              enabled: merged.enabled,
+            })
+          : await services.botCommands.update(merged.id, {
+              trigger: merged.trigger,
+              response: merged.response,
+              cooldownSeconds: merged.cooldownSeconds,
+              enabled: merged.enabled,
+            });
+
+        upsertSavedRow(updated);
+
+        setLocalEdits((prev) => {
+          const next = { ...prev };
+          delete next[merged.id];
+          return next;
+        });
+        clearDirty(merged.id);
         return true;
       } catch {
         return false;
       } finally {
-        setSubmitting(false);
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(row.id);
+          return next;
+        });
       }
     },
-    [editing, closeDialog, load]
+    [clearDirty, localEdits, upsertSavedRow]
+  );
+
+  const updateRow = useCallback(
+    (id: string, patch: Partial<BotCommandRowState>) => {
+      patchLocal(id, patch);
+    },
+    [patchLocal]
   );
 
   const toggleEnabled = useCallback(
-    async (command: BotCommandRecord) => {
+    async (row: BotCommandRowState, enabled: boolean) => {
+      if (row.isDraft || row.isNew) {
+        patchLocal(row.id, { enabled });
+        return;
+      }
+
+      setSavedRows((prev) =>
+        prev.map((saved) =>
+          saved.id === row.id ? { ...saved, enabled } : saved
+        )
+      );
+
+      setSavingIds((prev) => new Set(prev).add(row.id));
       try {
-        await services.botCommands.update(command.id, {
-          enabled: !command.enabled,
+        await services.botCommands.update(row.id, { enabled });
+
+        setLocalEdits((prev) => {
+          const current = prev[row.id];
+          if (!current) return prev;
+          const { enabled: _removed, ...rest } = current;
+          if (Object.keys(rest).length === 0) {
+            const next = { ...prev };
+            delete next[row.id];
+            clearDirty(row.id);
+            return next;
+          }
+          return { ...prev, [row.id]: rest };
         });
-        await load();
       } catch {
-        /* toast no page */
+        setSavedRows((prev) =>
+          prev.map((saved) =>
+            saved.id === row.id ? { ...saved, enabled: !enabled } : saved
+          )
+        );
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(row.id);
+          return next;
+        });
       }
     },
-    [load]
+    [clearDirty, patchLocal]
   );
 
-  const confirmDelete = useCallback(async () => {
-    if (!deleteTarget) return false;
-    setSubmitting(true);
-    try {
-      await services.botCommands.remove(deleteTarget.id);
-      setDeleteTarget(null);
-      await load();
-      return true;
-    } catch {
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
-  }, [deleteTarget, load]);
+  const addDraftRow = useCallback(() => {
+    const id = `draft-${createRandomString(8)}`;
+    const draft: BotCommandRowState = {
+      id,
+      trigger: "!",
+      response: "",
+      cooldownSeconds: 0,
+      enabled: true,
+      isBuiltin: false,
+      isDraft: true,
+      isNew: true,
+    };
+    setDraftRows((prev) => [...prev, draft]);
+    setOpenAccordion((prev) => [...prev, id]);
+  }, []);
 
-  const sortedItems = useMemo(
-    () => [...items].sort((a, b) => a.trigger.localeCompare(b.trigger)),
-    [items]
+  const removeDraftRow = useCallback(
+    (id: string) => {
+      setDraftRows((prev) => prev.filter((row) => row.id !== id));
+      setLocalEdits((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      clearDirty(id);
+      setOpenAccordion((prev) => prev.filter((value) => value !== id));
+    },
+    [clearDirty]
+  );
+
+  const deleteCustomCommand = useCallback(
+    async (row: BotCommandRowState) => {
+      if (row.isBuiltin) return false;
+      setSavingIds((prev) => new Set(prev).add(row.id));
+      try {
+        await services.botCommands.remove(row.id);
+        setSavedRows((prev) => prev.filter((saved) => saved.id !== row.id));
+        setLocalEdits((prev) => {
+          const next = { ...prev };
+          delete next[row.id];
+          return next;
+        });
+        clearDirty(row.id);
+        setOpenAccordion((prev) => prev.filter((value) => value !== row.id));
+        return true;
+      } catch {
+        return false;
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(row.id);
+          return next;
+        });
+      }
+    },
+    [clearDirty]
+  );
+
+  const builtinRows = useMemo(
+    () =>
+      savedRows
+        .filter((row) => row.isBuiltin)
+        .map((row) => getRowState(row))
+        .filter((row) =>
+          debouncedSearch
+            ? row.trigger.toLowerCase().includes(debouncedSearch.toLowerCase())
+            : true
+        ),
+    [savedRows, getRowState, debouncedSearch]
+  );
+
+  const customRows = useMemo(
+    () =>
+      savedRows
+        .filter((row) => !row.isBuiltin)
+        .map((row) => getRowState(row))
+        .filter((row) =>
+          debouncedSearch
+            ? row.trigger.toLowerCase().includes(debouncedSearch.toLowerCase())
+            : true
+        ),
+    [savedRows, getRowState, debouncedSearch]
+  );
+
+  const draftRowsMerged = useMemo(
+    () => draftRows.map((row) => getRowState(row)),
+    [draftRows, getRowState]
   );
 
   return {
-    items: sortedItems,
     loading,
     search,
     setSearch,
-    submitting,
-    dialogOpen,
-    setDialogOpen,
-    editing,
-    deleteTarget,
-    setDeleteTarget,
-    openCreate,
-    openEdit,
-    closeDialog,
-    saveCommand,
+    catalog,
+    catalogLoading,
+    allVariables,
+    emotes,
+    emotesLoading,
+    openAccordion,
+    setOpenAccordion,
+    builtinRows,
+    customRows,
+    draftRows: draftRowsMerged,
+    savingIds,
+    addDraftRow,
+    updateRow,
+    persistRow,
     toggleEnabled,
-    confirmDelete,
+    removeDraftRow,
+    deleteCustomCommand,
+    getRowState,
+    isRowDirty,
   };
 }

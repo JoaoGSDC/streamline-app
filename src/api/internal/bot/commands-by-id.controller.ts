@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
-import { resolveBotOwnerStreamerId } from "@lib/bot-auth";
+import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
 import {
   getBotCommandById,
   getBotCommandByTrigger,
+  isBuiltinBotCommand,
   softDeleteBotCommand,
   updateBotCommand,
 } from "@lib/bot-db-queries";
 import {
   formatZodErrorMessages,
+  updateBotBuiltinCommandSchema,
   updateBotCommandSchema,
 } from "@server/bot/bot.validators";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
@@ -22,7 +24,7 @@ export async function getBotCommandByIdController(
   context: RouteContext
 ) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(_request);
+    const resolved = await resolveActiveBotOwnerStreamerId(_request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -44,7 +46,7 @@ export async function patchBotCommandController(
   context: RouteContext
 ) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -56,6 +58,38 @@ export async function patchBotCommandController(
     }
 
     const body = await request.json();
+
+    if (isBuiltinBotCommand(existing)) {
+      const parsed = updateBotBuiltinCommandSchema.safeParse(body);
+      if (!parsed.success) {
+        return jsonError(
+          formatZodErrorMessages(parsed.error),
+          400,
+          "VALIDATION_ERROR"
+        );
+      }
+
+      const builtinPatch: Partial<{ response: string; enabled: boolean }> = {};
+      if (parsed.data.response !== undefined) {
+        builtinPatch.response = parsed.data.response;
+      }
+      if (parsed.data.enabled !== undefined) {
+        builtinPatch.enabled = parsed.data.enabled;
+      }
+
+      const { command, configVersion } = await updateBotCommand(
+        id,
+        resolved.streamerId,
+        builtinPatch
+      );
+
+      if (!command) {
+        throw new HttpError("Comando não encontrado", 404, "NOT_FOUND");
+      }
+
+      return jsonSuccess({ ...command, configVersion });
+    }
+
     const parsed = updateBotCommandSchema.safeParse(body);
     if (!parsed.success) {
       return jsonError(
@@ -97,7 +131,7 @@ export async function deleteBotCommandController(
   context: RouteContext
 ) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -108,6 +142,14 @@ export async function deleteBotCommandController(
       return jsonError("Comando não encontrado", 404, "NOT_FOUND");
     }
 
+    if (isBuiltinBotCommand(existing)) {
+      return jsonError(
+        "Comandos padrão não podem ser removidos — desative-os se não quiser usá-los.",
+        403,
+        "BUILTIN_NOT_DELETABLE"
+      );
+    }
+
     const { configVersion } = await softDeleteBotCommand(
       id,
       resolved.streamerId
@@ -115,6 +157,16 @@ export async function deleteBotCommandController(
 
     return jsonSuccess({ ok: true, configVersion });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "BUILTIN_COMMAND_NOT_DELETABLE"
+    ) {
+      return jsonError(
+        "Comandos padrão não podem ser removidos.",
+        403,
+        "BUILTIN_NOT_DELETABLE"
+      );
+    }
     return handleRouteError(error, "Falha ao excluir comando");
   }
 }

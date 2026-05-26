@@ -7,6 +7,7 @@ import type {
   TwitchHelixStreamRaw,
   TwitchHelixUserRaw,
 } from "./twitch.types";
+import type { TwitchHelixEmoteRaw } from "./twitch-emotes.types";
 
 const TWITCH_HELIX_BASE = "https://api.twitch.tv/helix";
 
@@ -91,5 +92,13 @@ export async function fetchLiveStreamsByLogins(
   if (!response.ok) return [];
 
   const payload: HelixListResponse<TwitchHelixStreamRaw> = await response.json();
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+export async function fetchChannelEmotes(
+  broadcasterId: string
+): Promise<TwitchHelixEmoteRaw[]> {
+  const params = new URLSearchParams({ broadcaster_id: broadcasterId });
+  const payload = await helixFetch<TwitchHelixEmoteRaw>("/chat/emotes", params);
   return Array.isArray(payload.data) ? payload.data : [];
 }

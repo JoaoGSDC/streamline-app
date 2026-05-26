@@ -11,9 +11,11 @@ import {
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useBotActivationContext } from "@features/bot/context/BotActivationContext";
 import { useBotDashboard } from "@features/bot/hooks/use-bot-dashboard.hook";
 
 export default function BotDashboardPage() {
+  const { active: botChannelActive } = useBotActivationContext();
   const { status, loading, refreshing, refresh } = useBotDashboard();
 
   const isOffline = status?.botServiceStatus !== "online";
@@ -28,7 +30,7 @@ export default function BotDashboardPage() {
           variant="outline"
           size="sm"
           onClick={() => void refresh()}
-          disabled={refreshing}
+          disabled={refreshing || !botChannelActive}
         >
           <RefreshCw
             className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { resolveBotOwnerStreamerId } from "@lib/bot-auth";
+import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
 import {
   createBotCommand,
   getBotCommandByTrigger,
@@ -14,7 +14,7 @@ import { createRandomString } from "@utils/factories/create-random-string";
 
 export async function listBotCommandsController(request: NextRequest) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -38,7 +38,7 @@ export async function listBotCommandsController(request: NextRequest) {
 
 export async function createBotCommandController(request: NextRequest) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }

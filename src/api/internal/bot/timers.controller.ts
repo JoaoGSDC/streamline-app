@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { resolveBotOwnerStreamerId } from "@lib/bot-auth";
+import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
 import { createBotTimer, listBotTimers } from "@lib/bot-db-queries";
 import {
   createBotTimerSchema,
@@ -10,7 +10,7 @@ import { createRandomString } from "@utils/factories/create-random-string";
 
 export async function listBotTimersController(request: NextRequest) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -24,7 +24,7 @@ export async function listBotTimersController(request: NextRequest) {
 
 export async function createBotTimerController(request: NextRequest) {
   try {
-    const resolved = await resolveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotOwnerStreamerId(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }

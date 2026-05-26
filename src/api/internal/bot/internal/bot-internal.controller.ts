@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { assertBotServiceToken } from "@lib/bot-auth";
 import {
   getBotConfigVersion,
+  isBotChannelActive,
   listActiveBotBlacklistForSnapshot,
   listActiveBotCommandsForSnapshot,
   listActiveBotTimersForSnapshot,
@@ -32,6 +33,11 @@ export async function getBotCommandsSnapshotController(
     const streamer = await getStreamerById(streamerId);
     if (!streamer) {
       return jsonError("Canal não encontrado", 404, "NOT_FOUND");
+    }
+
+    const active = await isBotChannelActive(streamerId);
+    if (!active) {
+      return jsonError("Bot não está ativo neste canal", 403, "BOT_CHANNEL_NOT_ACTIVE");
     }
 
     const sinceVersion = parseInt(
@@ -75,6 +81,11 @@ export async function getBotConfigSnapshotController(
     const streamer = await getStreamerById(streamerId);
     if (!streamer) {
       return jsonError("Canal não encontrado", 404, "NOT_FOUND");
+    }
+
+    const active = await isBotChannelActive(streamerId);
+    if (!active) {
+      return jsonError("Bot não está ativo neste canal", 403, "BOT_CHANNEL_NOT_ACTIVE");
     }
 
     const sinceVersion = parseInt(
