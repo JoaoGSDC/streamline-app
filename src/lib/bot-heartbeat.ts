@@ -1,3 +1,7 @@
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import { botChannelHeartbeat } from "./schema";
+
 export type BotHeartbeatIrcStatus = "connected" | "disconnected" | "degraded";
 
 export interface BotHeartbeatChannel {
@@ -18,24 +22,75 @@ export interface StoredBotHeartbeat extends BotHeartbeatPayload {
   receivedAt: Date;
 }
 
-const lastHeartbeatByStreamerId = new Map<string, StoredBotHeartbeat>();
-
-export function saveBotHeartbeat(payload: BotHeartbeatPayload): StoredBotHeartbeat {
-  const stored: StoredBotHeartbeat = {
-    ...payload,
-    receivedAt: new Date(),
-  };
+export async function saveBotHeartbeat(
+  payload: BotHeartbeatPayload
+): Promise<StoredBotHeartbeat> {
+  const receivedAt = new Date();
+  const recentErrors = JSON.stringify(payload.recentErrors);
 
   for (const channel of payload.channels) {
-    lastHeartbeatByStreamerId.set(channel.streamerId, stored);
+    await db
+      .insert(botChannelHeartbeat)
+      .values({
+        streamerId: channel.streamerId,
+        twitchUsername: channel.twitchUsername,
+        ircStatus: channel.ircStatus,
+        configVersion: channel.configVersion,
+        botVersion: payload.version,
+        uptimeSeconds: payload.uptimeSeconds,
+        recentErrors,
+        receivedAt,
+      })
+      .onConflictDoUpdate({
+        target: botChannelHeartbeat.streamerId,
+        set: {
+          twitchUsername: channel.twitchUsername,
+          ircStatus: channel.ircStatus,
+          configVersion: channel.configVersion,
+          botVersion: payload.version,
+          uptimeSeconds: payload.uptimeSeconds,
+          recentErrors,
+          receivedAt,
+        },
+      });
   }
 
-  return stored;
+  return { ...payload, receivedAt };
 }
 
-export function getRecentBotHeartbeat(streamerId: string, maxAgeMs = 90_000) {
-  const heartbeat = lastHeartbeatByStreamerId.get(streamerId);
-  if (!heartbeat) return null;
-  if (Date.now() - heartbeat.receivedAt.getTime() > maxAgeMs) return null;
-  return heartbeat;
+export async function getRecentBotHeartbeat(
+  streamerId: string,
+  maxAgeMs = 90_000
+): Promise<StoredBotHeartbeat | null> {
+  const rows = await db
+    .select()
+    .from(botChannelHeartbeat)
+    .where(eq(botChannelHeartbeat.streamerId, streamerId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+  if (Date.now() - row.receivedAt.getTime() > maxAgeMs) return null;
+
+  let recentErrors: string[] = [];
+  try {
+    recentErrors = JSON.parse(row.recentErrors) as string[];
+  } catch {
+    recentErrors = [];
+  }
+
+  return {
+    version: row.botVersion,
+    uptimeSeconds: row.uptimeSeconds,
+    channels: [
+      {
+        streamerId: row.streamerId,
+        twitchUsername: row.twitchUsername,
+        ircStatus: row.ircStatus as BotHeartbeatIrcStatus,
+        configVersion: row.configVersion,
+      },
+    ],
+    recentErrors,
+    receivedAt: row.receivedAt,
+  };
 }

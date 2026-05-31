@@ -25,7 +25,7 @@ export async function postBotHeartbeatController(request: NextRequest) {
     }
 
     const payload = heartbeatSchema.parse(await request.json());
-    const stored = saveBotHeartbeat(payload);
+    const stored = await saveBotHeartbeat(payload);
 
     return jsonSuccess({
       receivedAt: stored.receivedAt.toISOString(),

@@ -127,6 +127,20 @@ const BOT_TIMERS_TABLE = `
   );
 `;
 
+const BOT_CHANNEL_HEARTBEAT_TABLE = `
+  CREATE TABLE IF NOT EXISTS bot_channel_heartbeat (
+    streamer_id TEXT PRIMARY KEY,
+    twitch_username TEXT NOT NULL,
+    irc_status TEXT NOT NULL,
+    config_version INTEGER NOT NULL,
+    bot_version TEXT NOT NULL,
+    uptime_seconds INTEGER NOT NULL,
+    recent_errors TEXT NOT NULL,
+    received_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
 const BOT_BLACKLIST_TERMS_TABLE = `
   CREATE TABLE IF NOT EXISTS bot_blacklist_terms (
     id TEXT PRIMARY KEY,
@@ -173,6 +187,12 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
 
   try {
     await execute(BOT_ACTIVE_CHANNELS_TABLE);
+  } catch {
+    /* tabela já existe ou ambiente remoto */
+  }
+
+  try {
+    await execute(BOT_CHANNEL_HEARTBEAT_TABLE);
   } catch {
     /* tabela já existe ou ambiente remoto */
   }
@@ -243,7 +263,7 @@ export async function initializeDatabase() {
     }
 
     await serviceClient.executeMultiple(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}`
     );
   } else {
     const dbPath = dbUrl.startsWith("file:")
@@ -262,7 +282,7 @@ export async function initializeDatabase() {
     });
 
     sqlite.exec(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}`
     );
 
     console.log("Local SQLite database initialized ✅");

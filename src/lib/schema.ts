@@ -139,6 +139,20 @@ export const botTimers = sqliteTable("bot_timers", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+/** Último heartbeat IRC reportado pelo serviço bot por canal */
+export const botChannelHeartbeat = sqliteTable("bot_channel_heartbeat", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  twitchUsername: text("twitch_username").notNull(),
+  ircStatus: text("irc_status").notNull(),
+  configVersion: integer("config_version").notNull(),
+  botVersion: text("bot_version").notNull(),
+  uptimeSeconds: integer("uptime_seconds").notNull(),
+  recentErrors: text("recent_errors").notNull(),
+  receivedAt: integer("received_at", { mode: "timestamp" }).notNull(),
+});
+
 /** Blacklist de termos para moderação simples */
 export const botBlacklistTerms = sqliteTable("bot_blacklist_terms", {
   id: text("id").primaryKey(),

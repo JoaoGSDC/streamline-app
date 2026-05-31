@@ -31,7 +31,7 @@ export async function getBotStatusController(request: NextRequest) {
       isBotChannelActive(resolved.streamerId),
     ]);
 
-    const heartbeat = getRecentBotHeartbeat(resolved.streamerId);
+    const heartbeat = await getRecentBotHeartbeat(resolved.streamerId);
     const channel = heartbeat?.channels.find(
       (item) => item.streamerId === resolved.streamerId
     );
