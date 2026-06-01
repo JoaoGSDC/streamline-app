@@ -27,7 +27,15 @@ export interface BotCommandRowState {
   cooldownSeconds: number;
   enabled: boolean;
   isBuiltin: boolean;
+  builtinKey?: string | null;
   description?: string;
+  category?: string;
+  categoryLabel?: string;
+  minRole?: "everyone" | "moderator" | "streamer";
+  argsHint?: string | null;
+  customizableResponse?: boolean;
+  runtimeNotes?: string | null;
+  externalApiUrlTemplate?: string | null;
   isDraft?: boolean;
   isNew?: boolean;
 }
@@ -58,6 +66,13 @@ export function BotCommandAccordionRow({
   onToggleEnabled,
 }: BotCommandAccordionRowProps) {
   const isCustom = !command.isBuiltin;
+  const canEditResponse = isCustom || command.customizableResponse !== false;
+  const roleLabel =
+    command.minRole === "moderator"
+      ? "Mod"
+      : command.minRole === "streamer"
+        ? "Streamer"
+        : null;
 
   return (
     <AccordionItem
@@ -78,7 +93,33 @@ export function BotCommandAccordionRow({
                 Padrão
               </Badge>
             ) : (
-              <Badge variant="outline">Personalizado</Badge>
+              <Badge
+                variant="outline"
+                className="border-outline-variant/50 bg-transparent shadow-none"
+              >
+                Personalizado
+              </Badge>
+            )}
+            {command.categoryLabel && (
+              <Badge
+                variant="outline"
+                className="hidden border-outline-variant/50 bg-muted/30 shadow-none sm:inline-flex"
+              >
+                {command.categoryLabel}
+              </Badge>
+            )}
+            {roleLabel && (
+              <Badge
+                variant="outline"
+                className="border-amber-500/40 bg-transparent text-amber-700 shadow-none dark:text-amber-400"
+              >
+                {roleLabel}
+              </Badge>
+            )}
+            {command.argsHint && (
+              <span className="hidden truncate font-mono text-body-xs text-muted-foreground lg:inline">
+                {command.argsHint}
+              </span>
             )}
             {hasUnsavedChanges && (
               <Tooltip>
@@ -97,7 +138,9 @@ export function BotCommandAccordionRow({
               </Tooltip>
             )}
             {command.isDraft && (
-              <Badge className="bg-amber-500/15 text-amber-700">Rascunho</Badge>
+              <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
+                Rascunho
+              </Badge>
             )}
             <span className="hidden truncate text-body-sm text-muted-foreground sm:inline">
               {command.response}
@@ -115,6 +158,16 @@ export function BotCommandAccordionRow({
       <AccordionContent className="space-y-4 pb-4">
         {command.description && (
           <p className="text-body-sm text-muted-foreground">{command.description}</p>
+        )}
+        {command.runtimeNotes && (
+          <p className="rounded-md border border-outline-variant/30 bg-muted/30 px-3 py-2 text-body-xs text-muted-foreground">
+            {command.runtimeNotes}
+          </p>
+        )}
+        {command.externalApiUrlTemplate && (
+          <p className="font-mono text-body-xs text-muted-foreground break-all">
+            API: {command.externalApiUrlTemplate}
+          </p>
         )}
 
         {isCustom && (
@@ -149,19 +202,26 @@ export function BotCommandAccordionRow({
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label>Mensagem de resposta</Label>
-          <BotMessageComposer
-            value={command.response}
-            onChange={(response) => onChange({ response })}
-            variables={variables}
-            emotes={emotes}
-            emotesLoading={emotesLoading}
-            disabled={saving}
-            onSave={onSave}
-            saving={saving}
-          />
-        </div>
+        {canEditResponse ? (
+          <div className="space-y-2">
+            <Label>Mensagem de resposta</Label>
+            <BotMessageComposer
+              value={command.response}
+              onChange={(response) => onChange({ response })}
+              variables={variables}
+              emotes={emotes}
+              emotesLoading={emotesLoading}
+              disabled={saving}
+              onSave={onSave}
+              saving={saving}
+            />
+          </div>
+        ) : (
+          <p className="text-body-sm text-muted-foreground">
+            Este comando é executado automaticamente pelo bot (Twitch Helix, pontos,
+            etc.). Você pode apenas ativá-lo ou desativá-lo.
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {isCustom && onDelete && (
@@ -177,8 +237,8 @@ export function BotCommandAccordionRow({
           )}
           {command.isBuiltin && (
             <p className="text-body-sm text-muted-foreground">
-              Comandos padrão não podem ser removidos — apenas desativados ou com
-              mensagem personalizada.
+              Comandos padrão não podem ser removidos — apenas desativados
+              {canEditResponse ? " ou com mensagem personalizada" : ""}.
             </p>
           )}
         </div>

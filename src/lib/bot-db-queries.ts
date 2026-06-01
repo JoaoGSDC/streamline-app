@@ -1,5 +1,10 @@
 import { and, eq, isNull, like, ne } from "drizzle-orm";
-import { BOT_BUILTIN_COMMANDS } from "@server/bot/bot-builtin-commands";
+import {
+  BOT_BUILTIN_CATEGORY_ORDER,
+  BOT_BUILTIN_COMMANDS,
+  DEPRECATED_BUILTIN_KEYS,
+  getBuiltinDefinition,
+} from "@server/bot/bot-builtin-commands";
 import { db } from "./db";
 import {
   botActiveChannels,
@@ -102,6 +107,18 @@ export async function ensureBuiltinBotCommands(streamerId: string) {
     });
   }
 
+  for (const deprecatedKey of DEPRECATED_BUILTIN_KEYS) {
+    await db
+      .update(botCommands)
+      .set({ enabled: false, updatedAt: now })
+      .where(
+        and(
+          eq(botCommands.streamerId, streamerId),
+          eq(botCommands.builtinKey, deprecatedKey)
+        )
+      );
+  }
+
   await touchBotConfig(streamerId);
 }
 
@@ -138,6 +155,17 @@ export async function listBotCommands(
 
   const sorted = allRows.map(mapCommandRow).sort((a, b) => {
     if (a.isBuiltin !== b.isBuiltin) return a.isBuiltin ? -1 : 1;
+
+    if (a.isBuiltin && b.isBuiltin) {
+      const defA = a.builtinKey ? getBuiltinDefinition(a.builtinKey) : undefined;
+      const defB = b.builtinKey ? getBuiltinDefinition(b.builtinKey) : undefined;
+      const catA = defA?.category ?? "general";
+      const catB = defB?.category ?? "general";
+      const idxA = BOT_BUILTIN_CATEGORY_ORDER.indexOf(catA);
+      const idxB = BOT_BUILTIN_CATEGORY_ORDER.indexOf(catB);
+      if (idxA !== idxB) return idxA - idxB;
+    }
+
     return a.trigger.localeCompare(b.trigger);
   });
 
@@ -162,7 +190,26 @@ export async function listActiveBotCommandsForSnapshot(streamerId: string) {
     )
     .orderBy(botCommands.trigger);
 
-  return rows.map(mapCommandRow);
+  return rows.map((row) => {
+    const mapped = mapCommandRow(row);
+    if (!mapped.builtinKey) return mapped;
+
+    const definition = getBuiltinDefinition(mapped.builtinKey);
+    if (!definition) return mapped;
+
+    return {
+      ...mapped,
+      builtinMeta: {
+        category: definition.category,
+        minRole: definition.minRole,
+        executionKind: definition.executionKind,
+        argsHint: definition.argsHint ?? null,
+        customizableResponse: definition.customizableResponse,
+        runtimeNotes: definition.runtimeNotes ?? null,
+        externalApiUrlTemplate: definition.externalApiUrlTemplate ?? null,
+      },
+    };
+  });
 }
 
 export async function getBotCommandById(id: string, streamerId: string) {

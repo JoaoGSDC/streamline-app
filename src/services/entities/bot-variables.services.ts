@@ -10,12 +10,32 @@ export interface BotVariableItem {
   example?: string;
 }
 
+export type BotBuiltinCategoryId =
+  | "general"
+  | "raffles"
+  | "moderator"
+  | "streamer";
+
+export interface BotBuiltinCommandCatalogItem {
+  key: string;
+  trigger: string;
+  description: string;
+  category: BotBuiltinCategoryId;
+  minRole: "everyone" | "moderator" | "streamer";
+  argsHint: string | null;
+  executionKind: "static" | "runtime" | "mod_action" | "streamer_action";
+  customizableResponse: boolean;
+  runtimeNotes: string | null;
+  externalApiUrlTemplate: string | null;
+}
+
 export interface BotVariablesCatalogResponse {
   categories: Record<string, string>;
   globals: BotVariableItem[];
   counters: BotVariableItem[];
   timers: BotVariableItem[];
-  builtinCommands: { trigger: string; description: string }[];
+  builtinCommandCategories?: Record<BotBuiltinCategoryId, string>;
+  builtinCommands: BotBuiltinCommandCatalogItem[];
 }
 
 export const botVariables = {

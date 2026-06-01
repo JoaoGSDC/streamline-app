@@ -7,6 +7,7 @@ import {
   softDeleteBotCommand,
   updateBotCommand,
 } from "@lib/bot-db-queries";
+import { getBuiltinDefinition } from "@server/bot/bot-builtin-commands";
 import {
   formatZodErrorMessages,
   updateBotBuiltinCommandSchema,
@@ -66,6 +67,22 @@ export async function patchBotCommandController(
           formatZodErrorMessages(parsed.error),
           400,
           "VALIDATION_ERROR"
+        );
+      }
+
+      const builtinDef = existing.builtinKey
+        ? getBuiltinDefinition(existing.builtinKey)
+        : undefined;
+
+      if (
+        parsed.data.response !== undefined &&
+        builtinDef &&
+        !builtinDef.customizableResponse
+      ) {
+        return jsonError(
+          "Este comando padrão é processado automaticamente e não permite personalizar a mensagem.",
+          400,
+          "BUILTIN_RESPONSE_NOT_CUSTOMIZABLE"
         );
       }
 

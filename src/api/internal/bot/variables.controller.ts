@@ -8,7 +8,10 @@ import {
   BOT_CATEGORY_LABELS,
   type BotVariableDefinition,
 } from "@server/bot/bot-variables.catalog";
-import { BOT_BUILTIN_COMMANDS } from "@server/bot/bot-builtin-commands";
+import {
+  BOT_BUILTIN_CATEGORY_LABELS,
+  BOT_BUILTIN_COMMANDS,
+} from "@server/bot/bot-builtin-commands";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
 
 export async function listBotVariablesController(request: NextRequest) {
@@ -61,9 +64,18 @@ export async function listBotVariablesController(request: NextRequest) {
       globals,
       counters: dynamicCounters,
       timers: dynamicTimers,
+      builtinCommandCategories: BOT_BUILTIN_CATEGORY_LABELS,
       builtinCommands: BOT_BUILTIN_COMMANDS.map((command) => ({
+        key: command.key,
         trigger: command.trigger,
         description: command.description,
+        category: command.category,
+        minRole: command.minRole,
+        argsHint: command.argsHint ?? null,
+        executionKind: command.executionKind,
+        customizableResponse: command.customizableResponse,
+        runtimeNotes: command.runtimeNotes ?? null,
+        externalApiUrlTemplate: command.externalApiUrlTemplate ?? null,
       })),
     });
   } catch (error) {

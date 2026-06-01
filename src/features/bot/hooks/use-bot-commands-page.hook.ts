@@ -3,16 +3,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { services } from "@services";
 import type { BotCommandRecord } from "@services/entities/bot-commands.services";
-import type { BotVariablesCatalogResponse } from "@services/entities/bot-variables.services";
+import type {
+  BotBuiltinCategoryId,
+  BotBuiltinCommandCatalogItem,
+  BotVariablesCatalogResponse,
+} from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
 import type { BotCommandRowState } from "@features/bot/components/BotCommandAccordionRow";
 import { createRandomString } from "@utils/factories/create-random-string";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+const BUILTIN_CATEGORY_ORDER: BotBuiltinCategoryId[] = [
+  "general",
+  "raffles",
+  "moderator",
+  "streamer",
+];
+
 function recordToRow(
   record: BotCommandRecord,
-  description?: string
+  catalogItem?: BotBuiltinCommandCatalogItem,
+  categoryLabel?: string
 ): BotCommandRowState {
   return {
     id: record.id,
@@ -21,7 +33,15 @@ function recordToRow(
     cooldownSeconds: record.cooldownSeconds,
     enabled: record.enabled,
     isBuiltin: Boolean(record.isBuiltin ?? record.builtinKey),
-    description,
+    builtinKey: record.builtinKey,
+    description: catalogItem?.description,
+    category: catalogItem?.category,
+    categoryLabel,
+    minRole: catalogItem?.minRole,
+    argsHint: catalogItem?.argsHint,
+    customizableResponse: catalogItem?.customizableResponse,
+    runtimeNotes: catalogItem?.runtimeNotes,
+    externalApiUrlTemplate: catalogItem?.externalApiUrlTemplate,
   };
 }
 
@@ -42,13 +62,35 @@ export function useBotCommandsPage() {
   const [openAccordion, setOpenAccordion] = useState<string[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
-  const builtinDescriptions = useMemo(() => {
-    const map = new Map<string, string>();
+  const builtinCatalogByKey = useMemo(() => {
+    const map = new Map<string, BotBuiltinCommandCatalogItem>();
     catalog?.builtinCommands.forEach((item) => {
-      map.set(item.trigger, item.description);
+      map.set(item.key, item);
     });
     return map;
   }, [catalog]);
+
+  const builtinCategoryLabels: Record<BotBuiltinCategoryId, string> =
+    catalog?.builtinCommandCategories ?? {
+      general: "Gerais",
+      raffles: "Sorteios e interação",
+      moderator: "Moderadores",
+      streamer: "Streamer",
+    };
+
+  const enrichBuiltinRecord = useCallback(
+    (record: BotCommandRecord) => {
+      if (!record.builtinKey) {
+        return recordToRow(record);
+      }
+      const catalogItem = builtinCatalogByKey.get(record.builtinKey);
+      const categoryLabel = catalogItem?.category
+        ? builtinCategoryLabels[catalogItem.category]
+        : undefined;
+      return recordToRow(record, catalogItem, categoryLabel);
+    },
+    [builtinCatalogByKey, builtinCategoryLabels]
+  );
 
   const allVariables = useMemo(
     () =>
@@ -88,16 +130,13 @@ export function useBotCommandsPage() {
   }, []);
 
   const mapRecordsToRows = useCallback(
-    (items: BotCommandRecord[]) =>
-      items.map((item) =>
-        recordToRow(item, builtinDescriptions.get(item.trigger))
-      ),
-    [builtinDescriptions]
+    (items: BotCommandRecord[]) => items.map((item) => enrichBuiltinRecord(item)),
+    [enrichBuiltinRecord]
   );
 
   const upsertSavedRow = useCallback(
     (record: BotCommandRecord) => {
-      const row = recordToRow(record, builtinDescriptions.get(record.trigger));
+      const row = enrichBuiltinRecord(record);
       setSavedRows((prev) => {
         const index = prev.findIndex((item) => item.id === row.id);
         if (index === -1) {
@@ -111,7 +150,7 @@ export function useBotCommandsPage() {
         return next;
       });
     },
-    [builtinDescriptions]
+    [enrichBuiltinRecord]
   );
 
   const load = useCallback(
@@ -382,6 +421,19 @@ export function useBotCommandsPage() {
     [savedRows, getRowState, debouncedSearch]
   );
 
+  const builtinRowsByCategory = useMemo(() => {
+    const grouped = Object.fromEntries(
+      BUILTIN_CATEGORY_ORDER.map((category) => [category, [] as BotCommandRowState[]])
+    ) as Record<BotBuiltinCategoryId, BotCommandRowState[]>;
+
+    for (const row of builtinRows) {
+      const category = (row.category as BotBuiltinCategoryId) ?? "general";
+      grouped[category]?.push(row);
+    }
+
+    return grouped;
+  }, [builtinRows]);
+
   const customRows = useMemo(
     () =>
       savedRows
@@ -412,6 +464,8 @@ export function useBotCommandsPage() {
     openAccordion,
     setOpenAccordion,
     builtinRows,
+    builtinRowsByCategory,
+    builtinCategoryLabels,
     customRows,
     draftRows: draftRowsMerged,
     savingIds,

@@ -25,6 +25,14 @@ import {
   BotCommandAccordionRow,
   type BotCommandRowState,
 } from "@features/bot/components/BotCommandAccordionRow";
+import type { BotBuiltinCategoryId } from "@services/entities/bot-variables.services";
+
+const BUILTIN_CATEGORY_ORDER: BotBuiltinCategoryId[] = [
+  "general",
+  "raffles",
+  "moderator",
+  "streamer",
+];
 
 export default function BotCommandsPage() {
   const { toast } = useToast();
@@ -42,6 +50,8 @@ export default function BotCommandsPage() {
     openAccordion,
     setOpenAccordion,
     builtinRows,
+    builtinRowsByCategory,
+    builtinCategoryLabels: builtinCategoryLabelsFromCatalog,
     customRows,
     draftRows,
     savingIds,
@@ -155,16 +165,31 @@ export default function BotCommandsPage() {
               </span>
             </div>
             <p className="text-body-sm text-muted-foreground">
-              Não podem ser removidos. Você pode desativá-los ou personalizar apenas
-              a mensagem de resposta.
+              Não podem ser removidos. Comandos com link ou PIX permitem mensagem
+              personalizada; os demais são executados automaticamente pelo bot.
             </p>
             <Accordion
               type="multiple"
               value={openAccordion}
               onValueChange={setOpenAccordion}
-              className="space-y-2"
+              className="space-y-6"
             >
-              {builtinRows.map(renderRow)}
+              {BUILTIN_CATEGORY_ORDER.map((categoryId) => {
+                const rows = builtinRowsByCategory[categoryId] ?? [];
+                if (rows.length === 0) return null;
+
+                return (
+                  <div key={categoryId} className="space-y-2">
+                    <h3 className="text-body-sm font-semibold text-foreground">
+                      {builtinCategoryLabelsFromCatalog[categoryId] ?? categoryId}
+                      <span className="ml-2 font-normal text-muted-foreground">
+                        ({rows.length})
+                      </span>
+                    </h3>
+                    <div className="space-y-2">{rows.map(renderRow)}</div>
+                  </div>
+                );
+              })}
             </Accordion>
           </section>
 
