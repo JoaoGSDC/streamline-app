@@ -28,6 +28,8 @@ export const updateBotCommandSchema = createBotCommandSchema.partial();
 export const createBotTimerSchema = z.object({
   name: z.string().max(64).optional().nullable(),
   intervalMinutes: z.coerce.number().int().min(1).max(120),
+  firstRunAfterMinutes: z.coerce.number().int().min(1).max(120).optional(),
+  scheduleMode: z.enum(["live_elapsed"]).optional().default("live_elapsed"),
   message: z.string().min(1).max(500),
   enabled: z.boolean().optional().default(true),
 });

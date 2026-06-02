@@ -5,6 +5,10 @@ import {
   DEPRECATED_BUILTIN_KEYS,
   getBuiltinDefinition,
 } from "@server/bot/bot-builtin-commands";
+import {
+  BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
+  resolveFirstRunAfterMinutes,
+} from "@lib/bot-timer-schedule";
 import { db } from "./db";
 import {
   botActiveChannels,
@@ -344,11 +348,19 @@ export async function softDeleteBotCommand(id: string, streamerId: string) {
 }
 
 function mapTimerRow(row: typeof botTimers.$inferSelect) {
+  const intervalMinutes = row.intervalMinutes;
+  const firstRunAfterMinutes = resolveFirstRunAfterMinutes(
+    intervalMinutes,
+    row.firstRunAfterMinutes
+  );
+
   return {
     id: row.id,
     streamerId: row.streamerId,
     name: row.name,
-    intervalMinutes: row.intervalMinutes,
+    intervalMinutes,
+    firstRunAfterMinutes,
+    scheduleMode: row.scheduleMode ?? BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
     message: row.message,
     enabled: Boolean(row.enabled),
     updatedAt: row.updatedAt,
@@ -403,17 +415,27 @@ export async function createBotTimer(data: {
   streamerId: string;
   name?: string | null;
   intervalMinutes: number;
+  firstRunAfterMinutes?: number;
+  scheduleMode?: string;
   message: string;
   enabled: boolean;
 }) {
   const now = new Date();
+  const intervalMinutes = data.intervalMinutes;
+  const firstRunAfterMinutes = resolveFirstRunAfterMinutes(
+    intervalMinutes,
+    data.firstRunAfterMinutes
+  );
+
   const [row] = await db
     .insert(botTimers)
     .values({
       id: data.id,
       streamerId: data.streamerId,
       name: data.name?.trim() || null,
-      intervalMinutes: data.intervalMinutes,
+      intervalMinutes,
+      firstRunAfterMinutes,
+      scheduleMode: data.scheduleMode ?? BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
       message: data.message.trim(),
       enabled: data.enabled,
       createdAt: now,
@@ -431,6 +453,8 @@ export async function updateBotTimer(
   data: Partial<{
     name: string | null;
     intervalMinutes: number;
+    firstRunAfterMinutes: number;
+    scheduleMode: string;
     message: string;
     enabled: boolean;
   }>
@@ -443,6 +467,10 @@ export async function updateBotTimer(
   if (data.intervalMinutes !== undefined) {
     patch.intervalMinutes = data.intervalMinutes;
   }
+  if (data.firstRunAfterMinutes !== undefined) {
+    patch.firstRunAfterMinutes = data.firstRunAfterMinutes;
+  }
+  if (data.scheduleMode !== undefined) patch.scheduleMode = data.scheduleMode;
   if (data.message !== undefined) patch.message = data.message.trim();
   if (data.enabled !== undefined) patch.enabled = data.enabled;
 

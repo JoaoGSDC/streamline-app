@@ -71,8 +71,8 @@ export const BOT_TIMER_VARIABLE_HINT: BotVariableDefinition = {
   key: "{timer:<nome>}",
   label: "Nome do timer (referência)",
   description:
-    "Use o nome do timer nas mensagens automáticas. Timers não substituem variáveis em comandos até o bot suportar — exibido como referência.",
-  usage: "Próximo lembrete: timer redes sociais",
+    "Timers disparam a cada X minutos desde o início da live (ex.: 21:05, 21:10 com intervalo 5 min). Referência para organização na admin.",
+  usage: "Lembrete PIX a cada 5 min de live",
   category: "timer",
 };
 

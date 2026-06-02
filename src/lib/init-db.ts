@@ -118,6 +118,8 @@ const BOT_TIMERS_TABLE = `
     streamer_id TEXT NOT NULL,
     name TEXT,
     interval_minutes INTEGER NOT NULL,
+    first_run_after_minutes INTEGER,
+    schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed',
     message TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
     deleted_at INTEGER,
@@ -204,6 +206,8 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE streamers ADD COLUMN link_page_config TEXT`,
     `ALTER TABLE streamer_games ADD COLUMN rating REAL`,
     `ALTER TABLE bot_commands ADD COLUMN builtin_key TEXT`,
+    `ALTER TABLE bot_timers ADD COLUMN first_run_after_minutes INTEGER`,
+    `ALTER TABLE bot_timers ADD COLUMN schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed'`,
   ];
 
   for (const sql of migrations) {

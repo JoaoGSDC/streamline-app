@@ -6,6 +6,8 @@ export interface BotTimerRecord {
   streamerId: string;
   name: string | null;
   intervalMinutes: number;
+  firstRunAfterMinutes: number;
+  scheduleMode: "live_elapsed";
   message: string;
   enabled: boolean;
   updatedAt: string | Date;
@@ -15,6 +17,8 @@ export interface BotTimerRecord {
 export interface CreateBotTimerPayload {
   name?: string | null;
   intervalMinutes: number;
+  firstRunAfterMinutes?: number;
+  scheduleMode?: "live_elapsed";
   message: string;
   enabled?: boolean;
 }

@@ -132,6 +132,13 @@ export const botTimers = sqliteTable("bot_timers", {
     .references(() => streamers.id, { onDelete: "cascade" }),
   name: text("name"),
   intervalMinutes: integer("interval_minutes").notNull(),
+  /**
+   * Minutos após o início da live para a primeira mensagem.
+   * Null no banco = usar `intervalMinutes` (ex.: live 21:00, intervalo 5 → 21:05, 21:10…).
+   */
+  firstRunAfterMinutes: integer("first_run_after_minutes"),
+  /** `live_elapsed` — disparos ancorados ao início da transmissão ao vivo. */
+  scheduleMode: text("schedule_mode").notNull().default("live_elapsed"),
   message: text("message").notNull(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
