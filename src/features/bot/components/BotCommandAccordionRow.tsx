@@ -77,77 +77,93 @@ export function BotCommandAccordionRow({
         ? "Streamer"
         : null;
 
+  const previewText =
+    command.response.trim() ||
+    command.responseTemplate?.trim() ||
+    "";
+
   return (
     <AccordionItem
       value={command.id}
-      className="rounded-lg border border-outline-variant/30 px-3"
+      className="overflow-hidden rounded-lg border border-outline-variant/30 px-3"
     >
-      <div className="flex items-center gap-2 py-1">
-        <AccordionTrigger className="flex-1 py-3 hover:no-underline">
-          <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
-            <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-body-sm font-medium">
-              {command.trigger || "novo_comando"}
-            </code>
-            {command.isBuiltin ? (
-              <Badge
-                variant="outline"
-                className="border-outline-variant/50 bg-transparent shadow-none"
-              >
-                Padrão
-              </Badge>
-            ) : (
-              <Badge
-                variant="outline"
-                className="border-outline-variant/50 bg-transparent shadow-none"
-              >
-                Personalizado
-              </Badge>
-            )}
-            {command.categoryLabel && (
-              <Badge
-                variant="outline"
-                className="hidden border-outline-variant/50 bg-muted/30 shadow-none sm:inline-flex"
-              >
-                {command.categoryLabel}
-              </Badge>
-            )}
-            {roleLabel && (
-              <Badge
-                variant="outline"
-                className="border-amber-500/40 bg-transparent text-amber-700 shadow-none dark:text-amber-400"
-              >
-                {roleLabel}
-              </Badge>
-            )}
-            {command.argsHint && (
-              <span className="hidden truncate font-mono text-body-xs text-muted-foreground lg:inline">
-                {command.argsHint}
-              </span>
-            )}
-            {hasUnsavedChanges && (
+      <div className="flex min-w-0 items-center gap-2 py-1">
+        <AccordionTrigger className="min-w-0 flex-1 gap-2 overflow-hidden py-3 hover:no-underline">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-left sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-body-sm font-medium">
+                {command.trigger || "novo_comando"}
+              </code>
+              {command.isBuiltin ? (
+                <Badge
+                  variant="outline"
+                  className="border-outline-variant/50 bg-transparent shadow-none"
+                >
+                  Padrão
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-outline-variant/50 bg-transparent shadow-none"
+                >
+                  Personalizado
+                </Badge>
+              )}
+              {command.categoryLabel && (
+                <Badge
+                  variant="outline"
+                  className="hidden border-outline-variant/50 bg-muted/30 shadow-none sm:inline-flex"
+                >
+                  {command.categoryLabel}
+                </Badge>
+              )}
+              {roleLabel && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/40 bg-transparent text-amber-700 shadow-none dark:text-amber-400"
+                >
+                  {roleLabel}
+                </Badge>
+              )}
+              {command.argsHint && (
+                <span className="hidden max-w-[8rem] truncate font-mono text-body-xs text-muted-foreground lg:inline">
+                  {command.argsHint}
+                </span>
+              )}
+              {hasUnsavedChanges && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex shrink-0 text-amber-500"
+                      role="img"
+                      aria-label="Não salvo"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <AlertCircle className="h-4 w-4" aria-hidden />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Não salvo</TooltipContent>
+                </Tooltip>
+              )}
+              {command.isDraft && (
+                <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
+                  Rascunho
+                </Badge>
+              )}
+            </div>
+            {previewText ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span
-                    className="inline-flex shrink-0 text-amber-500"
-                    role="img"
-                    aria-label="Não salvo"
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <AlertCircle className="h-4 w-4" aria-hidden />
+                  <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-body-sm text-muted-foreground">
+                    {previewText}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top">Não salvo</TooltipContent>
+                <TooltipContent side="top" className="max-w-sm break-words">
+                  {previewText}
+                </TooltipContent>
               </Tooltip>
-            )}
-            {command.isDraft && (
-              <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
-                Rascunho
-              </Badge>
-            )}
-            <span className="hidden truncate text-body-sm text-muted-foreground sm:inline">
-              {command.response}
-            </span>
+            ) : null}
           </div>
         </AccordionTrigger>
         <Switch
@@ -222,7 +238,7 @@ export function BotCommandAccordionRow({
         ) : command.responseTemplate ? (
           <div className="space-y-2">
             <Label>Mensagem no chat (modelo)</Label>
-            <p className="rounded-md border border-outline-variant/30 bg-muted/20 px-3 py-2 font-mono text-body-xs text-muted-foreground">
+            <p className="line-clamp-3 break-words rounded-md border border-outline-variant/30 bg-muted/20 px-3 py-2 font-mono text-body-xs text-muted-foreground">
               {command.responseTemplate}
             </p>
             {command.requiresConfirmation && command.confirmationPrompt && (

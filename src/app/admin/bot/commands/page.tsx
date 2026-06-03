@@ -120,7 +120,7 @@ export default function BotCommandsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <AdminPageHeader
         title="Comandos"
         description="Comandos padrão do StreaminHub e personalizados do seu canal. Use o botão Salvar em cada linha para aplicar as alterações."

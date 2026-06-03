@@ -69,11 +69,11 @@ export function BotTimerAccordionRow({
   return (
     <AccordionItem
       value={timer.id}
-      className="rounded-lg border border-outline-variant/30 px-3"
+      className="overflow-hidden rounded-lg border border-outline-variant/30 px-3"
     >
-      <div className="flex items-center gap-2 py-1">
-        <AccordionTrigger className="flex-1 py-3 hover:no-underline">
-          <div className="flex min-w-0 flex-1 flex-col gap-1 text-left sm:flex-row sm:items-center sm:gap-2">
+      <div className="flex min-w-0 items-center gap-2 py-1">
+        <AccordionTrigger className="min-w-0 flex-1 gap-2 overflow-hidden py-3 hover:no-underline">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-left sm:flex-row sm:items-center sm:gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span className="font-medium text-foreground">
                 {timer.name.trim() || "Timer sem nome"}
@@ -114,9 +114,22 @@ export function BotTimerAccordionRow({
                 </Tooltip>
               )}
             </div>
-            <span className="truncate text-body-sm text-muted-foreground">
-              {timer.message || "Sem mensagem"}
-            </span>
+            {timer.message ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-body-sm text-muted-foreground">
+                    {timer.message}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm break-words">
+                  {timer.message}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="text-body-sm text-muted-foreground">
+                Sem mensagem
+              </span>
+            )}
           </div>
         </AccordionTrigger>
         <Switch

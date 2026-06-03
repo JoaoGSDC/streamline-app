@@ -87,7 +87,7 @@ export function BotMessageComposer({
   const variableGroups = groupVariablesByCategory(variables);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 overflow-hidden">
       <Textarea
         ref={textareaRef}
         value={value}
@@ -95,7 +95,7 @@ export function BotMessageComposer({
         rows={4}
         placeholder={placeholder}
         disabled={disabled}
-        className="font-mono text-body-sm"
+        className="max-w-full break-words font-mono text-body-sm"
       />
 
       <div className="flex flex-wrap items-center gap-2">
