@@ -3,15 +3,21 @@ import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
 import { listBotTimers } from "@lib/bot-db-queries";
 import { getStreamerById } from "@lib/db-queries";
 import {
+  BOT_BUILTIN_CATEGORY_LABELS,
+  BOT_BUILTIN_COMMANDS,
+  DEFAULT_CONFIRMATION_ACCEPT_WORDS,
+  DEFAULT_CONFIRMATION_REJECT_WORDS,
+  DEFAULT_CONFIRMATION_TIMEOUT_SECONDS,
+  DEFAULT_MOD_STREAMER_CONFIRMATION_PROMPT,
+} from "@server/bot/bot-builtin-commands";
+import {
   BOT_GLOBAL_VARIABLES,
+  BOT_RUNTIME_TEMPLATE_VARIABLES,
   BOT_TIMER_VARIABLE_HINT,
   BOT_CATEGORY_LABELS,
   type BotVariableDefinition,
 } from "@server/bot/bot-variables.catalog";
-import {
-  BOT_BUILTIN_CATEGORY_LABELS,
-  BOT_BUILTIN_COMMANDS,
-} from "@server/bot/bot-builtin-commands";
+import { BOT_COMMAND_ARG_VARIABLES } from "@lib/bot-message-substitution";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
 
 export async function listBotVariablesController(request: NextRequest) {
@@ -62,8 +68,16 @@ export async function listBotVariablesController(request: NextRequest) {
     return jsonSuccess({
       categories: BOT_CATEGORY_LABELS,
       globals,
+      commandArgs: BOT_COMMAND_ARG_VARIABLES,
       counters: dynamicCounters,
       timers: dynamicTimers,
+      runtimeTemplateVariables: BOT_RUNTIME_TEMPLATE_VARIABLES,
+      confirmation: {
+        defaultPrompt: DEFAULT_MOD_STREAMER_CONFIRMATION_PROMPT,
+        acceptWords: [...DEFAULT_CONFIRMATION_ACCEPT_WORDS],
+        rejectWords: [...DEFAULT_CONFIRMATION_REJECT_WORDS],
+        timeoutSeconds: DEFAULT_CONFIRMATION_TIMEOUT_SECONDS,
+      },
       builtinCommandCategories: BOT_BUILTIN_CATEGORY_LABELS,
       builtinCommands: BOT_BUILTIN_COMMANDS.map((command) => ({
         key: command.key,
@@ -76,6 +90,9 @@ export async function listBotVariablesController(request: NextRequest) {
         customizableResponse: command.customizableResponse,
         runtimeNotes: command.runtimeNotes ?? null,
         externalApiUrlTemplate: command.externalApiUrlTemplate ?? null,
+        responseTemplate: command.responseTemplate ?? null,
+        requiresConfirmation: command.requiresConfirmation ?? false,
+        confirmationPrompt: command.confirmationPrompt ?? null,
       })),
     });
   } catch (error) {

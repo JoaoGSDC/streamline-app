@@ -5,6 +5,7 @@ import {
   DEPRECATED_BUILTIN_KEYS,
   getBuiltinDefinition,
 } from "@server/bot/bot-builtin-commands";
+import { isLegacyRuntimePlaceholder } from "@server/bot/builtin-commands/helpers";
 import {
   BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
   resolveFirstRunAfterMinutes,
@@ -96,13 +97,33 @@ export async function ensureBuiltinBotCommands(streamerId: string) {
       )
       .limit(1);
 
-    if (existing[0]) continue;
+    if (existing[0]) {
+      if (
+        isLegacyRuntimePlaceholder(existing[0].response) ||
+        (!builtin.customizableResponse && existing[0].response?.trim())
+      ) {
+        await db
+          .update(botCommands)
+          .set({ response: "", updatedAt: now })
+          .where(
+            and(
+              eq(botCommands.streamerId, streamerId),
+              eq(botCommands.builtinKey, builtin.key)
+            )
+          );
+      }
+      continue;
+    }
+
+    const dbResponse = builtin.customizableResponse
+      ? builtin.defaultResponse
+      : "";
 
     await db.insert(botCommands).values({
       id: `builtin-${builtin.key}-${streamerId}`,
       streamerId,
       trigger: builtin.trigger,
-      response: builtin.defaultResponse,
+      response: dbResponse,
       cooldownSeconds: builtin.defaultCooldownSeconds,
       enabled: true,
       builtinKey: builtin.key,
@@ -211,6 +232,9 @@ export async function listActiveBotCommandsForSnapshot(streamerId: string) {
         customizableResponse: definition.customizableResponse,
         runtimeNotes: definition.runtimeNotes ?? null,
         externalApiUrlTemplate: definition.externalApiUrlTemplate ?? null,
+        responseTemplate: definition.responseTemplate ?? null,
+        requiresConfirmation: definition.requiresConfirmation ?? false,
+        confirmationPrompt: definition.confirmationPrompt ?? null,
       },
     };
   });

@@ -34,6 +34,9 @@ export interface BotCommandRowState {
   minRole?: "everyone" | "moderator" | "streamer";
   argsHint?: string | null;
   customizableResponse?: boolean;
+  responseTemplate?: string | null;
+  requiresConfirmation?: boolean;
+  confirmationPrompt?: string | null;
   runtimeNotes?: string | null;
   externalApiUrlTemplate?: string | null;
   isDraft?: boolean;
@@ -216,10 +219,26 @@ export function BotCommandAccordionRow({
               saving={saving}
             />
           </div>
+        ) : command.responseTemplate ? (
+          <div className="space-y-2">
+            <Label>Mensagem no chat (modelo)</Label>
+            <p className="rounded-md border border-outline-variant/30 bg-muted/20 px-3 py-2 font-mono text-body-xs text-muted-foreground">
+              {command.responseTemplate}
+            </p>
+            {command.requiresConfirmation && command.confirmationPrompt && (
+              <p className="text-body-xs text-muted-foreground">
+                Confirmação: {command.confirmationPrompt}
+              </p>
+            )}
+            <p className="text-body-xs text-muted-foreground">
+              Texto montado automaticamente pelo bot com dados da live. Não é
+              editável aqui.
+            </p>
+          </div>
         ) : (
           <p className="text-body-sm text-muted-foreground">
-            Este comando é executado automaticamente pelo bot (Twitch Helix, pontos,
-            etc.). Você pode apenas ativá-lo ou desativá-lo.
+            Este comando é executado automaticamente pelo bot. Você pode apenas
+            ativá-lo ou desativá-lo.
           </p>
         )}
 

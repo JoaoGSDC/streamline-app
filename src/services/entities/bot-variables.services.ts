@@ -6,7 +6,7 @@ export interface BotVariableItem {
   label: string;
   description: string;
   usage: string;
-  category: "global" | "counter" | "timer" | "meta";
+  category: "global" | "args" | "counter" | "timer" | "meta";
   example?: string;
 }
 
@@ -27,13 +27,24 @@ export interface BotBuiltinCommandCatalogItem {
   customizableResponse: boolean;
   runtimeNotes: string | null;
   externalApiUrlTemplate: string | null;
+  responseTemplate: string | null;
+  requiresConfirmation: boolean;
+  confirmationPrompt: string | null;
 }
 
 export interface BotVariablesCatalogResponse {
   categories: Record<string, string>;
   globals: BotVariableItem[];
+  commandArgs?: BotVariableItem[];
   counters: BotVariableItem[];
   timers: BotVariableItem[];
+  runtimeTemplateVariables?: BotVariableItem[];
+  confirmation?: {
+    defaultPrompt: string;
+    acceptWords: string[];
+    rejectWords: string[];
+    timeoutSeconds: number;
+  };
   builtinCommandCategories?: Record<BotBuiltinCategoryId, string>;
   builtinCommands: BotBuiltinCommandCatalogItem[];
 }
@@ -47,6 +58,7 @@ export const botVariables = {
       response.data ?? {
         categories: {},
         globals: [],
+        commandArgs: [],
         counters: [],
         timers: [],
         builtinCommands: [],

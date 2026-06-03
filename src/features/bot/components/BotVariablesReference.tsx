@@ -92,8 +92,35 @@ export function BotVariablesReference({
               </p>
 
               <VariableGroup title="Globais" items={catalog.globals} />
+              <VariableGroup title="Argumentos do comando" items={catalog.commandArgs ?? []} />
               <VariableGroup title="Contadores" items={catalog.counters} />
               <VariableGroup title="Timers" items={catalog.timers} />
+
+              {(catalog.commandArgs?.length ?? 0) > 0 && (
+                <div className="rounded-md border border-outline-variant/30 bg-primary-container/10 px-3 py-3 text-body-sm">
+                  <p className="font-medium text-foreground">
+                    Exemplo estilo StreamElements
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Comando personalizado{" "}
+                    <code className="text-xs">!hugs @joaomossi7</code> com mensagem{" "}
+                    <code className="text-xs">
+                      {"{displayName} meteu Hugs em {1}"}
+                    </code>{" "}
+                    →{" "}
+                    <span className="text-foreground">
+                      fantonlord meteu Hugs em @joaomossi7
+                    </span>
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    <strong>{`{1}`}</strong> a <strong>{`{9}`}</strong> = cada
+                    palavra após o comando. <strong>{`{sender}`}</strong> = quem
+                    digitou (igual a {`{displayName}`}). No StreamElements use{" "}
+                    <code>${"{sender}"}</code> e <code>${"{1}"}</code>; aqui use{" "}
+                    chaves <code>{`{displayName}`}</code> e <code>{`{1}`}</code>.
+                  </p>
+                </div>
+              )}
 
               {catalog.globals.some((v) => v.key === "{user}") && (
                 <div className="rounded-md bg-primary-container/15 px-3 py-2 text-body-sm">

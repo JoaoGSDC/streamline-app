@@ -42,7 +42,12 @@ export function useBotTimersPage() {
   const allVariables = useMemo(
     () =>
       catalog
-        ? [...catalog.globals, ...catalog.counters, ...catalog.timers]
+        ? [
+            ...catalog.globals,
+            ...(catalog.commandArgs ?? []),
+            ...catalog.counters,
+            ...catalog.timers,
+          ]
         : [],
     [catalog]
   );

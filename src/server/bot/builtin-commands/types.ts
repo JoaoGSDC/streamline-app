@@ -15,23 +15,26 @@ export type BotBuiltinExecutionKind =
 export interface BotBuiltinCommandDefinition {
   key: string;
   trigger: string;
+  /** Legado/admin: vazio para comandos não-estáticos. Nunca ecoar no chat. */
   defaultResponse: string;
   description: string;
   defaultCooldownSeconds: number;
   category: BotBuiltinCategory;
   executionKind: BotBuiltinExecutionKind;
   minRole: BotBuiltinMinRole;
-  /** Sintaxe de argumentos exibida na admin (ex.: [cara/coroa]) */
   argsHint?: string;
-  /** Permite editar a mensagem de resposta na admin */
   customizableResponse: boolean;
-  /** Notas para implementação no serviço do bot */
   runtimeNotes?: string;
-  /**
-   * GET externo com `{channel}` no query (ex.: FyreWire clip).
-   * O bot substitui `{channel}` pelo login Twitch do canal e envia o corpo da resposta ao chat.
-   */
   externalApiUrlTemplate?: string;
+  /**
+   * Molde humanizado que o bot deve montar/substituir antes de enviar ao chat.
+   * Comandos estáticos usam `defaultResponse`; runtime/mod/streamer usam isto.
+   */
+  responseTemplate?: string;
+  /** Mod/streamer: pedir sim/não antes de executar. */
+  requiresConfirmation?: boolean;
+  /** Mensagem exibida ao pedir confirmação (placeholders: {displayName}, {trigger}, {argsSummary}). */
+  confirmationPrompt?: string;
 }
 
 export const BOT_BUILTIN_CATEGORY_LABELS: Record<BotBuiltinCategory, string> = {
@@ -55,5 +58,13 @@ export const DEPRECATED_BUILTIN_KEYS = [
   "horarios",
 ] as const;
 
-export const RUNTIME_RESPONSE_PLACEHOLDER =
+/** Texto legado gravado no banco — deve ser limpo e nunca enviado ao chat. */
+export const LEGACY_RUNTIME_RESPONSE_PLACEHOLDER =
   "Resposta gerada automaticamente pelo bot em tempo real.";
+
+export const DEFAULT_MOD_STREAMER_CONFIRMATION_PROMPT =
+  "@{displayName}, você pediu {trigger}{argsSummary}. É isso mesmo? Responda sim ou não nos próximos 30 segundos.";
+
+export const DEFAULT_CONFIRMATION_ACCEPT_WORDS = ["sim", "s", "yes", "y"] as const;
+export const DEFAULT_CONFIRMATION_REJECT_WORDS = ["nao", "não", "n", "no"] as const;
+export const DEFAULT_CONFIRMATION_TIMEOUT_SECONDS = 30;

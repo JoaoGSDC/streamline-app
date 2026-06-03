@@ -42,6 +42,9 @@ function recordToRow(
     customizableResponse: catalogItem?.customizableResponse,
     runtimeNotes: catalogItem?.runtimeNotes,
     externalApiUrlTemplate: catalogItem?.externalApiUrlTemplate,
+    responseTemplate: catalogItem?.responseTemplate,
+    requiresConfirmation: catalogItem?.requiresConfirmation,
+    confirmationPrompt: catalogItem?.confirmationPrompt,
   };
 }
 
@@ -95,7 +98,12 @@ export function useBotCommandsPage() {
   const allVariables = useMemo(
     () =>
       catalog
-        ? [...catalog.globals, ...catalog.counters, ...catalog.timers]
+        ? [
+            ...catalog.globals,
+            ...(catalog.commandArgs ?? []),
+            ...catalog.counters,
+            ...catalog.timers,
+          ]
         : [],
     [catalog]
   );

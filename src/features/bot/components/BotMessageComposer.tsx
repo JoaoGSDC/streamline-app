@@ -40,9 +40,10 @@ function groupVariablesByCategory(variables: BotVariableItem[]) {
 
 const CATEGORY_LABELS: Record<string, string> = {
   global: "Globais",
+  args: "Argumentos",
   counter: "Contadores",
   timer: "Timers",
-  meta: "Outros",
+  meta: "Runtime",
 };
 
 export function BotMessageComposer({
