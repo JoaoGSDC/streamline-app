@@ -15,6 +15,8 @@ export interface ModeratorUserSearchProps {
   className?: string;
   /** Logins que não devem aparecer (dono do canal, moderadores já cadastrados) */
   excludeLogins?: string[];
+  inputAriaLabel?: string;
+  listboxId?: string;
 }
 
 export function ModeratorUserSearch({
@@ -25,6 +27,8 @@ export function ModeratorUserSearch({
   placeholder = "Buscar usuário na Twitch...",
   className,
   excludeLogins = [],
+  inputAriaLabel = "Buscar usuário na Twitch",
+  listboxId = "twitch-user-search-listbox",
 }: ModeratorUserSearchProps) {
   const [results, setResults] = useState<TwitchChannelResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -33,7 +37,7 @@ export function ModeratorUserSearch({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listboxId = "moderator-user-search-listbox";
+  const listboxIdResolved = listboxId;
 
   const excludedKey = excludeLogins
     .map((l) => l.trim().toLowerCase())
@@ -174,7 +178,7 @@ export function ModeratorUserSearch({
       )}
       role="combobox"
       aria-expanded={showDropdown}
-      aria-controls={listboxId}
+      aria-controls={listboxIdResolved}
       aria-haspopup="listbox"
     >
       <div className="relative">
@@ -194,7 +198,7 @@ export function ModeratorUserSearch({
           disabled={disabled}
           className="h-10 border-outline-variant/40 bg-surface-container-low/80 pl-10 pr-10 text-body-sm"
           autoComplete="off"
-          aria-label="Buscar usuário Twitch para moderador"
+          aria-label={inputAriaLabel}
           aria-autocomplete="list"
         />
         {value && !isSearching && (
@@ -222,7 +226,7 @@ export function ModeratorUserSearch({
 
       {showDropdown && results.length > 0 && (
         <ul
-          id={listboxId}
+          id={listboxIdResolved}
           className="autocomplete-dropdown absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg py-1"
           role="listbox"
         >

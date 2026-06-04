@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   CalendarPlus,
+  CircleDollarSign,
   Gamepad2,
   Home,
   Link2,
   ExternalLink,
+  ShoppingBag,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,12 @@ const baseNavItems = [
     icon: Link2,
     match: (path: string) => path.startsWith("/admin/links"),
   },
+  {
+    href: "/admin/loja",
+    label: "Loja",
+    icon: ShoppingBag,
+    match: (path: string) => path.startsWith("/admin/loja"),
+  },
 ] as const;
 
 export function AdminSidebar({
@@ -63,6 +71,12 @@ export function AdminSidebar({
           label: "Bot",
           icon: Bot,
           match: (path: string) => path.startsWith("/admin/bot"),
+        },
+        {
+          href: "/admin/economia",
+          label: "Pontuação",
+          icon: CircleDollarSign,
+          match: (path: string) => path.startsWith("/admin/economia"),
         },
         {
           href: "/admin/moderators",

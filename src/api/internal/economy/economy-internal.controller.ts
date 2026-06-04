@@ -1,0 +1,285 @@
+import { NextRequest } from "next/server";
+import { assertBotServiceToken } from "@lib/bot-auth";
+import {
+  adjustViewerPoints,
+  botAwardPoints,
+  botAwardXp,
+  getChannelRanking,
+  getEconomyConfigSnapshot,
+  getEconomyConfigVersion,
+  getViewerBalance,
+  setViewerPoints,
+  upsertChannelViewer,
+} from "@lib/economy-db-queries";
+import {
+  botAdjustPointsSchema,
+  botAwardPointsSchema,
+  botAwardXpSchema,
+  botSyncViewerSchema,
+  formatZodErrorMessages,
+} from "@server/economy/economy.validators";
+import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
+import { createRandomString } from "@utils/factories/create-random-string";
+import { twitchServerService } from "@server/twitch/twitch.service";
+
+function assertM2M(request: NextRequest) {
+  if (!assertBotServiceToken(request)) {
+    return jsonError("Não autorizado", 401, "UNAUTHORIZED");
+  }
+  return null;
+}
+
+export async function getEconomyInternalConfigController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const sinceVersion = parseInt(
+      request.nextUrl.searchParams.get("sinceVersion") ?? "0",
+      10
+    );
+    const currentVersion = await getEconomyConfigVersion(streamerId);
+
+    if (sinceVersion > 0 && sinceVersion >= currentVersion) {
+      return new Response(null, {
+        status: 304,
+        headers: { "X-Economy-Config-Version": String(currentVersion) },
+      });
+    }
+
+    const config = await getEconomyConfigSnapshot(streamerId);
+
+    return jsonSuccess(
+      { configVersion: currentVersion, ...config },
+      200,
+      { "X-Economy-Config-Version": String(currentVersion) }
+    );
+  } catch (error) {
+    return handleRouteError(error, "Falha ao carregar config de economia");
+  }
+}
+
+export async function getEconomyInternalBalanceController(
+  request: NextRequest,
+  streamerId: string,
+  twitchUserId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const balance = await getViewerBalance(streamerId, twitchUserId);
+    return jsonSuccess(balance);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao consultar saldo");
+  }
+}
+
+export async function getEconomyInternalRankingController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const searchParams = request.nextUrl.searchParams;
+    const search = searchParams.get("search") ?? undefined;
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const limit = parseInt(searchParams.get("limit") ?? "10", 10);
+
+    const ranking = await getChannelRanking(streamerId, {
+      search,
+      page: Number.isNaN(page) ? 1 : page,
+      limit: Number.isNaN(limit) ? 10 : limit,
+    });
+
+    return jsonSuccess(ranking);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao carregar ranking");
+  }
+}
+
+export async function postEconomyInternalSyncViewerController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const body = await request.json();
+    const parsed = botSyncViewerSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    const viewer = await upsertChannelViewer({
+      id: createRandomString(12),
+      streamerId,
+      twitchUserId: parsed.data.twitchUserId,
+      twitchUsername: parsed.data.twitchUsername,
+      displayName: parsed.data.displayName,
+    });
+
+    return jsonSuccess(viewer);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao sincronizar viewer");
+  }
+}
+
+export async function postEconomyInternalAwardPointsController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const body = await request.json();
+    const parsed = botAwardPointsSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    const result = await botAwardPoints({
+      streamerId,
+      viewerId: createRandomString(12),
+      twitchUserId: parsed.data.twitchUserId,
+      twitchUsername: parsed.data.twitchUsername,
+      displayName: parsed.data.displayName,
+      basePoints: parsed.data.basePoints,
+      multiplier: parsed.data.multiplier,
+    });
+
+    return jsonSuccess(result);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao conceder pontos");
+  }
+}
+
+export async function postEconomyInternalAwardXpController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const body = await request.json();
+    const parsed = botAwardXpSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    const result = await botAwardXp({
+      streamerId,
+      viewerId: createRandomString(12),
+      twitchUserId: parsed.data.twitchUserId,
+      twitchUsername: parsed.data.twitchUsername,
+      displayName: parsed.data.displayName,
+      xpAmount: parsed.data.xpAmount,
+    });
+
+    return jsonSuccess(result);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao conceder XP");
+  }
+}
+
+export async function postEconomyInternalAdjustPointsController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const authError = assertM2M(request);
+    if (authError) return authError;
+
+    const body = await request.json();
+    const parsed = botAdjustPointsSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    const targetUsername = parsed.data.targetTwitchUsername
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+
+    let targetUserId = parsed.data.targetTwitchUserId?.trim();
+    let targetDisplayName = parsed.data.targetDisplayName?.trim();
+
+    if (!targetUserId || !targetDisplayName) {
+      const twitchUser = await twitchServerService.getUserByLogin(targetUsername);
+      if (!twitchUser) {
+        return jsonError("Viewer alvo não encontrado na Twitch", 404, "NOT_FOUND");
+      }
+      targetUserId = twitchUser.id;
+      targetDisplayName = targetDisplayName ?? twitchUser.displayName;
+    }
+
+    const commandLabel = parsed.data.commandKey ?? "comando";
+    const reason =
+      parsed.data.reason?.trim() ||
+      `Ajuste manual via ${commandLabel} por @${parsed.data.actorTwitchUsername}`;
+
+    const viewerId = createRandomString(12);
+    const actorUserId = parsed.data.actorTwitchUserId;
+    const actorUsername = parsed.data.actorTwitchUsername;
+
+    if (parsed.data.action === "set") {
+      const viewer = await setViewerPoints({
+        auditId: createRandomString(16),
+        streamerId,
+        actorUserId,
+        actorUsername,
+        twitchUserId: targetUserId,
+        twitchUsername: targetUsername,
+        displayName: targetDisplayName,
+        viewerId,
+        points: parsed.data.amount,
+        reason,
+      });
+
+      return jsonSuccess({
+        action: "set",
+        amount: parsed.data.amount,
+        viewer,
+        totalPoints: viewer.points,
+      });
+    }
+
+    if (parsed.data.amount <= 0) {
+      return jsonError("Informe uma quantidade maior que zero", 400, "VALIDATION_ERROR");
+    }
+
+    const delta =
+      parsed.data.action === "remove" ? -parsed.data.amount : parsed.data.amount;
+
+    const viewer = await adjustViewerPoints({
+      auditId: createRandomString(16),
+      streamerId,
+      actorUserId,
+      actorUsername,
+      twitchUserId: targetUserId,
+      twitchUsername: targetUsername,
+      displayName: targetDisplayName,
+      viewerId,
+      delta,
+      reason,
+    });
+
+    return jsonSuccess({
+      action: parsed.data.action,
+      amount: parsed.data.amount,
+      viewer,
+      totalPoints: viewer.points,
+      pointsChanged: Math.abs(delta),
+    });
+  } catch (error) {
+    return handleRouteError(error, "Falha ao ajustar pontos");
+  }
+}

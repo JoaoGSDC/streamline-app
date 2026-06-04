@@ -13,6 +13,8 @@ import { botActivation } from "./entities/bot-activation.services";
 import { botStatus } from "./entities/bot-status.services";
 import { botVariables } from "./entities/bot-variables.services";
 import { botEmotes } from "./entities/bot-emotes.services";
+import { economy } from "./entities/economy.services";
+import { store } from "./entities/store.services";
 import {
   GameService,
   ScheduledStreamService,
@@ -48,6 +50,8 @@ export const services = {
   botStatus,
   botVariables,
   botEmotes,
+  economy,
+  store,
   gamesLegacy: GameService,
   scheduledStreamsLegacy: ScheduledStreamService,
 } as const;

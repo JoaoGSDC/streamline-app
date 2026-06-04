@@ -117,4 +117,34 @@ export const MODERATOR_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
       "@{displayName}, executar previsão ({argsSummary})? Responda sim ou não.",
     runtimeNotes: "Subcomandos: !prediction criar … e !prediction encerrar via Helix.",
   }),
+  modAction("addpontos", "!addpontos", {
+    description: "Adiciona pontos manualmente a um viewer.",
+    argsHint: "[pontos] @usuario",
+    responseTemplate:
+      "+{pointsAdded} pontos para {targetUser}. Saldo atual: {totalPoints}.",
+    confirmationPrompt:
+      "@{displayName}, adicionar pontos ({argsSummary})? Responda sim ou não.",
+    runtimeNotes:
+      "Moderadores e o streamer (broadcaster) podem usar. POST M2M .../points/adjust action=add. Cria o viewer se não existir.",
+  }),
+  modAction("setpontos", "!setpontos", {
+    description: "Define o saldo de pontos de um viewer.",
+    argsHint: "[pontos] @usuario",
+    responseTemplate:
+      "Saldo de {targetUser} definido para {totalPoints} pontos.",
+    confirmationPrompt:
+      "@{displayName}, definir pontos ({argsSummary})? Responda sim ou não.",
+    runtimeNotes:
+      "Moderadores e o streamer (broadcaster) podem usar. POST M2M .../points/adjust action=set.",
+  }),
+  modAction("removepontos", "!removepontos", {
+    description: "Remove pontos de um viewer.",
+    argsHint: "[pontos] @usuario",
+    responseTemplate:
+      "-{pointsRemoved} pontos de {targetUser}. Saldo atual: {totalPoints}.",
+    confirmationPrompt:
+      "@{displayName}, remover pontos ({argsSummary})? Responda sim ou não.",
+    runtimeNotes:
+      "Moderadores e o streamer (broadcaster) podem usar. POST M2M .../points/adjust action=remove.",
+  }),
 ];
