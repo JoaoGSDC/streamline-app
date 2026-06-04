@@ -2,8 +2,10 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowLeft,
+  ArrowUpDown,
   Search,
   ShoppingBag,
   Sparkles,
@@ -22,7 +24,22 @@ import {
 import { usePublicStore } from "@features/store/hooks/use-public-store.hook";
 import { StorePriceLabel } from "@features/store/components/StorePriceLabel";
 import { StoreRarityBadge } from "@features/store/components/StoreRarityBadge";
+import { StoreWalletBar } from "@features/store/components/StoreWalletBar";
+import { StoreBuyCoinsPanel } from "@features/store/components/StoreBuyCoinsPanel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { StoreProductDto, StoreProductSort } from "@server/store/store.types";
+import { canAffordProduct } from "@server/store/store-product-utils";
+
+const SORT_OPTIONS: Array<{ value: StoreProductSort; label: string; coinsOnly?: boolean }> = [
+  { value: "default", label: "Ordem padrão" },
+  { value: "newest", label: "Mais recentes" },
+  { value: "name_asc", label: "Nome (A–Z)" },
+  { value: "name_desc", label: "Nome (Z–A)" },
+  { value: "points_asc", label: "Menor preço em pontos" },
+  { value: "points_desc", label: "Maior preço em pontos" },
+  { value: "coins_asc", label: "Menor preço em coins", coinsOnly: true },
+  { value: "coins_desc", label: "Maior preço em coins", coinsOnly: true },
+];
 
 export default function PublicStorePage() {
   const params = useParams();
@@ -30,19 +47,33 @@ export default function PublicStorePage() {
 
   const {
     catalog,
+    balance,
     loading,
+    balanceLoading,
     search,
     setSearch,
     categoryId,
     setCategoryId,
+    sortBy,
+    setSortBy,
     filteredProducts,
     featuredProducts,
     redeemingId,
     redeem,
+    userPoints,
+    userCoins,
+    coinsAllowed,
   } = usePublicStore(username);
 
   const storeDisabled =
-    !loading && (!catalog || !catalog.config.enabled || !catalog.config);
+    !loading && (!catalog || !catalog.config.enabled);
+
+  const sortOptions = SORT_OPTIONS.filter(
+    (opt) => !opt.coinsOnly || coinsAllowed
+  );
+
+  const showBuyCoinsPanel =
+    coinsAllowed && catalog?.config.coinsPurchase;
 
   return (
     <div className="relative z-10 min-h-screen bg-background">
@@ -69,6 +100,7 @@ export default function PublicStorePage() {
                 <Skeleton className="h-4 w-32" />
               </div>
             </div>
+            <Skeleton className="h-20 w-full rounded-xl" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Skeleton key={i} className="h-48 rounded-xl" />
@@ -86,8 +118,8 @@ export default function PublicStorePage() {
             </p>
           </div>
         ) : (
-          <>
-            <header className="mb-8 flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+          <div className="space-y-8">
+            <header className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
               <Avatar className="h-16 w-16">
                 <AvatarImage src={catalog!.streamer.avatar ?? undefined} />
                 <AvatarFallback>
@@ -100,13 +132,38 @@ export default function PublicStorePage() {
                 </h1>
                 <p className="text-muted-foreground">
                   Resgate recompensas com pontos
-                  {catalog!.config.coinsAllowed ? " ou coins" : ""}
+                  {coinsAllowed ? " ou coins premium" : ""}
                 </p>
               </div>
             </header>
 
+            <StoreWalletBar
+              balance={balance}
+              loading={balanceLoading}
+              storeUsername={username}
+              streamerName={catalog!.streamer.name}
+              coinsAllowed={coinsAllowed}
+            />
+
+            {showBuyCoinsPanel && catalog!.config.coinsPurchase && (
+              <StoreBuyCoinsPanel
+                pixieUrl={catalog!.config.coinsPurchase.pixieUrl}
+                pixieUsername={catalog!.config.coinsPurchase.pixieUsername}
+                streamerName={catalog!.streamer.name}
+                userCoins={userCoins}
+                authenticated={balance?.authenticated ?? false}
+              />
+            )}
+
+            {coinsAllowed && !balance?.authenticated && (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-body-sm text-muted-foreground">
+                Este canal aceita <strong className="text-amber-600">Coins</strong>{" "}
+                premium. Entre com Twitch para ver seu saldo completo na loja.
+              </div>
+            )}
+
             {featuredProducts.length > 0 && (
-              <section className="mb-8">
+              <section>
                 <h2 className="mb-4 flex items-center gap-2 font-headline text-title-md font-semibold">
                   <Sparkles className="h-5 w-5 text-primary" />
                   Destaques
@@ -116,16 +173,20 @@ export default function PublicStorePage() {
                     <ProductCard
                       key={product.id}
                       product={product}
-                      coinsAllowed={catalog!.config.coinsAllowed}
+                      storeUsername={username}
+                      coinsAllowed={coinsAllowed}
+                      authenticated={balance?.authenticated ?? false}
+                      userPoints={userPoints}
+                      userCoins={userCoins}
                       redeeming={redeemingId === product.id}
-                      onRedeem={() => void redeem(product.id)}
+                      onRedeem={(payWith) => void redeem(product, payWith)}
                     />
                   ))}
                 </div>
               </section>
             )}
 
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 lg:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -136,7 +197,7 @@ export default function PublicStorePage() {
                 />
               </div>
               <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full lg:w-48">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,6 +209,22 @@ export default function PublicStorePage() {
                         {cat.name}
                       </SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={sortBy}
+                onValueChange={(v) => setSortBy(v as StoreProductSort)}
+              >
+                <SelectTrigger className="w-full lg:w-56">
+                  <ArrowUpDown className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -162,14 +239,18 @@ export default function PublicStorePage() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    coinsAllowed={catalog!.config.coinsAllowed}
+                    storeUsername={username}
+                    coinsAllowed={coinsAllowed}
+                    authenticated={balance?.authenticated ?? false}
+                    userPoints={userPoints}
+                    userCoins={userCoins}
                     redeeming={redeemingId === product.id}
-                    onRedeem={() => void redeem(product.id)}
+                    onRedeem={(payWith) => void redeem(product, payWith)}
                   />
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
     </div>
@@ -178,17 +259,46 @@ export default function PublicStorePage() {
 
 function ProductCard({
   product,
+  storeUsername,
   coinsAllowed,
+  authenticated,
+  userPoints,
+  userCoins,
   redeeming,
   onRedeem,
 }: {
-  product: import("@server/store/store.types").StoreProductDto;
+  product: StoreProductDto;
+  storeUsername: string;
   coinsAllowed: boolean;
+  authenticated: boolean;
+  userPoints: number;
+  userCoins: number;
   redeeming: boolean;
-  onRedeem: () => void;
+  onRedeem: (payWith?: "points" | "coins" | "combined") => void;
 }) {
+  const [payWith, setPayWith] = useState<"points" | "coins">(
+    product.pricePoints > 0 ? "points" : "coins"
+  );
+
   const outOfStock =
     !product.stockUnlimited && (product.stockQuantity ?? 0) <= 0;
+
+  const needsPayChoice = product.priceMode === "either" && coinsAllowed;
+  const effectivePayWith =
+    product.priceMode === "combined"
+      ? "combined"
+      : product.priceMode === "either"
+        ? payWith
+        : product.priceMode === "coins_only"
+          ? "coins"
+          : "points";
+
+  const affordable =
+    authenticated &&
+    canAffordProduct(product, userPoints, userCoins, effectivePayWith);
+
+  const showInsufficient =
+    authenticated && !affordable && !outOfStock;
 
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-outline-variant/30 bg-card shadow-sm">
@@ -223,13 +333,56 @@ function ProductCard({
                 : `${product.stockQuantity} disponíveis`}
             </p>
           )}
-          <Button
-            className="w-full"
-            disabled={outOfStock || redeeming}
-            onClick={onRedeem}
-          >
-            {redeeming ? "Resgatando…" : outOfStock ? "Esgotado" : "Resgatar"}
-          </Button>
+          {needsPayChoice && (
+            <Select
+              value={payWith}
+              onValueChange={(v) => setPayWith(v as "points" | "coins")}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {product.pricePoints > 0 && (
+                  <SelectItem value="points">
+                    Pagar com {product.pricePoints.toLocaleString("pt-BR")} pts
+                  </SelectItem>
+                )}
+                {product.priceCoins > 0 && (
+                  <SelectItem value="coins">
+                    Pagar com {product.priceCoins.toLocaleString("pt-BR")} coins
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          )}
+          {showInsufficient && (
+            <p className="text-body-xs text-destructive">
+              Saldo insuficiente para este produto.
+            </p>
+          )}
+          {!authenticated ? (
+            <Button className="w-full" asChild disabled={outOfStock}>
+              <Link
+                href={`/auth?returnTo=${encodeURIComponent(`/store/${storeUsername}`)}`}
+              >
+                Entrar para resgatar
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              className="w-full"
+              disabled={outOfStock || redeeming || !affordable}
+              onClick={() => onRedeem(effectivePayWith)}
+            >
+              {redeeming
+                ? "Resgatando…"
+                : outOfStock
+                  ? "Esgotado"
+                  : showInsufficient
+                    ? "Saldo insuficiente"
+                    : "Resgatar"}
+            </Button>
+          )}
         </div>
       </div>
     </article>

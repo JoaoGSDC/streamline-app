@@ -24,6 +24,7 @@ import {
 import { getStreamerById } from "./db-queries";
 import {
   adjustViewerPoints,
+  getViewerBalance,
   upsertChannelViewer,
 } from "./economy-db-queries";
 import type {
@@ -37,11 +38,17 @@ import type {
   StoreProductRarity,
   StoreProductStatus,
   StoreProductType,
+  StorePublicBalanceDto,
   StorePublicCatalogDto,
   StoreRedemptionDto,
   StoreRedemptionStatus,
 } from "@server/store/store.types";
 import { slugifyStoreText } from "@server/store/store.validators";
+import {
+  buildPixiePurchaseUrl,
+  isProductVisibleInPublicCatalog,
+  resolvePixieUsername,
+} from "@server/store/store-product-utils";
 import { HttpError } from "@server/utils/http-error";
 
 function parseJsonArray(raw: string | null | undefined): string[] {
@@ -293,6 +300,7 @@ export async function getStoreConfig(
     enabled: Boolean(row!.enabled),
     publicEnabled: Boolean(row!.publicEnabled),
     defaultFulfillmentMode: row!.defaultFulfillmentMode as StoreFulfillmentMode,
+    pixieUsername: row!.pixieUsername ?? null,
     configVersion: row!.configVersion,
     updatedAt: row!.updatedAt,
     coinsAllowed,
@@ -305,6 +313,7 @@ export async function updateStoreConfig(
     enabled: boolean;
     publicEnabled: boolean;
     defaultFulfillmentMode: string;
+    pixieUsername: string | null;
   }>,
   actor: { userId: string; username: string }
 ): Promise<StoreChannelConfigDto & { coinsAllowed: boolean }> {
@@ -1479,6 +1488,19 @@ export async function getPublicStoreCatalog(
   if (!streamerRow) return null;
 
   const config = await getStoreConfig(streamerRow.id);
+  const coinsPurchase =
+    config.coinsAllowed
+      ? {
+          pixieUsername: resolvePixieUsername(
+            config.pixieUsername,
+            streamerRow.twitchUsername
+          ),
+          pixieUrl: buildPixiePurchaseUrl(
+            resolvePixieUsername(config.pixieUsername, streamerRow.twitchUsername)
+          ),
+        }
+      : undefined;
+
   if (!config.enabled || !config.publicEnabled) {
     return {
       streamer: {
@@ -1488,7 +1510,11 @@ export async function getPublicStoreCatalog(
         avatar: streamerRow.avatar ?? null,
         partner: Boolean(streamerRow.partner),
       },
-      config: { enabled: false, coinsAllowed: config.coinsAllowed },
+      config: {
+        enabled: false,
+        coinsAllowed: config.coinsAllowed,
+        coinsPurchase,
+      },
       categories: [],
       featuredProducts: [],
       recentProducts: [],
@@ -1503,14 +1529,18 @@ export async function getPublicStoreCatalog(
     limit: 500,
   });
 
-  const visible = allProducts.filter((p) => !p.secret);
+  const visible = allProducts.filter((p) =>
+    isProductVisibleInPublicCatalog(p, config.coinsAllowed)
+  );
   const featuredProducts = visible.filter((p) => p.featured);
   const recentProducts = [...visible]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 12);
 
   const dashboard = await getStoreDashboard(streamerRow.id);
-  const popularProducts = dashboard.popularProducts.map((p) => p.product);
+  const popularProducts = dashboard.popularProducts
+    .map((p) => p.product)
+    .filter((p) => isProductVisibleInPublicCatalog(p, config.coinsAllowed));
 
   return {
     streamer: {
@@ -1520,7 +1550,11 @@ export async function getPublicStoreCatalog(
       avatar: streamerRow.avatar ?? null,
       partner: Boolean(streamerRow.partner),
     },
-    config: { enabled: true, coinsAllowed: config.coinsAllowed },
+    config: {
+      enabled: true,
+      coinsAllowed: config.coinsAllowed,
+      coinsPurchase,
+    },
     categories,
     featuredProducts,
     recentProducts,
@@ -1538,4 +1572,34 @@ export async function exportStoreRedemptionsCsv(streamerId: string): Promise<str
       `${r.id},"${r.productName}",${r.twitchUsername},${r.status},${r.paidPoints},${r.paidCoins},${r.createdAt.toISOString()}`
   );
   return header + lines.join("\n");
+}
+
+export async function getPublicStoreBalance(
+  twitchUsername: string,
+  twitchUserId: string | null
+): Promise<StorePublicBalanceDto | null> {
+  const catalog = await getPublicStoreCatalog(twitchUsername);
+  if (!catalog?.config.enabled) return null;
+
+  if (!twitchUserId) {
+    return {
+      authenticated: false,
+      points: 0,
+      coins: catalog.config.coinsAllowed ? 0 : null,
+      coinsAllowed: catalog.config.coinsAllowed,
+    };
+  }
+
+  const balance = await getViewerBalance(catalog.streamer.id, twitchUserId);
+
+  return {
+    authenticated: true,
+    points: balance.channel?.points ?? 0,
+    coins: catalog.config.coinsAllowed ? (balance.coins?.coins ?? 0) : null,
+    coinsAllowed: catalog.config.coinsAllowed,
+    displayName:
+      balance.channel?.displayName ??
+      balance.coins?.displayName ??
+      undefined,
+  };
 }

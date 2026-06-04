@@ -37,6 +37,13 @@ export const updateStoreConfigSchema = z.object({
   enabled: z.boolean().optional(),
   publicEnabled: z.boolean().optional(),
   defaultFulfillmentMode: fulfillmentSchema.optional(),
+  pixieUsername: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-zA-Z0-9_]+$/, "Use apenas letras, números e underscore")
+    .nullable()
+    .optional(),
 });
 
 export const createStoreCategorySchema = z.object({

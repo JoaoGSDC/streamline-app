@@ -5,6 +5,7 @@ import type {
   StoreChannelConfigDto,
   StoreDashboardDto,
   StoreProductDto,
+  StorePublicBalanceDto,
   StorePublicCatalogDto,
   StoreRedemptionDto,
 } from "@server/store/store.types";
@@ -35,7 +36,7 @@ export const store = {
     payload: Partial<
       Pick<
         StoreChannelConfigDto,
-        "enabled" | "publicEnabled" | "defaultFulfillmentMode"
+        "enabled" | "publicEnabled" | "defaultFulfillmentMode" | "pixieUsername"
       >
     >
   ): Promise<StoreChannelConfigDto> => {
@@ -195,6 +196,15 @@ export const store = {
   ): Promise<StorePublicCatalogDto> => {
     const response = await httpClient.get<StorePublicCatalogDto>(
       ENDPOINTS.Internal.Store.PublicCatalog(username)
+    );
+    return response.data;
+  },
+
+  getPublicBalance: async (
+    username: string
+  ): Promise<StorePublicBalanceDto> => {
+    const response = await httpClient.get<StorePublicBalanceDto>(
+      ENDPOINTS.Internal.Store.PublicBalance(username)
     );
     return response.data;
   },

@@ -279,6 +279,8 @@ export const storeChannelConfig = sqliteTable("store_channel_config", {
   defaultFulfillmentMode: text("default_fulfillment_mode")
     .notNull()
     .default("approval"),
+  /** @username no Pixie.gg para compra de Coins (opcional; padrão: twitch_username) */
+  pixieUsername: text("pixie_username"),
   configVersion: integer("config_version").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),

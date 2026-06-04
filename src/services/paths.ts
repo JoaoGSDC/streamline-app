@@ -95,6 +95,8 @@ export const ENDPOINTS = {
         `/api/internal/store/redemptions/${id}/refund`,
       PublicCatalog: (username: string) =>
         `/api/internal/store/public/${encodeURIComponent(username)}`,
+      PublicBalance: (username: string) =>
+        `/api/internal/store/public/${encodeURIComponent(username)}/balance`,
       PublicRedeem: (username: string) =>
         `/api/internal/store/public/${encodeURIComponent(username)}/redeem`,
       InternalConfig: (streamerId: string) =>

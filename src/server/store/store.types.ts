@@ -69,6 +69,7 @@ export interface StoreChannelConfigDto {
   publicEnabled: boolean;
   coinsAllowed: boolean;
   defaultFulfillmentMode: StoreFulfillmentMode;
+  pixieUsername: string | null;
   configVersion: number;
   updatedAt: Date;
 }
@@ -171,6 +172,24 @@ export interface StoreDashboardDto {
   featuredProducts: StoreProductDto[];
 }
 
+export type StoreProductSort =
+  | "default"
+  | "name_asc"
+  | "name_desc"
+  | "points_asc"
+  | "points_desc"
+  | "coins_asc"
+  | "coins_desc"
+  | "newest";
+
+export interface StorePublicBalanceDto {
+  authenticated: boolean;
+  points: number;
+  coins: number | null;
+  coinsAllowed: boolean;
+  displayName?: string;
+}
+
 export interface StorePublicCatalogDto {
   streamer: {
     id: string;
@@ -182,6 +201,10 @@ export interface StorePublicCatalogDto {
   config: {
     enabled: boolean;
     coinsAllowed: boolean;
+    coinsPurchase?: {
+      pixieUsername: string;
+      pixieUrl: string;
+    };
   };
   categories: StoreCategoryDto[];
   featuredProducts: StoreProductDto[];

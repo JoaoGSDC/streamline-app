@@ -8,6 +8,7 @@ import {
   duplicateStoreProduct,
   exportStoreRedemptionsCsv,
   getPublicStoreCatalog,
+  getPublicStoreBalance,
   getStoreConfig,
   getStoreDashboard,
   getStoreProductById,
@@ -389,6 +390,21 @@ export async function getPublicStoreController(
     return jsonSuccess(catalog);
   } catch (error) {
     return handleRouteError(error, "Falha ao carregar loja pública");
+  }
+}
+
+export async function getPublicStoreBalanceController(
+  request: NextRequest,
+  username: string
+) {
+  try {
+    const { parseSessionUser } = await import("@lib/admin-auth");
+    const user = parseSessionUser(request);
+    const balance = await getPublicStoreBalance(username, user?.id ?? null);
+    if (!balance) return jsonError("Loja não encontrada", 404, "NOT_FOUND");
+    return jsonSuccess(balance);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao carregar saldo");
   }
 }
 

@@ -268,6 +268,7 @@ const STORE_CHANNEL_CONFIG_TABLE = `
     enabled INTEGER NOT NULL DEFAULT 0,
     public_enabled INTEGER NOT NULL DEFAULT 1,
     default_fulfillment_mode TEXT NOT NULL DEFAULT 'approval',
+    pixie_username TEXT,
     config_version INTEGER NOT NULL DEFAULT 1,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -502,6 +503,7 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE bot_commands ADD COLUMN builtin_key TEXT`,
     `ALTER TABLE bot_timers ADD COLUMN first_run_after_minutes INTEGER`,
     `ALTER TABLE bot_timers ADD COLUMN schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed'`,
+    `ALTER TABLE store_channel_config ADD COLUMN pixie_username TEXT`,
   ];
 
   for (const sql of migrations) {
