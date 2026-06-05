@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { assertBotServiceToken } from "@lib/bot-auth";
+import { getStreamerById } from "@lib/db-queries";
 import {
   adjustViewerPoints,
   botAwardPoints,
@@ -29,13 +30,44 @@ function assertM2M(request: NextRequest) {
   return null;
 }
 
+async function assertStreamerChannel(streamerId: string) {
+  const streamer = await getStreamerById(streamerId);
+  if (!streamer) {
+    return jsonError("Canal não encontrado", 404, "NOT_FOUND");
+  }
+  return null;
+}
+
+async function assertM2MAndStreamer(request: NextRequest, streamerId: string) {
+  const authError = assertM2M(request);
+  if (authError) return authError;
+  return assertStreamerChannel(streamerId);
+}
+
+function mapBotBalanceResponse(balance: Awaited<ReturnType<typeof getViewerBalance>>) {
+  if (!balance.channel) {
+    return { channel: null };
+  }
+  return {
+    channel: {
+      twitchUserId: balance.channel.twitchUserId,
+      twitchUsername: balance.channel.twitchUsername,
+      displayName: balance.channel.displayName,
+      points: balance.channel.points,
+      xp: balance.channel.xp,
+      level: balance.channel.level,
+      levelTitle: balance.channel.levelTitle ?? undefined,
+    },
+  };
+}
+
 export async function getEconomyInternalConfigController(
   request: NextRequest,
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const sinceVersion = parseInt(
       request.nextUrl.searchParams.get("sinceVersion") ?? "0",
@@ -68,11 +100,11 @@ export async function getEconomyInternalBalanceController(
   twitchUserId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const balance = await getViewerBalance(streamerId, twitchUserId);
-    return jsonSuccess(balance);
+    return jsonSuccess(mapBotBalanceResponse(balance));
   } catch (error) {
     return handleRouteError(error, "Falha ao consultar saldo");
   }
@@ -83,8 +115,8 @@ export async function getEconomyInternalRankingController(
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search") ?? undefined;
@@ -108,8 +140,8 @@ export async function postEconomyInternalSyncViewerController(
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const body = await request.json();
     const parsed = botSyncViewerSchema.safeParse(body);
@@ -136,8 +168,8 @@ export async function postEconomyInternalAwardPointsController(
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const body = await request.json();
     const parsed = botAwardPointsSchema.safeParse(body);
@@ -166,8 +198,8 @@ export async function postEconomyInternalAwardXpController(
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const body = await request.json();
     const parsed = botAwardXpSchema.safeParse(body);
@@ -195,8 +227,8 @@ export async function postEconomyInternalAdjustPointsController(
   streamerId: string
 ) {
   try {
-    const authError = assertM2M(request);
-    if (authError) return authError;
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
 
     const body = await request.json();
     const parsed = botAdjustPointsSchema.safeParse(body);

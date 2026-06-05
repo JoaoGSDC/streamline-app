@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEconomyOverviewPage } from "@features/economy/hooks/use-economy-overview-page.hook";
+import { useAdminContext } from "@/components/admin/AdminProvider";
 
 function StatCard({
   title,
@@ -52,6 +53,7 @@ function StatCard({
 
 export default function EconomyOverviewPage() {
   const { overview, loading, saving, toggleEnabled } = useEconomyOverviewPage();
+  const { actingAs } = useAdminContext();
 
   return (
     <TooltipProvider>
@@ -89,6 +91,36 @@ export default function EconomyOverviewPage() {
                 Liga ou desliga todo o sistema de pontuação do canal
               </TooltipContent>
             </Tooltip>
+          </div>
+        </AdminSection>
+
+        <AdminSection
+          title="Integração com o bot"
+          description="O bot auxiliar persiste pontos via API M2M — não lê o Turso diretamente."
+        >
+          <div className="space-y-3 rounded-lg border border-outline-variant/30 bg-surface-container-low/30 p-4 text-body-sm">
+            <p>
+              <strong>streamerId do canal:</strong>{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-body-xs">
+                {actingAs?.id ?? "—"}
+              </code>
+            </p>
+            <p className="text-muted-foreground">
+              Deve ser idêntico a <code>bot_active_channels.streamer_id</code> e{" "}
+              <code>streamers.id</code> no Turso.
+            </p>
+            <p className="text-muted-foreground">
+              No servidor do bot, configure{" "}
+              <code>STREAMLINE_APP_URL</code> (ou <code>STREAMINHUB_API_URL</code>) e{" "}
+              <code>BOT_SERVICE_TOKEN</code> — o mesmo valor definido no{" "}
+              <code>.env</code> deste app.
+            </p>
+            {!overview?.enabled && (
+              <p className="text-amber-600">
+                Ative a pontuação acima. Isso liga <code>general.enabled</code>,{" "}
+                <code>pointsEnabled</code> e <code>levelsEnabled</code> na API.
+              </p>
+            )}
           </div>
         </AdminSection>
 

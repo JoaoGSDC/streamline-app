@@ -34,12 +34,20 @@ export function useEconomyOverviewPage() {
   const toggleEnabled = async (enabled: boolean) => {
     setSaving(true);
     try {
-      await services.economy.updateGeneral({ enabled });
+      await services.economy.updateGeneral(
+        enabled
+          ? {
+              enabled: true,
+              pointsEnabled: true,
+              levelsEnabled: true,
+            }
+          : { enabled: false }
+      );
       toast({
         title: enabled ? "Pontuação ativada" : "Pontuação desativada",
         description: enabled
-          ? "Seus viewers já podem acumular pontos quando o bot estiver integrado."
-          : "Nenhum ponto novo será distribuído.",
+          ? "Pontos e níveis foram habilitados. O bot precisa de STREAMLINE_APP_URL + BOT_SERVICE_TOKEN no .env."
+          : "Nenhum ponto ou XP novo será distribuído enquanto estiver desligado.",
       });
       await load();
     } catch {

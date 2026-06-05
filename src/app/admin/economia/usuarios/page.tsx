@@ -6,7 +6,7 @@ import { ModeratorUserSearch } from "@/components/admin/ModeratorUserSearch";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminSection } from "@/components/admin/shared/AdminSection";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
-import { EconomyUserActionsDialog } from "@features/economy/components/EconomyUserActionsDialog";
+import { EconomyUserAccordionRow } from "@features/economy/components/EconomyUserAccordionRow";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,15 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { ChannelViewerEconomyDto } from "@server/economy/economy.types";
+import { Accordion } from "@/components/ui/accordion";
 import { useEconomyUsersPage } from "@features/economy/hooks/use-economy-users-page.hook";
 
 export default function EconomyUsersPage() {
@@ -49,7 +41,11 @@ export default function EconomyUsersPage() {
     sortBy,
     setSortBy,
     loading,
-    submitting,
+    addingViewer,
+    resettingAll,
+    openAccordion,
+    setOpenAccordion,
+    isSavingUser,
     addUsername,
     setAddUsername,
     initialPoints,
@@ -64,8 +60,6 @@ export default function EconomyUsersPage() {
     resetAllPoints,
   } = useEconomyUsersPage();
 
-  const [selectedUser, setSelectedUser] =
-    useState<ChannelViewerEconomyDto | null>(null);
   const [resetAllOpen, setResetAllOpen] = useState(false);
   const [resetAllReason, setResetAllReason] = useState("");
   const [resetAllConfirm, setResetAllConfirm] = useState("");
@@ -74,7 +68,7 @@ export default function EconomyUsersPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Usuários"
-        description="Visualize saldos e faça ajustes manuais. Toda alteração é registrada em auditoria."
+        description="Visualize saldos e faça ajustes manuais. Expanda cada usuário para gerenciar pontos, coins ou reset."
       >
         <Button
           variant="destructive"
@@ -98,7 +92,7 @@ export default function EconomyUsersPage() {
                 setSelectedChannel(null);
               }}
               onSelect={setSelectedChannel}
-              disabled={submitting}
+              disabled={addingViewer}
               className="sm:flex-1"
               placeholder="Buscar viewer na Twitch…"
               inputAriaLabel="Buscar viewer na Twitch para adicionar"
@@ -113,16 +107,16 @@ export default function EconomyUsersPage() {
                 min={0}
                 value={initialPoints}
                 onChange={(e) => setInitialPoints(e.target.value)}
-                disabled={submitting}
+                disabled={addingViewer}
               />
             </div>
             <Button
               type="submit"
-              disabled={submitting || !addUsername.trim()}
+              disabled={addingViewer || !addUsername.trim()}
               className="sm:shrink-0"
             >
               <UserPlus className="mr-2 h-4 w-4" aria-hidden />
-              {submitting ? "Adicionando…" : "Adicionar"}
+              {addingViewer ? "Adicionando…" : "Adicionar"}
             </Button>
           </div>
         </form>
@@ -162,7 +156,7 @@ export default function EconomyUsersPage() {
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -173,47 +167,24 @@ export default function EconomyUsersPage() {
           />
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Pontos</TableHead>
-                  <TableHead>Nível / XP</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="font-medium">{user.displayName}</div>
-                      <div className="text-body-xs text-muted-foreground">
-                        @{user.twitchUsername}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.points.toLocaleString("pt-BR")}
-                    </TableCell>
-                    <TableCell>
-                      Nv. {user.level}
-                      {user.levelTitle ? ` · ${user.levelTitle}` : ""}
-                      <div className="text-body-xs text-muted-foreground">
-                        {user.xp.toLocaleString("pt-BR")} XP
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedUser(user)}
-                      >
-                        Gerenciar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Accordion
+              type="multiple"
+              value={openAccordion}
+              onValueChange={setOpenAccordion}
+              className="space-y-2"
+            >
+              {items.map((user) => (
+                <EconomyUserAccordionRow
+                  key={user.id}
+                  user={user}
+                  saving={isSavingUser(user.id)}
+                  onSetPoints={setPoints}
+                  onAdjustPoints={adjustPoints}
+                  onAdjustCoins={adjustCoins}
+                  onResetUser={resetUser}
+                />
+              ))}
+            </Accordion>
 
             {totalPages > 1 && (
               <div className="mt-4 flex items-center justify-center gap-2">
@@ -241,19 +212,6 @@ export default function EconomyUsersPage() {
           </>
         )}
       </AdminSection>
-
-      {selectedUser && (
-        <EconomyUserActionsDialog
-          user={selectedUser}
-          open={Boolean(selectedUser)}
-          onOpenChange={(open) => !open && setSelectedUser(null)}
-          submitting={submitting}
-          onAdjustPoints={adjustPoints}
-          onSetPoints={setPoints}
-          onAdjustCoins={adjustCoins}
-          onResetUser={resetUser}
-        />
-      )}
 
       <Dialog open={resetAllOpen} onOpenChange={setResetAllOpen}>
         <DialogContent>
@@ -295,7 +253,7 @@ export default function EconomyUsersPage() {
             <Button
               variant="destructive"
               disabled={
-                submitting ||
+                resettingAll ||
                 resetAllReason.length < 3 ||
                 resetAllConfirm !== "RESETAR TODOS OS PONTOS"
               }

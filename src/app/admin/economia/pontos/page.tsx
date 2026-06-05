@@ -18,6 +18,24 @@ import {
 } from "@/components/ui/tooltip";
 import { useEconomyPointsPage } from "@features/economy/hooks/use-economy-points-page.hook";
 
+function SectionSaveButton({
+  onClick,
+  saving,
+  label = "Salvar seção",
+}: {
+  onClick: () => void;
+  saving: boolean;
+  label?: string;
+}) {
+  return (
+    <div className="flex justify-end border-t border-outline-variant/20 pt-4">
+      <Button size="sm" onClick={onClick} disabled={saving}>
+        {saving ? "Salvando…" : label}
+      </Button>
+    </div>
+  );
+}
+
 export default function EconomyPointsPage() {
   const {
     form,
@@ -27,9 +45,13 @@ export default function EconomyPointsPage() {
     publicRanking,
     setPublicRanking,
     loading,
-    saving,
+    isSaving,
     previewSummary,
-    save,
+    saveActivation,
+    saveWatchTime,
+    saveMultipliers,
+    saveDailyCap,
+    saveEarnMessage,
   } = useEconomyPointsPage();
 
   if (loading) {
@@ -47,12 +69,8 @@ export default function EconomyPointsPage() {
       <div className="space-y-6">
         <AdminPageHeader
           title="Sistema de Pontos"
-          description="Configure como seus viewers ganham pontos gratuitos durante a live."
-        >
-          <Button onClick={() => void save()} disabled={saving}>
-            {saving ? "Salvando…" : "Salvar alterações"}
-          </Button>
-        </AdminPageHeader>
+          description="Configure como seus viewers ganham pontos gratuitos durante a live. Cada seção tem seu próprio botão Salvar."
+        />
 
         <AdminSection title="Ativação">
           <div className="space-y-4">
@@ -82,6 +100,11 @@ export default function EconomyPointsPage() {
                 onCheckedChange={setPublicRanking}
               />
             </div>
+            <SectionSaveButton
+              onClick={() => void saveActivation()}
+              saving={isSaving("activation")}
+              label="Salvar ativação"
+            />
           </div>
         </AdminSection>
 
@@ -89,58 +112,67 @@ export default function EconomyPointsPage() {
           title="Ganhos por tempo na live"
           description="Defina quantos pontos o viewer recebe e com que frequência."
         >
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="points-per-interval">Pontos por intervalo</Label>
-              <Input
-                id="points-per-interval"
-                type="number"
-                min={1}
-                value={form.pointsPerInterval}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    pointsPerInterval: Number(e.target.value) || 1,
-                  }))
-                }
-              />
+          <div className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="points-per-interval">Pontos por intervalo</Label>
+                <Input
+                  id="points-per-interval"
+                  type="number"
+                  min={1}
+                  value={form.pointsPerInterval}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      pointsPerInterval: Number(e.target.value) || 1,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="interval-minutes">Intervalo (minutos)</Label>
+                <Input
+                  id="interval-minutes"
+                  type="number"
+                  min={1}
+                  value={form.intervalMinutes}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      intervalMinutes: Number(e.target.value) || 1,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="min-messages">
+                  Mensagens mínimas no intervalo
+                </Label>
+                <Input
+                  id="min-messages"
+                  type="number"
+                  min={0}
+                  value={form.minMessagesPerInterval}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      minMessagesPerInterval: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+                <p className="text-body-xs text-muted-foreground">
+                  <strong>0</strong> = modo passivo (StreamElements): pontos para quem
+                  está na lista de chatters — o bot precisa ser moderador com escopo{" "}
+                  <code className="text-body-xs">moderator:read:chatters</code>.
+                  <strong className="ml-1">1 ou mais</strong> = modo ativo: o viewer
+                  precisa enviar mensagens normais no intervalo.
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-minutes">Intervalo (minutos)</Label>
-              <Input
-                id="interval-minutes"
-                type="number"
-                min={1}
-                value={form.intervalMinutes}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    intervalMinutes: Number(e.target.value) || 1,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="min-messages">
-                Mensagens mínimas no intervalo
-              </Label>
-              <Input
-                id="min-messages"
-                type="number"
-                min={0}
-                value={form.minMessagesPerInterval}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    minMessagesPerInterval: Number(e.target.value) || 0,
-                  }))
-                }
-              />
-              <p className="text-body-xs text-muted-foreground">
-                Evita pontos para contas AFK — o viewer precisa enviar pelo
-                menos esta quantidade de mensagens.
-              </p>
-            </div>
+            <SectionSaveButton
+              onClick={() => void saveWatchTime()}
+              saving={isSaving("watchTime")}
+            />
           </div>
         </AdminSection>
 
@@ -172,26 +204,36 @@ export default function EconomyPointsPage() {
                 <p className="text-body-xs text-muted-foreground">{hint}</p>
               </div>
             ))}
+            <SectionSaveButton
+              onClick={() => void saveMultipliers()}
+              saving={isSaving("multipliers")}
+            />
           </div>
         </AdminSection>
 
         <AdminSection title="Limite diário">
-          <div className="space-y-2">
-            <Label htmlFor="daily-cap">Máximo de pontos por dia (opcional)</Label>
-            <Input
-              id="daily-cap"
-              type="number"
-              min={1}
-              placeholder="Sem limite"
-              value={form.dailyPointsCap ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  dailyPointsCap: e.target.value
-                    ? Number(e.target.value)
-                    : null,
-                }))
-              }
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="daily-cap">Máximo de pontos por dia (opcional)</Label>
+              <Input
+                id="daily-cap"
+                type="number"
+                min={1}
+                placeholder="Sem limite"
+                value={form.dailyPointsCap ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    dailyPointsCap: e.target.value
+                      ? Number(e.target.value)
+                      : null,
+                  }))
+                }
+              />
+            </div>
+            <SectionSaveButton
+              onClick={() => void saveDailyCap()}
+              saving={isSaving("dailyCap")}
             />
           </div>
         </AdminSection>
@@ -223,6 +265,10 @@ export default function EconomyPointsPage() {
             <p className="text-body-xs text-muted-foreground">
               Variáveis: {"{displayName}"}, {"{points}"}, {"{totalPoints}"}
             </p>
+            <SectionSaveButton
+              onClick={() => void saveEarnMessage()}
+              saving={isSaving("earnMessage")}
+            />
           </div>
         </AdminSection>
 

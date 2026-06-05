@@ -17,11 +17,20 @@ const DEFAULT_POINTS = {
   earnMessageTemplate: "{displayName} ganhou {points} pontos!",
 };
 
+export type EconomyPointsSaveSection =
+  | "activation"
+  | "watchTime"
+  | "multipliers"
+  | "dailyCap"
+  | "earnMessage";
+
 export function useEconomyPointsPage() {
   const { toast } = useToast();
   const [config, setConfig] = useState<EconomyFullConfigDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<EconomyPointsSaveSection | null>(
+    null
+  );
   const [form, setForm] = useState(DEFAULT_POINTS);
   const [pointsEnabled, setPointsEnabled] = useState(false);
   const [publicRanking, setPublicRanking] = useState(true);
@@ -66,23 +75,51 @@ export function useEconomyPointsPage() {
       form.dailyPointsCap != null
         ? ` Limite diário: ${form.dailyPointsCap} pontos.`
         : " Sem limite diário.";
-    return `Usuário ganha ${form.pointsPerInterval} pontos a cada ${form.intervalMinutes} minuto${form.intervalMinutes === 1 ? "" : "s"} (mínimo ${form.minMessagesPerInterval} mensagem${form.minMessagesPerInterval === 1 ? "" : "ns"}). Inscritos recebem ${form.subscriberMultiplier}x, VIPs ${form.vipMultiplier}x e moderadores ${form.moderatorMultiplier}x.${capText}`;
+    const modeText =
+      form.minMessagesPerInterval === 0
+        ? "Modo passivo: pontos para quem está no chat (via lista de chatters do bot), sem precisar digitar."
+        : `Modo ativo: exige pelo menos ${form.minMessagesPerInterval} mensagem${form.minMessagesPerInterval === 1 ? "" : "ns"} por intervalo (comandos ! não contam).`;
+    return `${modeText} Usuário ganha ${form.pointsPerInterval} pontos a cada ${form.intervalMinutes} minuto${form.intervalMinutes === 1 ? "" : "s"}. Inscritos ${form.subscriberMultiplier}x, VIPs ${form.vipMultiplier}x, moderadores ${form.moderatorMultiplier}x.${capText}`;
   }, [form]);
 
-  const save = async () => {
-    setSaving(true);
+  const isSaving = (section: EconomyPointsSaveSection) => savingSection === section;
+
+  const saveActivation = async () => {
+    setSavingSection("activation");
     try {
       await services.economy.updateGeneral({
-        pointsEnabled,
+        ...(pointsEnabled
+          ? { enabled: true, pointsEnabled: true }
+          : { pointsEnabled: false }),
         publicRankingEnabled: publicRanking,
       });
+      toast({
+        title: "Ativação salva",
+        description: "Distribuição de pontos e ranking público atualizados.",
+      });
+      await load();
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar a ativação.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSection(null);
+    }
+  };
+
+  const saveWatchTime = async () => {
+    setSavingSection("watchTime");
+    try {
       await services.economy.updatePoints({
-        ...form,
-        dailyPointsCap: form.dailyPointsCap,
+        pointsPerInterval: form.pointsPerInterval,
+        intervalMinutes: form.intervalMinutes,
+        minMessagesPerInterval: form.minMessagesPerInterval,
       });
       toast({
-        title: "Configurações salvas",
-        description: "As regras de pontos foram atualizadas.",
+        title: "Ganhos por tempo salvos",
+        description: "Intervalo e mensagens mínimas atualizados.",
       });
       await load();
     } catch {
@@ -92,7 +129,76 @@ export function useEconomyPointsPage() {
         variant: "destructive",
       });
     } finally {
-      setSaving(false);
+      setSavingSection(null);
+    }
+  };
+
+  const saveMultipliers = async () => {
+    setSavingSection("multipliers");
+    try {
+      await services.economy.updatePoints({
+        subscriberMultiplier: form.subscriberMultiplier,
+        vipMultiplier: form.vipMultiplier,
+        moderatorMultiplier: form.moderatorMultiplier,
+      });
+      toast({
+        title: "Multiplicadores salvos",
+        description: "Bônus de inscritos, VIPs e moderadores atualizados.",
+      });
+      await load();
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Verifique os valores e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSection(null);
+    }
+  };
+
+  const saveDailyCap = async () => {
+    setSavingSection("dailyCap");
+    try {
+      await services.economy.updatePoints({
+        dailyPointsCap: form.dailyPointsCap,
+      });
+      toast({
+        title: "Limite diário salvo",
+        description: "Teto de pontos por dia atualizado.",
+      });
+      await load();
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Verifique o valor e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSection(null);
+    }
+  };
+
+  const saveEarnMessage = async () => {
+    setSavingSection("earnMessage");
+    try {
+      await services.economy.updatePoints({
+        earnMessageEnabled: form.earnMessageEnabled,
+        earnMessageTemplate: form.earnMessageTemplate,
+      });
+      toast({
+        title: "Mensagem salva",
+        description: "Configuração de aviso no chat atualizada.",
+      });
+      await load();
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Verifique o texto e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSection(null);
     }
   };
 
@@ -105,8 +211,12 @@ export function useEconomyPointsPage() {
     publicRanking,
     setPublicRanking,
     loading,
-    saving,
+    isSaving,
     previewSummary,
-    save,
+    saveActivation,
+    saveWatchTime,
+    saveMultipliers,
+    saveDailyCap,
+    saveEarnMessage,
   };
 }

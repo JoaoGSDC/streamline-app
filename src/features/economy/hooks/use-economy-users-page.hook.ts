@@ -25,7 +25,10 @@ export function useEconomyUsersPage() {
     "points"
   );
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [addingViewer, setAddingViewer] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
+  const [savingUserIds, setSavingUserIds] = useState<Set<string>>(new Set());
+  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
   const [addUsername, setAddUsername] = useState("");
   const [initialPoints, setInitialPoints] = useState("0");
   const [selectedChannel, setSelectedChannel] =
@@ -68,6 +71,43 @@ export function useEconomyUsersPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  const patchUser = useCallback((viewer: ChannelViewerEconomyDto) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === viewer.id ? viewer : item))
+    );
+  }, []);
+
+  const withUserSave = useCallback(
+    async (
+      userId: string,
+      action: () => Promise<ChannelViewerEconomyDto | void>
+    ): Promise<boolean> => {
+      setSavingUserIds((prev) => new Set(prev).add(userId));
+      try {
+        const result = await action();
+        if (result) {
+          patchUser(result);
+        }
+        return true;
+      } catch (error) {
+        return false;
+      } finally {
+        setSavingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    },
+    [patchUser]
+  );
+
+  const findUserId = useCallback(
+    (twitchUserId: string) =>
+      items.find((item) => item.twitchUserId === twitchUserId)?.id ?? twitchUserId,
+    [items]
+  );
+
   const adjustPoints = async (payload: {
     twitchUserId: string;
     twitchUsername: string;
@@ -75,20 +115,22 @@ export function useEconomyUsersPage() {
     amount: number;
     reason: string;
     action: "add" | "remove";
-  }) => {
-    setSubmitting(true);
-    try {
-      await services.economy.adjustPoints(payload);
-      toast({ title: "Pontos atualizados com sucesso" });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao ajustar pontos",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  }): Promise<boolean> => {
+    const userId = findUserId(payload.twitchUserId);
+    return withUserSave(userId, async () => {
+      try {
+        const viewer = await services.economy.adjustPoints(payload);
+        toast({ title: "Pontos atualizados com sucesso" });
+        return viewer;
+      } catch (error) {
+        toast({
+          title: "Erro ao ajustar pontos",
+          description: getApiErrorMessage(error, "Verifique os dados e tente novamente."),
+          variant: "destructive",
+        });
+        throw error;
+      }
+    });
   };
 
   const setPoints = async (payload: {
@@ -97,20 +139,22 @@ export function useEconomyUsersPage() {
     displayName: string;
     points: number;
     reason: string;
-  }) => {
-    setSubmitting(true);
-    try {
-      await services.economy.setPoints(payload);
-      toast({ title: "Saldo de pontos atualizado" });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao definir pontos",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  }): Promise<boolean> => {
+    const userId = findUserId(payload.twitchUserId);
+    return withUserSave(userId, async () => {
+      try {
+        const viewer = await services.economy.setPoints(payload);
+        toast({ title: "Saldo de pontos atualizado" });
+        return viewer;
+      } catch (error) {
+        toast({
+          title: "Erro ao definir pontos",
+          description: getApiErrorMessage(error, "Verifique os dados e tente novamente."),
+          variant: "destructive",
+        });
+        throw error;
+      }
+    });
   };
 
   const adjustCoins = async (payload: {
@@ -120,20 +164,21 @@ export function useEconomyUsersPage() {
     amount: number;
     reason: string;
     action: "add" | "remove";
-  }) => {
-    setSubmitting(true);
-    try {
-      await services.economy.adjustCoins(payload);
-      toast({ title: "Coins atualizadas com sucesso" });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao ajustar coins",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  }): Promise<boolean> => {
+    const userId = findUserId(payload.twitchUserId);
+    return withUserSave(userId, async () => {
+      try {
+        await services.economy.adjustCoins(payload);
+        toast({ title: "Coins atualizadas com sucesso" });
+      } catch (error) {
+        toast({
+          title: "Erro ao ajustar coins",
+          description: getApiErrorMessage(error, "Verifique os dados e tente novamente."),
+          variant: "destructive",
+        });
+        throw error;
+      }
+    });
   };
 
   const resetUser = async (payload: {
@@ -143,24 +188,26 @@ export function useEconomyUsersPage() {
     resetPoints: boolean;
     resetXp: boolean;
     reason: string;
-  }) => {
-    setSubmitting(true);
-    try {
-      await services.economy.resetUser(payload);
-      toast({ title: "Usuário resetado com sucesso" });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao resetar usuário",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  }): Promise<boolean> => {
+    const userId = findUserId(payload.twitchUserId);
+    return withUserSave(userId, async () => {
+      try {
+        const viewer = await services.economy.resetUser(payload);
+        toast({ title: "Usuário resetado com sucesso" });
+        return viewer;
+      } catch (error) {
+        toast({
+          title: "Erro ao resetar usuário",
+          description: getApiErrorMessage(error, "Verifique os dados e tente novamente."),
+          variant: "destructive",
+        });
+        throw error;
+      }
+    });
   };
 
   const resetAllPoints = async (reason: string) => {
-    setSubmitting(true);
+    setResettingAll(true);
     try {
       const result = await services.economy.resetAllPoints({
         reason,
@@ -171,13 +218,14 @@ export function useEconomyUsersPage() {
         description: `${result.affected} usuário(s) afetado(s).`,
       });
       await load();
-    } catch {
+    } catch (error) {
       toast({
         title: "Erro ao resetar pontos do canal",
+        description: getApiErrorMessage(error, "Tente novamente em instantes."),
         variant: "destructive",
       });
     } finally {
-      setSubmitting(false);
+      setResettingAll(false);
     }
   };
 
@@ -200,7 +248,7 @@ export function useEconomyUsersPage() {
         return;
       }
 
-      setSubmitting(true);
+      setAddingViewer(true);
       try {
         const points = Math.max(0, Number(initialPoints) || 0);
         const viewer = await services.economy.addUser(
@@ -231,10 +279,15 @@ export function useEconomyUsersPage() {
           variant: "destructive",
         });
       } finally {
-        setSubmitting(false);
+        setAddingViewer(false);
       }
     },
     [addUsername, initialPoints, selectedChannel, load, toast]
+  );
+
+  const isSavingUser = useCallback(
+    (userId: string) => savingUserIds.has(userId),
+    [savingUserIds]
   );
 
   return {
@@ -248,7 +301,11 @@ export function useEconomyUsersPage() {
     sortBy,
     setSortBy,
     loading,
-    submitting,
+    addingViewer,
+    resettingAll,
+    openAccordion,
+    setOpenAccordion,
+    isSavingUser,
     addUsername,
     setAddUsername,
     initialPoints,
