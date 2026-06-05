@@ -68,7 +68,7 @@ export default function EconomyUsersPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Usuários"
-        description="Visualize saldos e faça ajustes manuais. Expanda cada usuário para gerenciar pontos, coins ou reset."
+        description="Expanda um usuário para ajustar pontos, coins ou reset."
       >
         <Button
           variant="destructive"
