@@ -93,6 +93,9 @@ export async function listBotVariablesController(request: NextRequest) {
         responseTemplate: command.responseTemplate ?? null,
         requiresConfirmation: command.requiresConfirmation ?? false,
         confirmationPrompt: command.confirmationPrompt ?? null,
+        economyRewardKey: command.economyRewardKey ?? null,
+        economyRewardPoints: command.economyRewardPoints ?? null,
+        economyBalanceCommand: command.economyBalanceCommand ?? false,
       })),
     });
   } catch (error) {

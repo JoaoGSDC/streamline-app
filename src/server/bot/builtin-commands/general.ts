@@ -104,6 +104,48 @@ export const GENERAL_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
       "{displayName}, você já passou {watchtime} acompanhando o {channel}.",
     runtimeNotes: "Depende de contador/pontos persistidos pelo bot.",
   }),
+  generalRuntime("daily", "!daily", {
+    description:
+      "Recompensa da live — 300 pontos, uma vez por usuário enquanto a transmissão estiver no ar.",
+    defaultCooldownSeconds: 10,
+    customizableResponse: true,
+    defaultResponse:
+      "{displayName} coletou sua recompensa diária de {pointsAdded} pontos! Agora você tem {points} pontos.",
+    responseTemplate:
+      "{displayName} coletou sua recompensa diária de {pointsAdded} pontos! Agora você tem {points} pontos.",
+    runtimeNotes:
+      "POST .../live-rewards/claim com rewardKey=daily e streamStartedAt (started_at da stream Twitch). " +
+      "Uma vez por usuário por transmissão. Se status=already_claimed, responder algo como: " +
+      "\"{displayName}, você já coletou !daily nesta live.\"",
+    economyRewardKey: "daily",
+    economyRewardPoints: 300,
+  }),
+  generalRuntime("early", "!early", {
+    description:
+      "Bônus por chegar cedo na live — 100 pontos, uma vez por usuário por transmissão.",
+    defaultCooldownSeconds: 10,
+    customizableResponse: true,
+    defaultResponse:
+      "{displayName} chegou cedo e ganhou {pointsAdded} pontos! Agora você tem {points} pontos.",
+    responseTemplate:
+      "{displayName} chegou cedo e ganhou {pointsAdded} pontos! Agora você tem {points} pontos.",
+    runtimeNotes:
+      "POST .../live-rewards/claim com rewardKey=early e streamStartedAt. " +
+      "Uma vez por usuário por transmissão. Se status=already_claimed: " +
+      "\"{displayName}, você já usou !early nesta live.\"",
+    economyRewardKey: "early",
+    economyRewardPoints: 100,
+  }),
+  generalRuntime("pontos", "!pontos", {
+    description: "Mostra quantos pontos o usuário tem no canal.",
+    defaultCooldownSeconds: 10,
+    customizableResponse: true,
+    defaultResponse: "{displayName}, você tem {points} pontos.",
+    responseTemplate: "{displayName}, você tem {points} pontos.",
+    runtimeNotes:
+      "GET .../balance/{twitchUserId}. Substituir {points} pelo saldo retornado (0 se viewer novo).",
+    economyBalanceCommand: true,
+  }),
   generalRuntime("rank", "!rank", {
     description: "Posição do usuário no ranking de watchtime do canal.",
     defaultCooldownSeconds: 20,

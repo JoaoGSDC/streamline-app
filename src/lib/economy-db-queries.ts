@@ -12,6 +12,7 @@ import {
   economyAuditLog,
   economyChannelConfig,
   economyLevelsConfig,
+  economyLiveRewardClaims,
   economyPointsConfig,
   platformUserCoins,
 } from "./schema";
@@ -31,6 +32,11 @@ import {
   type ViewerBalanceDto,
 } from "@server/economy/economy.types";
 import { defaultLevelsDefinitionJson } from "@server/economy/economy.validators";
+import {
+  ECONOMY_LIVE_REWARD_POINTS,
+  type EconomyLiveRewardClaimStatus,
+  type EconomyLiveRewardKey,
+} from "@server/economy/economy-live-rewards";
 import { HttpError } from "@server/utils/http-error";
 
 function parseLevelsDefinition(raw: string): EconomyLevelDefinition[] {
@@ -1092,6 +1098,109 @@ export async function resetAllChannelPoints(input: {
 export async function getEconomyConfigSnapshot(streamerId: string) {
   await ensureEconomyDefaults(streamerId);
   return getEconomyFullConfig(streamerId);
+}
+
+export async function claimEconomyLiveReward(input: {
+  claimId: string;
+  auditId: string;
+  streamerId: string;
+  rewardKey: EconomyLiveRewardKey;
+  twitchUserId: string;
+  twitchUsername: string;
+  displayName: string;
+  streamStartedAt: string;
+  viewerId: string;
+}): Promise<{
+  status: EconomyLiveRewardClaimStatus;
+  pointsAwarded: number;
+  viewer: ChannelViewerEconomyDto;
+}> {
+  await ensureEconomyDefaults(input.streamerId);
+  const config = await getEconomyFullConfig(input.streamerId);
+  const levels = await getLevelsForStreamer(input.streamerId);
+
+  const viewer = await upsertChannelViewer({
+    id: input.viewerId,
+    streamerId: input.streamerId,
+    twitchUserId: input.twitchUserId,
+    twitchUsername: input.twitchUsername,
+    displayName: input.displayName,
+  });
+
+  if (!config.general.enabled || !config.general.pointsEnabled) {
+    return { status: "economy_disabled", pointsAwarded: 0, viewer };
+  }
+
+  const [existingClaim] = await db
+    .select()
+    .from(economyLiveRewardClaims)
+    .where(
+      and(
+        eq(economyLiveRewardClaims.streamerId, input.streamerId),
+        eq(economyLiveRewardClaims.twitchUserId, input.twitchUserId),
+        eq(economyLiveRewardClaims.rewardKey, input.rewardKey),
+        eq(economyLiveRewardClaims.streamStartedAt, input.streamStartedAt)
+      )
+    )
+    .limit(1);
+
+  if (existingClaim) {
+    const row = await getViewerRowById(viewer.id);
+    return {
+      status: "already_claimed",
+      pointsAwarded: 0,
+      viewer: mapViewerRow(
+        row!,
+        resolveLevelFromXp(row!.xp, levels).title
+      ),
+    };
+  }
+
+  const basePoints = ECONOMY_LIVE_REWARD_POINTS[input.rewardKey];
+  const previousPoints = viewer.points;
+
+  const award = await botAwardPoints({
+    streamerId: input.streamerId,
+    viewerId: input.viewerId,
+    twitchUserId: input.twitchUserId,
+    twitchUsername: input.twitchUsername,
+    displayName: input.displayName,
+    basePoints,
+    multiplier: 1,
+  });
+
+  const now = new Date();
+  await db.insert(economyLiveRewardClaims).values({
+    id: input.claimId,
+    streamerId: input.streamerId,
+    twitchUserId: input.twitchUserId,
+    rewardKey: input.rewardKey,
+    streamStartedAt: input.streamStartedAt,
+    pointsAwarded: award.awarded,
+    claimedAt: now,
+  });
+
+  if (award.awarded > 0) {
+    await recordAuditLog({
+      id: input.auditId,
+      streamerId: input.streamerId,
+      actorUserId: input.twitchUserId,
+      actorUsername: input.twitchUsername,
+      targetTwitchUserId: input.twitchUserId,
+      targetTwitchUsername: input.twitchUsername,
+      action: "add_points",
+      currencyType: "points",
+      previousValue: previousPoints,
+      newValue: award.viewer.points,
+      reason: `Recompensa !${input.rewardKey} (live ${input.streamStartedAt})`,
+    });
+  }
+
+  return {
+    status: "claimed",
+    pointsAwarded: award.awarded,
+    viewer: award.viewer,
+  };
 }
 
 export async function getEconomyConfigVersion(

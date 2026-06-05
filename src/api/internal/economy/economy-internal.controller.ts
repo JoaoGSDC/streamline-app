@@ -5,6 +5,7 @@ import {
   adjustViewerPoints,
   botAwardPoints,
   botAwardXp,
+  claimEconomyLiveReward,
   getChannelRanking,
   getEconomyConfigSnapshot,
   getEconomyConfigVersion,
@@ -16,6 +17,7 @@ import {
   botAdjustPointsSchema,
   botAwardPointsSchema,
   botAwardXpSchema,
+  botClaimLiveRewardSchema,
   botSyncViewerSchema,
   formatZodErrorMessages,
 } from "@server/economy/economy.validators";
@@ -313,5 +315,51 @@ export async function postEconomyInternalAdjustPointsController(
     });
   } catch (error) {
     return handleRouteError(error, "Falha ao ajustar pontos");
+  }
+}
+
+export async function postEconomyInternalLiveRewardClaimController(
+  request: NextRequest,
+  streamerId: string
+) {
+  try {
+    const gateError = await assertM2MAndStreamer(request, streamerId);
+    if (gateError) return gateError;
+
+    const body = await request.json();
+    const parsed = botClaimLiveRewardSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    const result = await claimEconomyLiveReward({
+      claimId: createRandomString(16),
+      auditId: createRandomString(16),
+      streamerId,
+      rewardKey: parsed.data.rewardKey,
+      twitchUserId: parsed.data.twitchUserId,
+      twitchUsername: parsed.data.twitchUsername,
+      displayName: parsed.data.displayName,
+      streamStartedAt: parsed.data.streamStartedAt,
+      viewerId: createRandomString(12),
+    });
+
+    return jsonSuccess({
+      status: result.status,
+      rewardKey: parsed.data.rewardKey,
+      pointsAwarded: result.pointsAwarded,
+      totalPoints: result.viewer.points,
+      viewer: {
+        twitchUserId: result.viewer.twitchUserId,
+        twitchUsername: result.viewer.twitchUsername,
+        displayName: result.viewer.displayName,
+        points: result.viewer.points,
+        xp: result.viewer.xp,
+        level: result.viewer.level,
+        levelTitle: result.viewer.levelTitle ?? undefined,
+      },
+    });
+  } catch (error) {
+    return handleRouteError(error, "Falha ao resgatar recompensa da live");
   }
 }

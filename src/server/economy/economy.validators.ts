@@ -122,4 +122,16 @@ export const botSyncViewerSchema = z.object({
   displayName: z.string().min(1).max(64),
 });
 
+export const botClaimLiveRewardSchema = z.object({
+  rewardKey: z.enum(["daily", "early"]),
+  twitchUserId: z.string().min(1),
+  twitchUsername: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(64),
+  streamStartedAt: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^\d{4}-\d{2}-\d{2}T/, "streamStartedAt deve ser ISO 8601 (started_at da Twitch)"),
+});
+
 export const defaultLevelsDefinitionJson = JSON.stringify(DEFAULT_LEVELS_DEFINITION);

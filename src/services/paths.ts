@@ -78,6 +78,8 @@ export const ENDPOINTS = {
         `/api/internal/economy/internal/channels/${streamerId}/points/adjust`,
       InternalAwardXp: (streamerId: string) =>
         `/api/internal/economy/internal/channels/${streamerId}/xp/award`,
+      InternalLiveRewardClaim: (streamerId: string) =>
+        `/api/internal/economy/internal/channels/${streamerId}/live-rewards/claim`,
     },
     Store: {
       Dashboard: "/api/internal/store/dashboard",

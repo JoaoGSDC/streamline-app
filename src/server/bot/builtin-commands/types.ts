@@ -35,6 +35,12 @@ export interface BotBuiltinCommandDefinition {
   requiresConfirmation?: boolean;
   /** Mensagem exibida ao pedir confirmação (placeholders: {displayName}, {trigger}, {argsSummary}). */
   confirmationPrompt?: string;
+  /** Comando !daily / !early — chave enviada em POST .../live-rewards/claim */
+  economyRewardKey?: "daily" | "early";
+  /** Pontos padrão da recompensa (espelha economy-live-rewards.ts) */
+  economyRewardPoints?: number;
+  /** Comando !pontos — consulta saldo via GET .../balance */
+  economyBalanceCommand?: boolean;
 }
 
 export const BOT_BUILTIN_CATEGORY_LABELS: Record<BotBuiltinCategory, string> = {

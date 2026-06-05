@@ -248,6 +248,20 @@ export const platformUserCoins = sqliteTable("platform_user_coins", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+/** Recompensas !daily / !early resgatadas por transmissão (uma vez por usuário por live) */
+export const economyLiveRewardClaims = sqliteTable("economy_live_reward_claims", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  twitchUserId: text("twitch_user_id").notNull(),
+  rewardKey: text("reward_key").notNull(),
+  /** started_at ISO da transmissão Twitch — identifica a sessão da live */
+  streamStartedAt: text("stream_started_at").notNull(),
+  pointsAwarded: integer("points_awarded").notNull().default(0),
+  claimedAt: integer("claimed_at", { mode: "timestamp" }).notNull(),
+});
+
 /** Auditoria de alterações manuais na economia */
 export const economyAuditLog = sqliteTable("economy_audit_log", {
   id: text("id").primaryKey(),

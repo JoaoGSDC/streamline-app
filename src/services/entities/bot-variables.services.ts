@@ -30,6 +30,9 @@ export interface BotBuiltinCommandCatalogItem {
   responseTemplate: string | null;
   requiresConfirmation: boolean;
   confirmationPrompt: string | null;
+  economyRewardKey: "daily" | "early" | null;
+  economyRewardPoints: number | null;
+  economyBalanceCommand: boolean;
 }
 
 export interface BotVariablesCatalogResponse {

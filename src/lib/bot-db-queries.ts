@@ -235,6 +235,9 @@ export async function listActiveBotCommandsForSnapshot(streamerId: string) {
         responseTemplate: definition.responseTemplate ?? null,
         requiresConfirmation: definition.requiresConfirmation ?? false,
         confirmationPrompt: definition.confirmationPrompt ?? null,
+        economyRewardKey: definition.economyRewardKey ?? null,
+        economyRewardPoints: definition.economyRewardPoints ?? null,
+        economyBalanceCommand: definition.economyBalanceCommand ?? false,
       },
     };
   });

@@ -20,6 +20,9 @@ interface BuiltinBaseOptions {
   responseTemplate?: string;
   requiresConfirmation?: boolean;
   confirmationPrompt?: string;
+  economyRewardKey?: "daily" | "early";
+  economyRewardPoints?: number;
+  economyBalanceCommand?: boolean;
 }
 
 function builtin(
@@ -53,6 +56,9 @@ function builtin(
     responseTemplate: options.responseTemplate,
     requiresConfirmation: options.requiresConfirmation,
     confirmationPrompt: options.confirmationPrompt,
+    economyRewardKey: options.economyRewardKey,
+    economyRewardPoints: options.economyRewardPoints,
+    economyBalanceCommand: options.economyBalanceCommand,
   };
 }
 
