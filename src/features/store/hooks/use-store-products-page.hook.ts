@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { services } from "@services/index";
 import type { StoreProductDto } from "@server/store/store.types";
-import type { StoreProductRowState } from "@features/store/components/StoreProductAccordionRow";
+import type { StoreProductRowState } from "@features/store/types/store-product.types";
 import { createRandomString } from "@utils/factories/create-random-string";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -16,6 +16,7 @@ function dtoToRow(dto: StoreProductDto): StoreProductRowState {
     name: dto.name,
     shortDescription: dto.shortDescription ?? "",
     fullDescription: dto.fullDescription ?? "",
+    imageUrl: dto.imageUrl ?? "",
     productType: dto.productType,
     rarity: dto.rarity ?? "",
     pricePoints: dto.pricePoints,
@@ -24,8 +25,12 @@ function dtoToRow(dto: StoreProductDto): StoreProductRowState {
     stockUnlimited: dto.stockUnlimited,
     stockQuantity: dto.stockQuantity ?? 0,
     fulfillmentMode: dto.fulfillmentMode,
+    fulfillmentInstructions: dto.internalNotes ?? "",
     featured: dto.featured,
     status: dto.status,
+    subscribersOnly: dto.subscribersOnly,
+    vipOnly: dto.vipOnly,
+    secret: dto.secret,
   };
 }
 
@@ -35,6 +40,7 @@ function rowToPayload(row: StoreProductRowState) {
     name: row.name.trim(),
     shortDescription: row.shortDescription || null,
     fullDescription: row.fullDescription || null,
+    imageUrl: row.imageUrl.trim() || null,
     productType: row.productType,
     rarity: row.rarity || null,
     pricePoints: row.pricePoints,
@@ -43,8 +49,12 @@ function rowToPayload(row: StoreProductRowState) {
     stockUnlimited: row.stockUnlimited,
     stockQuantity: row.stockUnlimited ? null : row.stockQuantity,
     fulfillmentMode: row.fulfillmentMode,
+    internalNotes: row.fulfillmentInstructions.trim() || null,
     featured: row.featured,
     status: row.status === "archived" ? "inactive" : row.status,
+    subscribersOnly: row.subscribersOnly,
+    vipOnly: row.vipOnly,
+    secret: row.secret,
   };
 }
 
@@ -59,8 +69,6 @@ export function useStoreProductsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
-  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
-  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -78,7 +86,6 @@ export function useStoreProductsPage() {
       });
       setSavedRows(data.items.map(dtoToRow));
       setLocalEdits({});
-      setDirtyIds(new Set());
     } catch {
       setSavedRows([]);
     } finally {
@@ -96,41 +103,6 @@ export function useStoreProductsPage() {
       ...localEdits[row.id],
     }),
     [localEdits]
-  );
-
-  const markDirty = useCallback((id: string) => {
-    setDirtyIds((prev) => new Set(prev).add(id));
-  }, []);
-
-  const clearDirty = useCallback((id: string) => {
-    setDirtyIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-
-  const patchLocal = useCallback(
-    (id: string, patch: Partial<StoreProductRowState>) => {
-      setLocalEdits((prev) => ({
-        ...prev,
-        [id]: { ...prev[id], ...patch },
-      }));
-      markDirty(id);
-    },
-    [markDirty]
-  );
-
-  const isRowDirty = useCallback(
-    (id: string) => {
-      const edits = localEdits[id];
-      if (!edits && !dirtyIds.has(id)) return false;
-      const keys = Object.keys(edits ?? {});
-      if (keys.length === 0) return dirtyIds.has(id);
-      const contentKeys = keys.filter((key) => key !== "status");
-      return contentKeys.length > 0 || Boolean(dirtyIds.has(id) && keys.length > 0);
-    },
-    [dirtyIds, localEdits]
   );
 
   const upsertSavedRow = useCallback((dto: StoreProductDto) => {
@@ -161,16 +133,12 @@ export function useStoreProductsPage() {
           const created = await services.store.createProduct(rowToPayload(merged));
           setDraftRows((prev) => prev.filter((draft) => draft.id !== merged.id));
           upsertSavedRow(created);
-          setOpenAccordion((prev) =>
-            prev.map((value) => (value === merged.id ? created.id : value))
-          );
           setLocalEdits((prev) => {
             const next = { ...prev };
             delete next[merged.id];
             return next;
           });
-          clearDirty(merged.id);
-          return true;
+          return created;
         }
 
         const updated = await services.store.updateProduct(
@@ -183,8 +151,7 @@ export function useStoreProductsPage() {
           delete next[merged.id];
           return next;
         });
-        clearDirty(merged.id);
-        return true;
+        return updated;
       } catch {
         return false;
       } finally {
@@ -195,14 +162,7 @@ export function useStoreProductsPage() {
         });
       }
     },
-    [clearDirty, localEdits, upsertSavedRow]
-  );
-
-  const updateRow = useCallback(
-    (id: string, patch: Partial<StoreProductRowState>) => {
-      patchLocal(id, patch);
-    },
-    [patchLocal]
+    [localEdits, upsertSavedRow]
   );
 
   const toggleActive = useCallback(
@@ -210,7 +170,11 @@ export function useStoreProductsPage() {
       const status = active ? "active" : "inactive";
 
       if (row.isDraft || row.isNew) {
-        patchLocal(row.id, { status });
+        setDraftRows((prev) =>
+          prev.map((draft) =>
+            draft.id === row.id ? { ...draft, status } : draft
+          )
+        );
         return;
       }
 
@@ -223,18 +187,6 @@ export function useStoreProductsPage() {
       setSavingIds((prev) => new Set(prev).add(row.id));
       try {
         await services.store.updateProduct(row.id, { status });
-        setLocalEdits((prev) => {
-          const current = prev[row.id];
-          if (!current) return prev;
-          const { status: _removed, ...rest } = current;
-          if (Object.keys(rest).length === 0) {
-            const next = { ...prev };
-            delete next[row.id];
-            clearDirty(row.id);
-            return next;
-          }
-          return { ...prev, [row.id]: rest };
-        });
       } catch {
         setSavedRows((prev) =>
           prev.map((saved) =>
@@ -251,7 +203,7 @@ export function useStoreProductsPage() {
         });
       }
     },
-    [clearDirty, patchLocal]
+    []
   );
 
   const addDraftRow = useCallback((defaultCategoryId: string) => {
@@ -262,6 +214,7 @@ export function useStoreProductsPage() {
       name: "",
       shortDescription: "",
       fullDescription: "",
+      imageUrl: "",
       productType: "custom",
       rarity: "",
       pricePoints: 0,
@@ -270,40 +223,39 @@ export function useStoreProductsPage() {
       stockUnlimited: true,
       stockQuantity: 10,
       fulfillmentMode: "manual",
+      fulfillmentInstructions: "",
       featured: false,
       status: "inactive",
+      subscribersOnly: false,
+      vipOnly: false,
+      secret: false,
       isDraft: true,
       isNew: true,
     };
     setDraftRows((prev) => [...prev, draft]);
-    setOpenAccordion((prev) => [...prev, id]);
+    return draft;
   }, []);
 
-  const removeDraftRow = useCallback(
-    (id: string) => {
-      setDraftRows((prev) => prev.filter((row) => row.id !== id));
-      setLocalEdits((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      clearDirty(id);
-      setOpenAccordion((prev) => prev.filter((value) => value !== id));
-    },
-    [clearDirty]
-  );
+  const removeDraftRow = useCallback((id: string) => {
+    setDraftRows((prev) => prev.filter((row) => row.id !== id));
+    setLocalEdits((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
 
   const duplicateProduct = useCallback(
-    async (row: StoreProductRowState) => {
-      if (row.isDraft) return false;
+    async (row: StoreProductRowState): Promise<StoreProductRowState | null> => {
+      if (row.isDraft) return null;
       setSavingIds((prev) => new Set(prev).add(row.id));
       try {
         const created = await services.store.duplicateProduct(row.id);
+        const mapped = dtoToRow(created);
         upsertSavedRow(created);
-        setOpenAccordion((prev) => [...prev, created.id]);
-        return true;
+        return mapped;
       } catch {
-        return false;
+        return null;
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);
@@ -327,8 +279,6 @@ export function useStoreProductsPage() {
           delete next[row.id];
           return next;
         });
-        clearDirty(row.id);
-        setOpenAccordion((prev) => prev.filter((value) => value !== row.id));
         return true;
       } catch {
         return false;
@@ -340,7 +290,7 @@ export function useStoreProductsPage() {
         });
       }
     },
-    [clearDirty]
+    []
   );
 
   const productRows = useMemo(
@@ -364,19 +314,15 @@ export function useStoreProductsPage() {
     setSearch,
     statusFilter,
     setStatusFilter,
-    openAccordion,
-    setOpenAccordion,
     allRows,
     draftRows: draftRowsMerged,
     savingIds,
     addDraftRow,
-    updateRow,
     persistRow,
     toggleActive,
     removeDraftRow,
     duplicateProduct,
     archiveProduct,
-    isRowDirty,
     reload: load,
   };
 }

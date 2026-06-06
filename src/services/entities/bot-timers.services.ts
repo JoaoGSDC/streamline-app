@@ -9,6 +9,7 @@ export interface BotTimerRecord {
   firstRunAfterMinutes: number;
   scheduleMode: "live_elapsed";
   message: string;
+  minViewers?: number | null;
   enabled: boolean;
   updatedAt: string | Date;
   configVersion?: number;
@@ -20,6 +21,7 @@ export interface CreateBotTimerPayload {
   firstRunAfterMinutes?: number;
   scheduleMode?: "live_elapsed";
   message: string;
+  minViewers?: number | null;
   enabled?: boolean;
 }
 

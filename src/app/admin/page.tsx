@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -8,12 +8,18 @@ import {
   type AdminViewFilter,
 } from "@/hooks/useAdminChannelOptions";
 import { ScheduleForm } from "@/components/ScheduleForm";
-import { EnhancedGameModal } from "@/components/EnhancedGameModal";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminSection } from "@/components/admin/shared/AdminSection";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
 import { ScheduledStreamCard } from "@/components/admin/schedule/ScheduledStreamCard";
-import { ScheduleListToolbar } from "@/components/admin/schedule/ScheduleListToolbar";
+import {
+  ScheduleListToolbar,
+  type ScheduleViewMode,
+} from "@/components/admin/schedule/ScheduleListToolbar";
+import {
+  ScheduleMiniCalendar,
+  isSameCalendarDay,
+} from "@/components/admin/schedule/ScheduleMiniCalendar";
 import { useAdminSchedulePage } from "@features/schedule/hooks/use-admin-schedule-page.hook";
 import { Button } from "@/components/ui/button";
 
@@ -22,18 +28,21 @@ export default function AdminSchedulePage() {
   const {
     ownerChannel,
     moderatedChannels,
-    viewFilterOptions,
-    resolveFormStreamerId,
     channels,
     userId,
+    canModerateOthers,
+    resolveFormStreamerId,
   } = useAdminChannelOptions();
 
   const [viewFilter, setViewFilter] = useState<AdminViewFilter>("mine");
   const [formTarget, setFormTarget] = useState("");
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>("list");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | null>(
+    () => new Date()
+  );
 
   const {
-    selectedStream,
-    isModalOpen,
     editingStream,
     period,
     page,
@@ -43,13 +52,10 @@ export default function AdminSchedulePage() {
     paginatedStreams,
     setPeriod,
     setPage,
-    setEditingStream,
     handleSuccess,
     handleEditStream,
     handleCancelEdit,
     handleDeleteStream,
-    handleStreamClick,
-    handleCloseModal,
   } = useAdminSchedulePage({
     channels,
     userId,
@@ -78,6 +84,13 @@ export default function AdminSchedulePage() {
     },
   });
 
+  const calendarDayStreams = useMemo(() => {
+    if (!selectedCalendarDate) return [];
+    return filteredStreams.filter((stream) =>
+      isSameCalendarDay(stream.scheduledDate, selectedCalendarDate)
+    );
+  }, [filteredStreams, selectedCalendarDate]);
+
   const onFormSuccess = () => {
     const wasEditing = handleSuccess();
     toast({
@@ -96,6 +109,20 @@ export default function AdminSchedulePage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const renderStreamCard = (stream: (typeof filteredStreams)[number]) => (
+    <ScheduledStreamCard
+      key={stream.id}
+      stream={stream}
+      streamerLabel={
+        viewFilter === "all" && stream.streamerId
+          ? streamerLabels[stream.streamerId]
+          : undefined
+      }
+      onEdit={() => onEditStream(stream)}
+      onDelete={handleDeleteStream}
+    />
+  );
+
   if (!ownerChannel && channels.length === 0) return null;
 
   return (
@@ -107,6 +134,7 @@ export default function AdminSchedulePage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <AdminSection
+          id="schedule-form"
           title={editingStream ? "Editar transmissão" : "Nova transmissão"}
           description={
             editingStream
@@ -127,54 +155,92 @@ export default function AdminSchedulePage() {
         </AdminSection>
 
         <AdminSection
-          title={`Agenda (${filteredStreams.length})`}
-          description="Clique em um evento para ver detalhes. Use filtros para navegar entre canais e datas."
+          title="Agenda"
+          description="Alterne entre lista e calendário. Clique em um evento para ver detalhes."
           contentClassName="space-y-4"
         >
           <ScheduleListToolbar
             viewFilter={viewFilter}
-            onViewFilterChange={setViewFilter}
-            viewFilterOptions={viewFilterOptions}
+            onViewFilterChange={(nextFilter) => {
+              setViewFilter(nextFilter);
+              setPage(1);
+            }}
+            showChannelFilter={canModerateOthers || channels.length > 1}
             period={period}
             onPeriodChange={(nextPeriod) => {
               setPeriod(nextPeriod);
               setPage(1);
             }}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            totalCount={filteredStreams.length}
           />
 
-          {filteredStreams.length === 0 ? (
+          {viewMode === "calendar" ? (
+            <>
+              <ScheduleMiniCalendar
+                streams={filteredStreams}
+                month={calendarMonth}
+                selectedDate={selectedCalendarDate}
+                onMonthChange={setCalendarMonth}
+                onSelectDate={setSelectedCalendarDate}
+              />
+
+              {selectedCalendarDate ? (
+                <div className="space-y-3">
+                  <p className="text-body-sm text-muted-foreground">
+                    {selectedCalendarDate.toLocaleDateString("pt-BR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </p>
+                  {calendarDayStreams.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-outline-variant/30 px-4 py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma transmissão neste dia.
+                    </p>
+                  ) : (
+                    calendarDayStreams.map(renderStreamCard)
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : filteredStreams.length === 0 ? (
             <AdminEmptyState
               icon={CalendarPlus}
-              title="Nenhuma stream neste filtro"
-              description="Ajuste o período ou o canal exibido, ou crie uma nova transmissão ao lado."
+              title="Nenhuma transmissão neste período"
+              description="Agende sua próxima live para que viewers saibam quando você estará online."
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    document
+                      .getElementById("schedule-form")
+                      ?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  Agendar stream
+                </Button>
+              }
             />
           ) : (
             <>
               <div className="space-y-3">
-                {paginatedStreams.map((stream) => (
-                  <ScheduledStreamCard
-                    key={stream.id}
-                    stream={stream}
-                    streamerLabel={
-                      viewFilter === "all" && stream.streamerId
-                        ? streamerLabels[stream.streamerId]
-                        : undefined
-                    }
-                    onClick={() => handleStreamClick(stream)}
-                    onEdit={() => onEditStream(stream)}
-                    onDelete={handleDeleteStream}
-                  />
-                ))}
+                {paginatedStreams.map(renderStreamCard)}
               </div>
 
               {totalPages > 1 ? (
-                <div className="flex items-center justify-between gap-2 border-t border-outline-variant/25 pt-4">
+                <div className="mt-5 flex items-center justify-between gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={page <= 1}
-                    onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+                    onClick={() =>
+                      setPage((currentPage) => Math.max(1, currentPage - 1))
+                    }
                   >
                     <ChevronLeft className="mr-1 h-4 w-4" />
                     Anterior
@@ -188,7 +254,9 @@ export default function AdminSchedulePage() {
                     size="sm"
                     disabled={page >= totalPages}
                     onClick={() =>
-                      setPage((currentPage) => Math.min(totalPages, currentPage + 1))
+                      setPage((currentPage) =>
+                        Math.min(totalPages, currentPage + 1)
+                      )
                     }
                   >
                     Próxima
@@ -200,33 +268,6 @@ export default function AdminSchedulePage() {
           )}
         </AdminSection>
       </div>
-
-      <EnhancedGameModal
-        open={isModalOpen}
-        onOpenChange={(open) => {
-          if (!open) handleCloseModal();
-        }}
-        onEdit={
-          selectedStream ? () => onEditStream(selectedStream) : undefined
-        }
-        streamData={
-          selectedStream
-            ? {
-                ...selectedStream,
-                scheduledDate: new Date(selectedStream.scheduledDate),
-                game:
-                  selectedStream.game ||
-                  (selectedStream.gameTitle
-                    ? {
-                        title: selectedStream.gameTitle || "Jogo",
-                        image: selectedStream.gameImage || undefined,
-                        synopsis: selectedStream.gameSynopsis || undefined,
-                      }
-                    : null),
-              }
-            : null
-        }
-      />
     </>
   );
 }

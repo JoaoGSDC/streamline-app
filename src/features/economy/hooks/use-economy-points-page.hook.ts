@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { services } from "@services/index";
 import type { EconomyFullConfigDto } from "@server/economy/economy.types";
@@ -17,30 +17,78 @@ const DEFAULT_POINTS = {
   earnMessageTemplate: "{displayName} ganhou {points} pontos!",
 };
 
-export type EconomyPointsSaveSection =
-  | "activation"
-  | "watchTime"
-  | "multipliers"
-  | "dailyCap"
-  | "earnMessage";
+type PointsForm = typeof DEFAULT_POINTS;
+
+function buildSnapshot(
+  form: PointsForm,
+  pointsEnabled: boolean,
+  publicRanking: boolean
+) {
+  return JSON.stringify({ form, pointsEnabled, publicRanking });
+}
+
+function getDirtySections(
+  form: PointsForm,
+  pointsEnabled: boolean,
+  publicRanking: boolean,
+  baseline: EconomyFullConfigDto | null
+) {
+  if (!baseline) return new Set<string>();
+
+  const dirty = new Set<string>();
+  const { general, points } = baseline;
+
+  if (
+    pointsEnabled !== general.pointsEnabled ||
+    publicRanking !== general.publicRankingEnabled
+  ) {
+    dirty.add("activation");
+  }
+  if (
+    form.pointsPerInterval !== points.pointsPerInterval ||
+    form.intervalMinutes !== points.intervalMinutes ||
+    form.minMessagesPerInterval !== points.minMessagesPerInterval
+  ) {
+    dirty.add("watchTime");
+  }
+  if (
+    form.subscriberMultiplier !== points.subscriberMultiplier ||
+    form.vipMultiplier !== points.vipMultiplier ||
+    form.moderatorMultiplier !== points.moderatorMultiplier
+  ) {
+    dirty.add("multipliers");
+  }
+  if (form.dailyPointsCap !== points.dailyPointsCap) {
+    dirty.add("dailyCap");
+  }
+  if (
+    form.earnMessageEnabled !== points.earnMessageEnabled ||
+    form.earnMessageTemplate !==
+      (points.earnMessageTemplate ?? "{displayName} ganhou {points} pontos!")
+  ) {
+    dirty.add("earnMessage");
+  }
+
+  return dirty;
+}
 
 export function useEconomyPointsPage() {
   const { toast } = useToast();
   const [config, setConfig] = useState<EconomyFullConfigDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [savingSection, setSavingSection] = useState<EconomyPointsSaveSection | null>(
-    null
-  );
+  const [saving, setSaving] = useState(false);
+  const [savedRecently, setSavedRecently] = useState(false);
   const [form, setForm] = useState(DEFAULT_POINTS);
   const [pointsEnabled, setPointsEnabled] = useState(false);
   const [publicRanking, setPublicRanking] = useState(true);
+  const savedSnapshotRef = useRef("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await services.economy.getConfig();
       setConfig(data);
-      setForm({
+      const nextForm = {
         pointsPerInterval: data.points.pointsPerInterval,
         intervalMinutes: data.points.intervalMinutes,
         minMessagesPerInterval: data.points.minMessagesPerInterval,
@@ -52,9 +100,15 @@ export function useEconomyPointsPage() {
         earnMessageTemplate:
           data.points.earnMessageTemplate ??
           "{displayName} ganhou {points} pontos!",
-      });
+      };
+      setForm(nextForm);
       setPointsEnabled(data.general.pointsEnabled);
       setPublicRanking(data.general.publicRankingEnabled);
+      savedSnapshotRef.current = buildSnapshot(
+        nextForm,
+        data.general.pointsEnabled,
+        data.general.publicRankingEnabled
+      );
     } catch {
       toast({
         title: "Erro ao carregar",
@@ -70,82 +124,69 @@ export function useEconomyPointsPage() {
     void load();
   }, [load]);
 
+  const dirtySections = useMemo(
+    () => getDirtySections(form, pointsEnabled, publicRanking, config),
+    [form, pointsEnabled, publicRanking, config]
+  );
+
+  const isDirty = dirtySections.size > 0;
+
   const previewSummary = useMemo(() => {
-    const capText =
+    const mode =
+      form.minMessagesPerInterval === 0 ? "Modo passivo" : "Modo ativo";
+    const pts = `${form.pointsPerInterval} pts a cada ${form.intervalMinutes} min`;
+    const sub = `Inscritos ${form.subscriberMultiplier.toFixed(1)}×`;
+    const cap =
       form.dailyPointsCap != null
-        ? ` Limite diário: ${form.dailyPointsCap} pontos.`
-        : " Sem limite diário.";
-    const modeText =
-      form.minMessagesPerInterval === 0
-        ? "Modo passivo: pontos para quem está no chat (via lista de chatters do bot), sem precisar digitar."
-        : `Modo ativo: exige pelo menos ${form.minMessagesPerInterval} mensagem${form.minMessagesPerInterval === 1 ? "" : "ns"} por intervalo (comandos ! não contam).`;
-    return `${modeText} Usuário ganha ${form.pointsPerInterval} pontos a cada ${form.intervalMinutes} minuto${form.intervalMinutes === 1 ? "" : "s"}. Inscritos ${form.subscriberMultiplier}x, VIPs ${form.vipMultiplier}x, moderadores ${form.moderatorMultiplier}x.${capText}`;
+        ? `Limite ${form.dailyPointsCap}/dia`
+        : "Sem limite diário";
+    return `${mode} · ${pts} · ${sub} · ${cap}`;
   }, [form]);
 
-  const isSaving = (section: EconomyPointsSaveSection) => savingSection === section;
-
-  const saveActivation = async () => {
-    setSavingSection("activation");
+  const saveAll = useCallback(async () => {
+    if (!isDirty) return;
+    setSaving(true);
+    setSavedRecently(false);
     try {
-      await services.economy.updateGeneral({
-        ...(pointsEnabled
-          ? { enabled: true, pointsEnabled: true }
-          : { pointsEnabled: false }),
-        publicRankingEnabled: publicRanking,
-      });
+      if (dirtySections.has("activation")) {
+        await services.economy.updateGeneral({
+          ...(pointsEnabled
+            ? { enabled: true, pointsEnabled: true }
+            : { pointsEnabled: false }),
+          publicRankingEnabled: publicRanking,
+        });
+      }
+      if (dirtySections.has("watchTime")) {
+        await services.economy.updatePoints({
+          pointsPerInterval: form.pointsPerInterval,
+          intervalMinutes: form.intervalMinutes,
+          minMessagesPerInterval: form.minMessagesPerInterval,
+        });
+      }
+      if (dirtySections.has("multipliers")) {
+        await services.economy.updatePoints({
+          subscriberMultiplier: form.subscriberMultiplier,
+          vipMultiplier: form.vipMultiplier,
+          moderatorMultiplier: form.moderatorMultiplier,
+        });
+      }
+      if (dirtySections.has("dailyCap")) {
+        await services.economy.updatePoints({
+          dailyPointsCap: form.dailyPointsCap,
+        });
+      }
+      if (dirtySections.has("earnMessage")) {
+        await services.economy.updatePoints({
+          earnMessageEnabled: form.earnMessageEnabled,
+          earnMessageTemplate: form.earnMessageTemplate,
+        });
+      }
       toast({
-        title: "Ativação salva",
-        description: "Distribuição de pontos e ranking público atualizados.",
+        title: "Alterações salvas",
+        description: "Configurações de pontos atualizadas.",
       });
       await load();
-    } catch {
-      toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar a ativação.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingSection(null);
-    }
-  };
-
-  const saveWatchTime = async () => {
-    setSavingSection("watchTime");
-    try {
-      await services.economy.updatePoints({
-        pointsPerInterval: form.pointsPerInterval,
-        intervalMinutes: form.intervalMinutes,
-        minMessagesPerInterval: form.minMessagesPerInterval,
-      });
-      toast({
-        title: "Ganhos por tempo salvos",
-        description: "Intervalo e mensagens mínimas atualizados.",
-      });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao salvar",
-        description: "Verifique os valores e tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingSection(null);
-    }
-  };
-
-  const saveMultipliers = async () => {
-    setSavingSection("multipliers");
-    try {
-      await services.economy.updatePoints({
-        subscriberMultiplier: form.subscriberMultiplier,
-        vipMultiplier: form.vipMultiplier,
-        moderatorMultiplier: form.moderatorMultiplier,
-      });
-      toast({
-        title: "Multiplicadores salvos",
-        description: "Bônus de inscritos, VIPs e moderadores atualizados.",
-      });
-      await load();
+      setSavedRecently(true);
     } catch {
       toast({
         title: "Erro ao salvar",
@@ -153,54 +194,29 @@ export function useEconomyPointsPage() {
         variant: "destructive",
       });
     } finally {
-      setSavingSection(null);
+      setSaving(false);
     }
-  };
+  }, [
+    dirtySections,
+    form,
+    isDirty,
+    load,
+    pointsEnabled,
+    publicRanking,
+    toast,
+  ]);
 
-  const saveDailyCap = async () => {
-    setSavingSection("dailyCap");
-    try {
-      await services.economy.updatePoints({
-        dailyPointsCap: form.dailyPointsCap,
-      });
-      toast({
-        title: "Limite diário salvo",
-        description: "Teto de pontos por dia atualizado.",
-      });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao salvar",
-        description: "Verifique o valor e tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingSection(null);
+  useEffect(() => {
+    if (isDirty) {
+      setSavedRecently(false);
     }
-  };
+  }, [isDirty]);
 
-  const saveEarnMessage = async () => {
-    setSavingSection("earnMessage");
-    try {
-      await services.economy.updatePoints({
-        earnMessageEnabled: form.earnMessageEnabled,
-        earnMessageTemplate: form.earnMessageTemplate,
-      });
-      toast({
-        title: "Mensagem salva",
-        description: "Configuração de aviso no chat atualizada.",
-      });
-      await load();
-    } catch {
-      toast({
-        title: "Erro ao salvar",
-        description: "Verifique o texto e tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingSection(null);
-    }
-  };
+  useEffect(() => {
+    if (!savedRecently) return;
+    const timer = setTimeout(() => setSavedRecently(false), 3000);
+    return () => clearTimeout(timer);
+  }, [savedRecently]);
 
   return {
     config,
@@ -211,12 +227,10 @@ export function useEconomyPointsPage() {
     publicRanking,
     setPublicRanking,
     loading,
-    isSaving,
+    saving,
+    isDirty,
+    savedRecently,
     previewSummary,
-    saveActivation,
-    saveWatchTime,
-    saveMultipliers,
-    saveDailyCap,
-    saveEarnMessage,
+    saveAll,
   };
 }

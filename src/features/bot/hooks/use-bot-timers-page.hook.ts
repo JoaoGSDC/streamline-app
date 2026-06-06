@@ -5,8 +5,10 @@ import { services } from "@services";
 import type { BotTimerRecord } from "@services/entities/bot-timers.services";
 import type { BotVariablesCatalogResponse } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
-import type { BotTimerRowState } from "@features/bot/components/BotTimerAccordionRow";
+import type { BotTimerRowState } from "@features/bot/types/bot-timer.types";
 import { createRandomString } from "@utils/factories/create-random-string";
+
+const SEARCH_DEBOUNCE_MS = 200;
 
 function recordToRow(record: BotTimerRecord): BotTimerRowState {
   return {
@@ -16,8 +18,18 @@ function recordToRow(record: BotTimerRecord): BotTimerRowState {
     firstRunAfterMinutes: record.firstRunAfterMinutes,
     scheduleMode: record.scheduleMode ?? "live_elapsed",
     message: record.message,
+    minViewers: record.minViewers ?? null,
     enabled: record.enabled,
   };
+}
+
+function matchesSearch(row: BotTimerRowState, query: string): boolean {
+  if (!query) return true;
+  const normalized = query.toLowerCase();
+  return (
+    row.name.toLowerCase().includes(normalized) ||
+    row.message.toLowerCase().includes(normalized)
+  );
 }
 
 export function useBotTimersPage() {
@@ -36,7 +48,6 @@ export function useBotTimersPage() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [emotes, setEmotes] = useState<TwitchChannelEmote[]>([]);
   const [emotesLoading, setEmotesLoading] = useState(true);
-  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
   const allVariables = useMemo(
@@ -55,7 +66,7 @@ export function useBotTimersPage() {
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
   }, [search]);
 
@@ -94,7 +105,7 @@ export function useBotTimersPage() {
       const index = prev.findIndex((item) => item.id === row.id);
       if (index === -1) {
         return [...prev, row].sort((a, b) =>
-          (a.name || a.id).localeCompare(b.name || b.id)
+          (a.name || a.message || a.id).localeCompare(b.name || b.message || b.id)
         );
       }
       const next = [...prev];
@@ -168,18 +179,6 @@ export function useBotTimersPage() {
     [markDirty]
   );
 
-  const isRowDirty = useCallback(
-    (id: string) => {
-      const edits = localEdits[id];
-      if (!edits && !dirtyIds.has(id)) return false;
-      const keys = Object.keys(edits ?? {});
-      if (keys.length === 0) return dirtyIds.has(id);
-      const contentKeys = keys.filter((key) => key !== "enabled");
-      return contentKeys.length > 0;
-    },
-    [dirtyIds, localEdits]
-  );
-
   const persistRow = useCallback(
     async (row: BotTimerRowState) => {
       const merged: BotTimerRowState = {
@@ -188,7 +187,7 @@ export function useBotTimersPage() {
       };
 
       if (!merged.message.trim()) {
-        return false;
+        return null;
       }
 
       setSavingIds((prev) => new Set(prev).add(row.id));
@@ -199,6 +198,7 @@ export function useBotTimersPage() {
           firstRunAfterMinutes: merged.firstRunAfterMinutes,
           scheduleMode: merged.scheduleMode,
           message: merged.message.trim(),
+          minViewers: merged.minViewers ?? null,
           enabled: merged.enabled,
         };
 
@@ -206,16 +206,13 @@ export function useBotTimersPage() {
           const created = await services.botTimers.create(payload);
           setDraftRows((prev) => prev.filter((draft) => draft.id !== merged.id));
           upsertSavedRow(created);
-          setOpenAccordion((prev) =>
-            prev.map((value) => (value === merged.id ? created.id : value))
-          );
           setLocalEdits((prev) => {
             const next = { ...prev };
             delete next[merged.id];
             return next;
           });
           clearDirty(merged.id);
-          return true;
+          return created.id;
         }
 
         const updated = await services.botTimers.update(merged.id, payload);
@@ -226,9 +223,9 @@ export function useBotTimersPage() {
           return next;
         });
         clearDirty(merged.id);
-        return true;
+        return merged.id;
       } catch {
-        return false;
+        return null;
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);
@@ -297,24 +294,27 @@ export function useBotTimersPage() {
       firstRunAfterMinutes: 5,
       scheduleMode: "live_elapsed",
       message: "",
+      minViewers: null,
       enabled: true,
       isDraft: true,
       isNew: true,
     };
     setDraftRows((prev) => [...prev, draft]);
-    setOpenAccordion((prev) => [...prev, id]);
+    return id;
   }, []);
 
-  const removeDraftRow = useCallback((id: string) => {
-    setDraftRows((prev) => prev.filter((row) => row.id !== id));
-    setLocalEdits((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    clearDirty(id);
-    setOpenAccordion((prev) => prev.filter((value) => value !== id));
-  }, [clearDirty]);
+  const removeDraftRow = useCallback(
+    (id: string) => {
+      setDraftRows((prev) => prev.filter((row) => row.id !== id));
+      setLocalEdits((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      clearDirty(id);
+    },
+    [clearDirty]
+  );
 
   const deleteTimer = useCallback(
     async (row: BotTimerRowState) => {
@@ -327,7 +327,12 @@ export function useBotTimersPage() {
       try {
         await services.botTimers.remove(row.id);
         setSavedRows((prev) => prev.filter((item) => item.id !== row.id));
-        setOpenAccordion((prev) => prev.filter((value) => value !== row.id));
+        setLocalEdits((prev) => {
+          const next = { ...prev };
+          delete next[row.id];
+          return next;
+        });
+        clearDirty(row.id);
         return true;
       } catch {
         return false;
@@ -339,24 +344,40 @@ export function useBotTimersPage() {
         });
       }
     },
-    [removeDraftRow]
+    [clearDirty, removeDraftRow]
   );
 
-  const timerRows = useMemo(() => {
-    const merged = [
+  const allRows = useMemo(() => {
+    return [
       ...savedRows.map((row) => getRowState(row)),
       ...draftRows.map((row) => getRowState(row)),
     ];
+  }, [savedRows, draftRows, getRowState]);
 
-    if (!debouncedSearch) return merged;
+  const timerRows = useMemo(
+    () => allRows.filter((row) => matchesSearch(row, debouncedSearch)),
+    [allRows, debouncedSearch]
+  );
 
-    const query = debouncedSearch.toLowerCase();
-    return merged.filter(
-      (row) =>
-        row.name.toLowerCase().includes(query) ||
-        row.message.toLowerCase().includes(query)
-    );
-  }, [savedRows, draftRows, getRowState, debouncedSearch]);
+  const getRowById = useCallback(
+    (id: string | null): BotTimerRowState | null => {
+      if (!id) return null;
+      return allRows.find((row) => row.id === id) ?? null;
+    },
+    [allRows]
+  );
+
+  const revertLocalEdits = useCallback(
+    (id: string) => {
+      setLocalEdits((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      clearDirty(id);
+    },
+    [clearDirty]
+  );
 
   return {
     loading,
@@ -367,8 +388,6 @@ export function useBotTimersPage() {
     allVariables,
     emotes,
     emotesLoading,
-    openAccordion,
-    setOpenAccordion,
     timerRows,
     savingIds,
     addDraftRow,
@@ -377,6 +396,7 @@ export function useBotTimersPage() {
     toggleEnabled,
     removeDraftRow,
     deleteTimer,
-    isRowDirty,
+    getRowById,
+    revertLocalEdits,
   };
-};
+}

@@ -31,6 +31,7 @@ export const createBotTimerSchema = z.object({
   firstRunAfterMinutes: z.coerce.number().int().min(1).max(120).optional(),
   scheduleMode: z.enum(["live_elapsed"]).optional().default("live_elapsed"),
   message: z.string().min(1).max(500),
+  minViewers: z.coerce.number().int().min(0).max(1_000_000).optional().nullable(),
   enabled: z.boolean().optional().default(true),
 });
 

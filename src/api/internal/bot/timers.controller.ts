@@ -47,6 +47,7 @@ export async function createBotTimerController(request: NextRequest) {
       firstRunAfterMinutes: parsed.data.firstRunAfterMinutes,
       scheduleMode: parsed.data.scheduleMode,
       message: parsed.data.message,
+      minViewers: parsed.data.minViewers ?? null,
       enabled: parsed.data.enabled ?? true,
     });
 

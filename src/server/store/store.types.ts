@@ -152,6 +152,27 @@ export interface StoreRedemptionDto {
   deliveredAt: Date | null;
 }
 
+export interface StoreDashboardDayMetric {
+  date: string;
+  value: number;
+}
+
+export interface StoreDashboardMetrics7d {
+  products: StoreDashboardDayMetric[];
+  redemptions: StoreDashboardDayMetric[];
+  pointsSpent: StoreDashboardDayMetric[];
+  coinsSpent: StoreDashboardDayMetric[];
+}
+
+export interface StoreRedemptionStatusCounts {
+  all: number;
+  pending: number;
+  approved: number;
+  delivered: number;
+  cancelled: number;
+  refunded: number;
+}
+
 export interface StoreDashboardDto {
   totalProducts: number;
   activeProducts: number;
@@ -159,6 +180,7 @@ export interface StoreDashboardDto {
   pendingRedemptions: number;
   pointsSpent: number;
   coinsSpent: number;
+  metrics7d: StoreDashboardMetrics7d;
   lowStockProducts: StoreProductDto[];
   popularProducts: Array<{ product: StoreProductDto; redemptionCount: number }>;
   topRedeemers: Array<{

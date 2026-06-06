@@ -46,6 +46,22 @@ export default {
           "var(--text-stats-number)",
           { lineHeight: "1", fontWeight: "600" },
         ],
+        "page-title": [
+          "var(--text-page-title)",
+          { lineHeight: "1.3", fontWeight: "600" },
+        ],
+        "section-title": [
+          "var(--text-section-title)",
+          { lineHeight: "1.4", fontWeight: "600" },
+        ],
+        label: [
+          "var(--text-label)",
+          { lineHeight: "1.4", fontWeight: "500", letterSpacing: "0.01em" },
+        ],
+        caption: [
+          "var(--text-caption)",
+          { lineHeight: "1.4", fontWeight: "400" },
+        ],
       },
       spacing: {
         unit: "var(--space-unit)",

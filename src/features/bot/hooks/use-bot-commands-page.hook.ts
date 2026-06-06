@@ -9,17 +9,15 @@ import type {
   BotVariablesCatalogResponse,
 } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
-import type { BotCommandRowState } from "@features/bot/components/BotCommandAccordionRow";
+import {
+  BUILTIN_CATEGORY_ORDER,
+  getResponsePreview,
+  type BotCommandCategoryFilter,
+  type BotCommandRowState,
+} from "@features/bot/types/bot-command.types";
 import { createRandomString } from "@utils/factories/create-random-string";
 
-const SEARCH_DEBOUNCE_MS = 300;
-
-const BUILTIN_CATEGORY_ORDER: BotBuiltinCategoryId[] = [
-  "general",
-  "raffles",
-  "moderator",
-  "streamer",
-];
+const SEARCH_DEBOUNCE_MS = 200;
 
 function recordToRow(
   record: BotCommandRecord,
@@ -48,6 +46,29 @@ function recordToRow(
   };
 }
 
+function matchesSearch(row: BotCommandRowState, query: string): boolean {
+  if (!query) return true;
+  const normalized = query.toLowerCase();
+  const trigger = row.trigger.toLowerCase();
+  const response = getResponsePreview(row).toLowerCase();
+  return trigger.includes(normalized) || response.includes(normalized);
+}
+
+function matchesCategory(
+  row: BotCommandRowState,
+  filter: BotCommandCategoryFilter
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "custom") return !row.isBuiltin;
+  if (!row.isBuiltin) return false;
+  return (row.category as BotBuiltinCategoryId) === filter;
+}
+
+function getRowCategoryFilter(row: BotCommandRowState): BotCommandCategoryFilter {
+  if (!row.isBuiltin) return "custom";
+  return (row.category as BotBuiltinCategoryId) ?? "general";
+}
+
 export function useBotCommandsPage() {
   const [savedRows, setSavedRows] = useState<BotCommandRowState[]>([]);
   const [draftRows, setDraftRows] = useState<BotCommandRowState[]>([]);
@@ -57,12 +78,13 @@ export function useBotCommandsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] =
+    useState<BotCommandCategoryFilter>("all");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [catalog, setCatalog] = useState<BotVariablesCatalogResponse | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [emotes, setEmotes] = useState<TwitchChannelEmote[]>([]);
   const [emotesLoading, setEmotesLoading] = useState(true);
-  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
   const builtinCatalogByKey = useMemo(() => {
@@ -76,7 +98,7 @@ export function useBotCommandsPage() {
   const builtinCategoryLabels: Record<BotBuiltinCategoryId, string> =
     catalog?.builtinCommandCategories ?? {
       general: "Gerais",
-      raffles: "Sorteios e interação",
+      raffles: "Sorteios",
       moderator: "Moderadores",
       streamer: "Streamer",
     };
@@ -168,8 +190,7 @@ export function useBotCommandsPage() {
       }
       try {
         const result = await services.botCommands.list({
-          search: debouncedSearch || undefined,
-          limit: 100,
+          limit: 200,
         });
         setSavedRows(mapRecordsToRows(result.items));
         if (!options?.silent) {
@@ -186,7 +207,7 @@ export function useBotCommandsPage() {
         }
       }
     },
-    [debouncedSearch, mapRecordsToRows]
+    [mapRecordsToRows]
   );
 
   useEffect(() => {
@@ -259,16 +280,13 @@ export function useBotCommandsPage() {
           });
           setDraftRows((prev) => prev.filter((draft) => draft.id !== merged.id));
           upsertSavedRow(created);
-          setOpenAccordion((prev) =>
-            prev.map((value) => (value === merged.id ? created.id : value))
-          );
           setLocalEdits((prev) => {
             const next = { ...prev };
             delete next[merged.id];
             return next;
           });
           clearDirty(merged.id);
-          return true;
+          return created.id;
         }
 
         const updated = merged.isBuiltin
@@ -291,9 +309,9 @@ export function useBotCommandsPage() {
           return next;
         });
         clearDirty(merged.id);
-        return true;
+        return merged.id;
       } catch {
-        return false;
+        return null;
       } finally {
         setSavingIds((prev) => {
           const next = new Set(prev);
@@ -371,7 +389,7 @@ export function useBotCommandsPage() {
       isNew: true,
     };
     setDraftRows((prev) => [...prev, draft]);
-    setOpenAccordion((prev) => [...prev, id]);
+    return id;
   }, []);
 
   const removeDraftRow = useCallback(
@@ -383,7 +401,6 @@ export function useBotCommandsPage() {
         return next;
       });
       clearDirty(id);
-      setOpenAccordion((prev) => prev.filter((value) => value !== id));
     },
     [clearDirty]
   );
@@ -401,7 +418,6 @@ export function useBotCommandsPage() {
           return next;
         });
         clearDirty(row.id);
-        setOpenAccordion((prev) => prev.filter((value) => value !== row.id));
         return true;
       } catch {
         return false;
@@ -416,66 +432,97 @@ export function useBotCommandsPage() {
     [clearDirty]
   );
 
-  const builtinRows = useMemo(
-    () =>
-      savedRows
-        .filter((row) => row.isBuiltin)
-        .map((row) => getRowState(row))
-        .filter((row) =>
-          debouncedSearch
-            ? row.trigger.toLowerCase().includes(debouncedSearch.toLowerCase())
-            : true
-        ),
-    [savedRows, getRowState, debouncedSearch]
+  const allRows = useMemo(() => {
+    const builtins = savedRows
+      .filter((row) => row.isBuiltin)
+      .map((row) => getRowState(row));
+    const customs = savedRows
+      .filter((row) => !row.isBuiltin)
+      .map((row) => getRowState(row));
+    const drafts = draftRows.map((row) => getRowState(row));
+
+    const orderedBuiltins = BUILTIN_CATEGORY_ORDER.flatMap((category) =>
+      builtins.filter(
+        (row) => ((row.category as BotBuiltinCategoryId) ?? "general") === category
+      )
+    );
+    const uncategorizedBuiltins = builtins.filter(
+      (row) =>
+        !BUILTIN_CATEGORY_ORDER.includes(
+          (row.category as BotBuiltinCategoryId) ?? "general"
+        )
+    );
+
+    return [
+      ...orderedBuiltins,
+      ...uncategorizedBuiltins,
+      ...customs.sort((a, b) => a.trigger.localeCompare(b.trigger)),
+      ...drafts,
+    ];
+  }, [draftRows, getRowState, savedRows]);
+
+  const searchMatchedRows = useMemo(
+    () => allRows.filter((row) => matchesSearch(row, debouncedSearch)),
+    [allRows, debouncedSearch]
   );
 
-  const builtinRowsByCategory = useMemo(() => {
-    const grouped = Object.fromEntries(
-      BUILTIN_CATEGORY_ORDER.map((category) => [category, [] as BotCommandRowState[]])
-    ) as Record<BotBuiltinCategoryId, BotCommandRowState[]>;
+  const categoryCounts = useMemo(() => {
+    const counts: Record<BotCommandCategoryFilter, number> = {
+      all: searchMatchedRows.length,
+      general: 0,
+      raffles: 0,
+      moderator: 0,
+      streamer: 0,
+      custom: 0,
+    };
 
-    for (const row of builtinRows) {
-      const category = (row.category as BotBuiltinCategoryId) ?? "general";
-      grouped[category]?.push(row);
+    for (const row of searchMatchedRows) {
+      const key = getRowCategoryFilter(row);
+      counts[key] += 1;
     }
 
-    return grouped;
-  }, [builtinRows]);
+    return counts;
+  }, [searchMatchedRows]);
 
-  const customRows = useMemo(
+  const filteredRows = useMemo(
     () =>
-      savedRows
-        .filter((row) => !row.isBuiltin)
-        .map((row) => getRowState(row))
-        .filter((row) =>
-          debouncedSearch
-            ? row.trigger.toLowerCase().includes(debouncedSearch.toLowerCase())
-            : true
-        ),
-    [savedRows, getRowState, debouncedSearch]
+      searchMatchedRows.filter((row) => matchesCategory(row, categoryFilter)),
+    [categoryFilter, searchMatchedRows]
   );
 
-  const draftRowsMerged = useMemo(
-    () => draftRows.map((row) => getRowState(row)),
-    [draftRows, getRowState]
+  const getRowById = useCallback(
+    (id: string | null): BotCommandRowState | null => {
+      if (!id) return null;
+      return allRows.find((row) => row.id === id) ?? null;
+    },
+    [allRows]
+  );
+
+  const revertLocalEdits = useCallback(
+    (id: string) => {
+      setLocalEdits((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      clearDirty(id);
+    },
+    [clearDirty]
   );
 
   return {
     loading,
     search,
     setSearch,
+    categoryFilter,
+    setCategoryFilter,
+    categoryCounts,
+    filteredRows,
     catalog,
     catalogLoading,
     allVariables,
     emotes,
     emotesLoading,
-    openAccordion,
-    setOpenAccordion,
-    builtinRows,
-    builtinRowsByCategory,
-    builtinCategoryLabels,
-    customRows,
-    draftRows: draftRowsMerged,
     savingIds,
     addDraftRow,
     updateRow,
@@ -483,7 +530,8 @@ export function useBotCommandsPage() {
     toggleEnabled,
     removeDraftRow,
     deleteCustomCommand,
-    getRowState,
+    getRowById,
+    revertLocalEdits,
     isRowDirty,
   };
 }

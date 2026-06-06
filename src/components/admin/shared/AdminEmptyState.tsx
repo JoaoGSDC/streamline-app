@@ -21,19 +21,13 @@ export function AdminEmptyState({
   return (
     <div
       className={cn(
-        "admin-empty-state flex flex-col items-center justify-center rounded-lg border border-dashed border-outline-variant/50 bg-surface-container-low/40 px-6 py-12 text-center",
+        "admin-empty-state flex flex-col items-center justify-center rounded-lg border border-dashed border-outline-variant/40 bg-surface-container-low/30 px-6 py-12 text-center",
         className
       )}
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-container/20 text-primary">
-        <Icon className="h-5 w-5" aria-hidden />
-      </div>
-      <p className="font-headline text-body-md font-semibold text-foreground">
-        {title}
-      </p>
-      <p className="mt-1 max-w-sm text-body-sm text-muted-foreground">
-        {description}
-      </p>
+      <Icon className="admin-empty-icon mb-4" aria-hidden />
+      <p className="admin-empty-title text-foreground">{title}</p>
+      <p className="admin-empty-description mt-1 max-w-sm">{description}</p>
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

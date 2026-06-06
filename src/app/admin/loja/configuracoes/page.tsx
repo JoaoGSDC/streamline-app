@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { ExternalLink, Settings } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { AdminConfigSection } from "@/components/admin/shared/AdminConfigSection";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
-import { AdminSection } from "@/components/admin/shared/AdminSection";
+import { AdminSaveFooter } from "@/components/admin/shared/AdminSaveFooter";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -21,163 +20,156 @@ import { buildPixiePurchaseUrl } from "@server/store/store-product-utils";
 import { useAdminContext } from "@/components/admin/AdminProvider";
 
 export default function StoreConfigPage() {
-  const { config, loading, saving, save } = useStoreConfigPage();
+  const {
+    form,
+    coinsAllowed,
+    configVersion,
+    loading,
+    saving,
+    isDirty,
+    savedRecently,
+    patchForm,
+    save,
+  } = useStoreConfigPage();
   const { actingAs } = useAdminContext();
-  const [pixieDraft, setPixieDraft] = useState("");
 
-  if (loading) {    return (
-      <div className="space-y-4">
+  if (loading || !form) {
+    return (
+      <div className="admin-page-stack">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-32 w-full" />
       </div>
     );
   }
 
-  const effectivePixie =
-    pixieDraft ||
-    config?.pixieUsername ||
-    actingAs?.twitchUsername ||
-    "";
-  const pixiePreviewUrl = effectivePixie
-    ? buildPixiePurchaseUrl(effectivePixie)
-    : null;
+  const pixiePreviewUrl = buildPixiePurchaseUrl(
+    form.pixieUsername.trim() || actingAs?.twitchUsername || ""
+  );
 
-  return (    <div className="space-y-6">
+  return (
+    <div className="admin-page-stack pb-20">
       <AdminPageHeader
         title="Configurações"
         description="Controle a loja do canal. Coins só ficam disponíveis para streamers parceiros."
       />
 
-      <AdminSection
-        title="Loja"
-        description="Ative ou desative a loja virtual do canal."
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-outline-variant/30 p-4">
-            <div>
-              <p className="font-medium">Loja ativa</p>
-              <p className="text-body-sm text-muted-foreground">
-                Permite resgates de produtos no canal.
-              </p>
-            </div>
-            <Switch
-              checked={config?.enabled ?? false}
-              disabled={saving}
-              onCheckedChange={(v) => void save({ enabled: v })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-outline-variant/30 p-4">
-            <div>
-              <p className="font-medium">Loja pública</p>
-              <p className="text-body-sm text-muted-foreground">
-                Exibe a página /store/seu-usuario para viewers.
-              </p>
-            </div>
-            <Switch
-              checked={config?.publicEnabled ?? false}
-              disabled={saving || !config?.enabled}
-              onCheckedChange={(v) => void save({ publicEnabled: v })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-outline-variant/30 p-4">
-            <div>
-              <p className="font-medium flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Modo de entrega padrão
-              </p>
-              <p className="text-body-sm text-muted-foreground">
-                Usado quando o produto não define um modo específico.
-              </p>
-            </div>
-            <Select
-              value={config?.defaultFulfillmentMode ?? "manual"}
-              disabled={saving}
-              onValueChange={(v) =>
-                void save({
-                  defaultFulfillmentMode: v as "auto" | "manual" | "approval",
-                })
-              }
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Automática</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-                <SelectItem value="approval">Aprovação</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {config?.coinsAllowed && (
-            <div className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+      <div className="admin-config-stack">
+        <AdminConfigSection
+          title="Disponibilidade"
+          description="Defina se a loja está ativa e visível para viewers."
+          showDivider={false}
+        >
+          <div className="admin-subsection-stack">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="font-medium">Compra de Coins via Pixie.gg</p>
-                <p className="mt-1 text-body-sm text-muted-foreground">
-                  Viewers parceiros veem um fluxo para apoiar pelo Pixie e receber
-                  Coins. Deixe em branco para usar seu username da Twitch (
-                  {actingAs?.twitchUsername}).
+                <p className="text-label font-medium">Loja ativa</p>
+                <p className="text-caption">
+                  Permite resgates de produtos no canal.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pixie-username">Username no Pixie</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    id="pixie-username"
-                    placeholder={actingAs?.twitchUsername ?? "seu_username"}
-                    value={
-                      pixieDraft ||
-                      config.pixieUsername ||
-                      ""
-                    }
-                    onChange={(e) => setPixieDraft(e.target.value)}
-                    disabled={saving}
-                  />
-                  <Button
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => {
-                      void save({
-                        pixieUsername:
-                          (pixieDraft || config?.pixieUsername || null)?.trim() ||
-                          null,
-                      });
-                      setPixieDraft("");
-                    }}
-                  >
-                    Salvar Pixie
-                  </Button>
-                </div>
-                {pixiePreviewUrl && (
-                  <a
-                    href={pixiePreviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-body-sm text-primary hover:underline"
-                  >
-                    Pré-visualizar {pixiePreviewUrl}
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
+              <Switch
+                checked={form.enabled}
+                disabled={saving}
+                onCheckedChange={(value) => patchForm({ enabled: value })}
+              />
             </div>
-          )}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-label font-medium">Loja pública</p>
+                <p className="text-caption">
+                  Exibe a página /store/seu-usuario para viewers.
+                </p>
+              </div>
+              <Switch
+                checked={form.publicEnabled}
+                disabled={saving || !form.enabled}
+                onCheckedChange={(value) => patchForm({ publicEnabled: value })}
+              />
+            </div>
+          </div>
+        </AdminConfigSection>
 
-          <div className="rounded-lg border border-outline-variant/20 bg-surface-container-low/30 p-4 text-body-sm">
+        <AdminConfigSection
+          title="Pagamentos"
+          description="Configurações de moedas aceitas na loja."
+        >
+          <div className="rounded-lg bg-muted/30 p-4 text-label">
             <p className="font-medium">Coins na loja</p>
-            <p className="mt-1 text-muted-foreground">
-              {config?.coinsAllowed
+            <p className="mt-1 text-caption">
+              {coinsAllowed
                 ? "Seu canal é parceiro — produtos podem aceitar Coins."
                 : "Coins não disponíveis — apenas streamers parceiros podem usar Coins na loja."}
             </p>
-            <p className="mt-2 text-body-xs text-muted-foreground">
-              Versão da config: {config?.configVersion ?? 1}
+            <p className="mt-2 text-caption">
+              Versão da config: {configVersion}
             </p>
           </div>
-        </div>
-      </AdminSection>
+        </AdminConfigSection>
+
+        <AdminConfigSection
+          title="Entrega padrão"
+          description="Modo usado quando o produto não define um modo específico."
+        >
+          <Select
+            value={form.defaultFulfillmentMode}
+            disabled={saving}
+            onValueChange={(value) =>
+              patchForm({
+                defaultFulfillmentMode: value as typeof form.defaultFulfillmentMode,
+              })
+            }
+          >
+            <SelectTrigger className="max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Automática</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
+              <SelectItem value="approval">Aprovação</SelectItem>
+            </SelectContent>
+          </Select>
+        </AdminConfigSection>
+
+        {coinsAllowed && (
+          <AdminConfigSection
+            title="Integração Pixie.gg"
+            description="Link de compra de Coins para viewers parceiros."
+          >
+            <div className="space-y-2">
+              <Label htmlFor="pixie-username">Username no Pixie</Label>
+              <Input
+                id="pixie-username"
+                placeholder={actingAs?.twitchUsername ?? "seu_username"}
+                value={form.pixieUsername}
+                disabled={saving}
+                onChange={(e) => patchForm({ pixieUsername: e.target.value })}
+              />
+              <p className="text-caption">
+                Deixe em branco para usar seu username da Twitch (
+                {actingAs?.twitchUsername}).
+              </p>
+              {pixiePreviewUrl ? (
+                <a
+                  href={pixiePreviewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-label text-primary hover:underline"
+                >
+                  Pré-visualizar link Pixie
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+            </div>
+          </AdminConfigSection>
+        )}
+      </div>
+
+      <AdminSaveFooter
+        dirty={isDirty}
+        saving={saving}
+        saved={savedRecently}
+        onSave={() => void save()}
+      />
     </div>
   );
 }

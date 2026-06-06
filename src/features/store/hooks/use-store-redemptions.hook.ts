@@ -1,41 +1,82 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { services } from "@services/index";
-import type { StoreRedemptionDto } from "@server/store/store.types";
+import type {
+  StoreRedemptionDto,
+  StoreRedemptionStatusCounts,
+} from "@server/store/store.types";
+
+const EMPTY_COUNTS: StoreRedemptionStatusCounts = {
+  all: 0,
+  pending: 0,
+  approved: 0,
+  delivered: 0,
+  cancelled: 0,
+  refunded: 0,
+};
 
 export function useStoreRedemptions() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const [redemptions, setRedemptions] = useState<StoreRedemptionDto[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [statusCounts, setStatusCounts] =
+    useState<StoreRedemptionStatusCounts>(EMPTY_COUNTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const statusFromUrl = searchParams.get("status");
+    if (
+      statusFromUrl &&
+      ["pending", "approved", "delivered", "cancelled", "refunded"].includes(
+        statusFromUrl
+      )
+    ) {
+      setStatusFilter(statusFromUrl);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await services.store.listRedemptions({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: statusFilter || undefined,
         page,
         limit: 20,
       });
       setRedemptions(data.items);
       setTotal(data.total);
+      setStatusCounts(data.statusCounts ?? EMPTY_COUNTS);
     } catch {
       toast({ title: "Erro ao carregar resgates", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, toast]);
+  }, [debouncedSearch, page, statusFilter, toast]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(total / 20));
 
   const updateStatus = async (
     id: string,
@@ -72,10 +113,12 @@ export function useStoreRedemptions() {
     total,
     page,
     setPage,
+    totalPages,
     search,
     setSearch,
     statusFilter,
     setStatusFilter,
+    statusCounts,
     loading,
     saving,
     updateStatus,

@@ -41,6 +41,7 @@ import type {
   StorePublicBalanceDto,
   StorePublicCatalogDto,
   StoreRedemptionDto,
+  StoreRedemptionStatusCounts,
   StoreRedemptionStatus,
 } from "@server/store/store.types";
 import { slugifyStoreText } from "@server/store/store.validators";
@@ -1169,7 +1170,13 @@ export async function listStoreRedemptions(
     page?: number;
     limit?: number;
   } = {}
-): Promise<{ items: StoreRedemptionDto[]; total: number; page: number; limit: number }> {
+): Promise<{
+  items: StoreRedemptionDto[];
+  total: number;
+  page: number;
+  limit: number;
+  statusCounts: StoreRedemptionStatusCounts;
+}> {
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(100, Math.max(1, options.limit ?? 20));
   const offset = (page - 1) * limit;
@@ -1187,12 +1194,30 @@ export async function listStoreRedemptions(
   if (options.productId) {
     filtered = filtered.filter((r) => r.productId === options.productId);
   }
+  const productIdsAll = [...new Set(rows.map((r) => r.productId))];
+  const productsForSearch = await Promise.all(
+    productIdsAll.map((id) => getStoreProductById(streamerId, id))
+  );
+  const productNameMap = new Map(
+    productsForSearch.filter(Boolean).map((p) => [p!.id, p!.name.toLowerCase()])
+  );
+
+  const statusCounts = {
+    all: rows.length,
+    pending: rows.filter((r) => r.status === "pending").length,
+    approved: rows.filter((r) => r.status === "approved").length,
+    delivered: rows.filter((r) => r.status === "delivered").length,
+    cancelled: rows.filter((r) => r.status === "cancelled").length,
+    refunded: rows.filter((r) => r.status === "refunded").length,
+  };
+
   if (options.search?.trim()) {
     const term = options.search.trim().toLowerCase();
     filtered = filtered.filter(
       (r) =>
         r.twitchUsername.toLowerCase().includes(term) ||
-        r.displayName.toLowerCase().includes(term)
+        r.displayName.toLowerCase().includes(term) ||
+        (productNameMap.get(r.productId) ?? "").includes(term)
     );
   }
 
@@ -1215,6 +1240,74 @@ export async function listStoreRedemptions(
     total,
     page,
     limit,
+    statusCounts,
+  };
+}
+
+function buildLast7DayKeys(): string[] {
+  const days: string[] = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() - offset);
+    days.push(date.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+function buildDashboardMetrics7d(
+  dayKeys: string[],
+  products: StoreProductDto[],
+  redemptions: StoreRedemptionDto[]
+) {
+  const productsByDay = new Map<string, number>();
+  const redemptionsByDay = new Map<string, number>();
+  const pointsByDay = new Map<string, number>();
+  const coinsByDay = new Map<string, number>();
+
+  for (const day of dayKeys) {
+    productsByDay.set(day, 0);
+    redemptionsByDay.set(day, 0);
+    pointsByDay.set(day, 0);
+    coinsByDay.set(day, 0);
+  }
+
+  for (const product of products) {
+    const day = new Date(product.createdAt).toISOString().slice(0, 10);
+    if (productsByDay.has(day)) {
+      productsByDay.set(day, (productsByDay.get(day) ?? 0) + 1);
+    }
+  }
+
+  for (const redemption of redemptions) {
+    const day = new Date(redemption.createdAt).toISOString().slice(0, 10);
+    if (!redemptionsByDay.has(day)) continue;
+    redemptionsByDay.set(day, (redemptionsByDay.get(day) ?? 0) + 1);
+    pointsByDay.set(day, (pointsByDay.get(day) ?? 0) + redemption.paidPoints);
+    coinsByDay.set(day, (coinsByDay.get(day) ?? 0) + redemption.paidCoins);
+  }
+
+  let cumulativeProducts = products.filter((product) => {
+    const created = new Date(product.createdAt).toISOString().slice(0, 10);
+    return created < dayKeys[0];
+  }).length;
+
+  return {
+    products: dayKeys.map((date) => {
+      cumulativeProducts += productsByDay.get(date) ?? 0;
+      return { date, value: cumulativeProducts };
+    }),
+    redemptions: dayKeys.map((date) => ({
+      date,
+      value: redemptionsByDay.get(date) ?? 0,
+    })),
+    pointsSpent: dayKeys.map((date) => ({
+      date,
+      value: pointsByDay.get(date) ?? 0,
+    })),
+    coinsSpent: dayKeys.map((date) => ({
+      date,
+      value: coinsByDay.get(date) ?? 0,
+    })),
   };
 }
 
@@ -1460,6 +1553,8 @@ export async function getStoreDashboard(
         : p.stockQuantity <= 5)
   );
 
+  const dayKeys = buildLast7DayKeys();
+
   return {
     totalProducts: products.total,
     activeProducts: activeProducts.length,
@@ -1468,6 +1563,11 @@ export async function getStoreDashboard(
       .length,
     pointsSpent,
     coinsSpent,
+    metrics7d: buildDashboardMetrics7d(
+      dayKeys,
+      products.items,
+      redemptions.items
+    ),
     lowStockProducts,
     popularProducts,
     topRedeemers,

@@ -6,6 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { AdminAdvancedSection } from "@/components/admin/shared/AdminAdvancedSection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,7 +87,18 @@ export function StoreProductAccordionRow({
   onRemoveDraft,
 }: StoreProductAccordionRowProps) {
   const isArchived = product.status === "archived";
+  const isInactive = product.status !== "active" && !isArchived;
   const previewText = product.shortDescription.trim() || product.fullDescription.trim();
+
+  const statusBadge = product.isDraft ? (
+    <Badge variant="draft">Rascunho</Badge>
+  ) : isArchived ? (
+    <Badge variant="inactive">Arquivado</Badge>
+  ) : isInactive ? (
+    <Badge variant="inactive">Inativo</Badge>
+  ) : product.featured ? (
+    <Badge variant="featured">Destaque</Badge>
+  ) : null;
 
   return (
     <AccordionItem
@@ -100,28 +112,11 @@ export function StoreProductAccordionRow({
               <span className="truncate font-medium">
                 {product.name.trim() || "Novo produto"}
               </span>
-              <Badge
-                variant="outline"
-                className="border-outline-variant/50 bg-transparent shadow-none"
-              >
+              <span className="text-caption">
                 {STORE_PRODUCT_TYPE_LABELS[product.productType]}
-              </Badge>
+              </span>
               <StoreRarityBadge rarity={product.rarity || null} />
-              {product.featured && (
-                <Badge className="border-primary/30 bg-primary/10 text-primary shadow-none">
-                  Destaque
-                </Badge>
-              )}
-              {isArchived && (
-                <Badge variant="outline" className="text-muted-foreground shadow-none">
-                  Arquivado
-                </Badge>
-              )}
-              {product.isDraft && (
-                <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
-                  Rascunho
-                </Badge>
-              )}
+              {statusBadge}
               {hasUnsavedChanges && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -202,52 +197,6 @@ export function StoreProductAccordionRow({
           </Select>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Tipo</Label>
-            <Select
-              value={product.productType}
-              disabled={saving || isArchived}
-              onValueChange={(v) =>
-                onChange({ productType: v as StoreProductType })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(STORE_PRODUCT_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Raridade</Label>
-            <Select
-              value={product.rarity || "none"}
-              disabled={saving || isArchived}
-              onValueChange={(v) =>
-                onChange({ rarity: v === "none" ? "" : (v as StoreProductRarity) })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Opcional" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma</SelectItem>
-                {Object.entries(STORE_RARITY_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor={`short-${product.id}`}>Descrição curta</Label>
           <Input
@@ -255,17 +204,6 @@ export function StoreProductAccordionRow({
             value={product.shortDescription}
             disabled={saving || isArchived}
             onChange={(e) => onChange({ shortDescription: e.target.value })}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={`full-${product.id}`}>Descrição completa</Label>
-          <Textarea
-            id={`full-${product.id}`}
-            rows={3}
-            value={product.fullDescription}
-            disabled={saving || isArchived}
-            onChange={(e) => onChange({ fullDescription: e.target.value })}
           />
         </div>
 
@@ -321,65 +259,124 @@ export function StoreProductAccordionRow({
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-outline-variant/30 p-3">
-          <p className="text-body-sm font-medium">Estoque ilimitado</p>
-          <Switch
-            checked={product.stockUnlimited}
-            disabled={saving || isArchived}
-            onCheckedChange={(v) => onChange({ stockUnlimited: v })}
-          />
-        </div>
+        <AdminAdvancedSection summary="Opções avançadas">
+          <div className="admin-subsection-stack">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={product.productType}
+                  disabled={saving || isArchived}
+                  onValueChange={(v) =>
+                    onChange({ productType: v as StoreProductType })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STORE_PRODUCT_TYPE_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Raridade</Label>
+                <Select
+                  value={product.rarity || "none"}
+                  disabled={saving || isArchived}
+                  onValueChange={(v) =>
+                    onChange({ rarity: v === "none" ? "" : (v as StoreProductRarity) })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {Object.entries(STORE_RARITY_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        {!product.stockUnlimited && (
-          <div className="space-y-2">
-            <Label htmlFor={`stock-${product.id}`}>Quantidade</Label>
-            <Input
-              id={`stock-${product.id}`}
-              type="number"
-              min={0}
-              value={product.stockQuantity}
-              disabled={saving || isArchived}
-              onChange={(e) =>
-                onChange({
-                  stockQuantity: parseInt(e.target.value, 10) || 0,
-                })
-              }
-            />
+            <div className="space-y-2">
+              <Label htmlFor={`full-${product.id}`}>Descrição completa</Label>
+              <Textarea
+                id={`full-${product.id}`}
+                rows={3}
+                value={product.fullDescription}
+                disabled={saving || isArchived}
+                onChange={(e) => onChange({ fullDescription: e.target.value })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
+              <p className="text-label font-medium">Estoque ilimitado</p>
+              <Switch
+                checked={product.stockUnlimited}
+                disabled={saving || isArchived}
+                onCheckedChange={(v) => onChange({ stockUnlimited: v })}
+              />
+            </div>
+
+            {!product.stockUnlimited && (
+              <div className="space-y-2">
+                <Label htmlFor={`stock-${product.id}`}>Quantidade</Label>
+                <Input
+                  id={`stock-${product.id}`}
+                  type="number"
+                  min={0}
+                  value={product.stockQuantity}
+                  disabled={saving || isArchived}
+                  onChange={(e) =>
+                    onChange({
+                      stockQuantity: parseInt(e.target.value, 10) || 0,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Entrega</Label>
+              <Select
+                value={product.fulfillmentMode}
+                disabled={saving || isArchived}
+                onValueChange={(v) =>
+                  onChange({ fulfillmentMode: v as StoreFulfillmentMode })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Automática</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="approval">Fila de aprovação</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={product.featured}
+                disabled={saving || isArchived}
+                onCheckedChange={(v) => onChange({ featured: v })}
+              />
+              <Label>Destaque</Label>
+            </div>
           </div>
-        )}
+        </AdminAdvancedSection>
 
-        <div className="space-y-2">
-          <Label>Entrega</Label>
-          <Select
-            value={product.fulfillmentMode}
-            disabled={saving || isArchived}
-            onValueChange={(v) =>
-              onChange({ fulfillmentMode: v as StoreFulfillmentMode })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">Automática</SelectItem>
-              <SelectItem value="manual">Manual</SelectItem>
-              <SelectItem value="approval">Fila de aprovação</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-wrap gap-6">
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={product.featured}
-              disabled={saving || isArchived}
-              onCheckedChange={(v) => onChange({ featured: v })}
-            />
-            <Label>Destaque</Label>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 border-t border-outline-variant/20 pt-4">
+        <div className="flex flex-wrap gap-2 pt-2">
           {!isArchived && (
             <Button size="sm" onClick={onSave} disabled={saving}>
               {saving ? "Salvando…" : "Salvar produto"}

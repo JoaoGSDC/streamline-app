@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminChannelOptions } from "@/hooks/useAdminChannelOptions";
+import type { TwitchChannelResult } from "@/lib/twitch-api";
 import { services } from "@services";
 import type { ModeratorDto } from "@api/internal/streamers/moderators.controller";
 
@@ -13,14 +14,30 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function normalizeLogin(value: string): string {
+  return value.trim().toLowerCase().replace(/^@/, "");
+}
+
+export type ModeratorSearchFeedback = "not_found" | "already_moderator" | null;
+
 export function useAdminModeratorsPage() {
   const { toast } = useToast();
-  const { ownerChannel, resolveFormStreamerId, userId, channels } =
-    useAdminChannelOptions();
+  const {
+    ownerChannel,
+    moderatedChannels,
+    resolveFormStreamerId,
+    userId,
+    channels,
+    canModerateOthers,
+  } = useAdminChannelOptions();
 
   const [manageTarget, setManageTarget] = useState("");
   const [moderators, setModerators] = useState<ModeratorDto[]>([]);
   const [username, setUsername] = useState("");
+  const [pendingUser, setPendingUser] = useState<TwitchChannelResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchFeedback, setSearchFeedback] =
+    useState<ModeratorSearchFeedback>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,7 +47,7 @@ export function useAdminModeratorsPage() {
   );
 
   const targetChannel = useMemo(
-    () => channels.find((c) => c.id === targetStreamerId) ?? ownerChannel,
+    () => channels.find((channel) => channel.id === targetStreamerId) ?? ownerChannel,
     [channels, targetStreamerId, ownerChannel]
   );
 
@@ -41,6 +58,16 @@ export function useAdminModeratorsPage() {
   const channelLabel = targetChannel?.twitchUsername
     ? `@${targetChannel.twitchUsername}`
     : "seu canal";
+
+  const moderatorLoginSet = useMemo(
+    () =>
+      new Set(
+        moderators.map((moderator) =>
+          moderator.moderatorUsername.toLowerCase()
+        )
+      ),
+    [moderators]
+  );
 
   const loadModerators = useCallback(async () => {
     if (!targetStreamerId || !canManageModerators) {
@@ -68,11 +95,62 @@ export function useAdminModeratorsPage() {
     void loadModerators();
   }, [loadModerators]);
 
-  const handleAdd = useCallback(
+  const handleUsernameChange = useCallback((value: string) => {
+    setUsername(value);
+    setPendingUser(null);
+    setSearchFeedback(null);
+  }, []);
+
+  const handleUserSelect = useCallback(
+    (channel: TwitchChannelResult) => {
+      const login = channel.login.toLowerCase();
+      if (moderatorLoginSet.has(login)) {
+        setSearchFeedback("already_moderator");
+        setPendingUser(null);
+        return;
+      }
+      setSearchFeedback(null);
+      setPendingUser(channel);
+    },
+    [moderatorLoginSet]
+  );
+
+  const handleSearchComplete = useCallback(
+    (results: TwitchChannelResult[], query: string) => {
+      const login = normalizeLogin(query);
+      if (login.length < 2) {
+        setSearchFeedback(null);
+        return;
+      }
+
+      if (moderatorLoginSet.has(login)) {
+        setSearchFeedback("already_moderator");
+        setPendingUser(null);
+        return;
+      }
+
+      if (results.length === 0) {
+        setSearchFeedback("not_found");
+        setPendingUser(null);
+        return;
+      }
+
+      setSearchFeedback(null);
+      const exactMatch = results.find(
+        (channel) => channel.login.toLowerCase() === login
+      );
+      if (exactMatch) {
+        setPendingUser(exactMatch);
+      }
+    },
+    [moderatorLoginSet]
+  );
+
+  const handleConfirmAdd = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      const login = username.trim().toLowerCase().replace(/^@/, "");
-      if (!targetStreamerId || !login) return;
+      const login = pendingUser?.login ?? normalizeLogin(username);
+      if (!targetStreamerId || !login || !pendingUser) return;
 
       setSubmitting(true);
       try {
@@ -81,6 +159,8 @@ export function useAdminModeratorsPage() {
           login
         );
         setUsername("");
+        setPendingUser(null);
+        setSearchFeedback(null);
         await loadModerators();
         toast({
           title: "Moderador adicionado",
@@ -96,21 +176,25 @@ export function useAdminModeratorsPage() {
         setSubmitting(false);
       }
     },
-    [username, targetStreamerId, loadModerators, channelLabel, toast]
+    [
+      pendingUser,
+      username,
+      targetStreamerId,
+      loadModerators,
+      channelLabel,
+      toast,
+    ]
   );
 
   const handleRemove = useCallback(
-    async (moderatorId: string, modUsername: string) => {
+    async (moderatorId: string, _modUsername: string) => {
       if (!targetStreamerId) return;
-      if (
-        !confirm(`Remover @${modUsername} como moderador de ${channelLabel}?`)
-      ) {
-        return;
-      }
 
       try {
         await services.streamers.moderators.remove(targetStreamerId, moderatorId);
-        setModerators((prev) => prev.filter((m) => m.moderatorId !== moderatorId));
+        setModerators((previous) =>
+          previous.filter((moderator) => moderator.moderatorId !== moderatorId)
+        );
         toast({ title: "Moderador removido" });
       } catch (error) {
         toast({
@@ -118,33 +202,46 @@ export function useAdminModeratorsPage() {
           description: getApiErrorMessage(error, "Falha ao remover"),
           variant: "destructive",
         });
+        throw error;
       }
     },
-    [targetStreamerId, channelLabel, toast]
+    [targetStreamerId, toast]
   );
 
   const excludeLogins = useMemo(
     () => [
       targetChannel?.twitchUsername ?? "",
-      ...moderators.map((m) => m.moderatorUsername),
+      ...moderators.map((moderator) => moderator.moderatorUsername),
     ],
     [targetChannel?.twitchUsername, moderators]
   );
 
+  const handleSearchingChange = useCallback((searching: boolean) => {
+    setIsSearching(searching);
+  }, []);
+
   return {
     ownerChannel,
+    moderatedChannels,
     channels,
+    canModerateOthers,
     manageTarget,
     setManageTarget,
     moderators,
     username,
-    setUsername,
+    pendingUser,
+    isSearching,
+    searchFeedback,
     loading,
     submitting,
     canManageModerators,
     channelLabel,
     excludeLogins,
-    handleAdd,
+    handleUsernameChange,
+    handleUserSelect,
+    handleSearchingChange,
+    handleSearchComplete,
+    handleConfirmAdd,
     handleRemove,
   };
 }

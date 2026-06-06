@@ -519,6 +519,7 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE bot_commands ADD COLUMN builtin_key TEXT`,
     `ALTER TABLE bot_timers ADD COLUMN first_run_after_minutes INTEGER`,
     `ALTER TABLE bot_timers ADD COLUMN schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed'`,
+    `ALTER TABLE bot_timers ADD COLUMN min_viewers INTEGER`,
     `ALTER TABLE store_channel_config ADD COLUMN pixie_username TEXT`,
   ];
 

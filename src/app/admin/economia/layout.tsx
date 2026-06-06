@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { EconomySubNav } from "@/components/admin/economy/EconomySubNav";
 import { useAdminContext } from "@/components/admin/AdminProvider";
 
 export default function EconomyModuleLayout({
@@ -25,10 +24,5 @@ export default function EconomyModuleLayout({
     return null;
   }
 
-  return (
-    <div className="space-y-6">
-      <EconomySubNav />
-      {children}
-    </div>
-  );
+  return <div className="admin-page-stack">{children}</div>;
 }

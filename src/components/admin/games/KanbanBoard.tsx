@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
 import { Layers } from "lucide-react";
 import {
   KanbanCard,
   type KanbanGameItem,
-  type KanbanGameMetaPatch,
 } from "./KanbanCard";
 import { KANBAN_COLUMNS, type KanbanColumnKey } from "./kanban-config";
 
@@ -20,11 +21,13 @@ interface KanbanBoardProps {
     beforeId: string | null,
     draggedId: string
   ) => void;
+  onEdit: (item: KanbanGameItem) => void;
   onRemove: (id: string) => void;
-  onSaveMeta: (id: string, patch: KanbanGameMetaPatch) => void;
+  onAddToColumn: (columnKey: KanbanColumnKey) => void;
   normalizeImageUrl: (raw?: string | null) => string;
   showStreamerBadge?: boolean;
   streamerLabels?: Record<string, string>;
+  visibleColumnKeys: KanbanColumnKey[];
 }
 
 function DropSlot({
@@ -52,11 +55,13 @@ function DropSlot({
 export function KanbanBoard({
   columns,
   onDropAt,
+  onEdit,
   onRemove,
-  onSaveMeta,
+  onAddToColumn,
   normalizeImageUrl,
   showStreamerBadge,
   streamerLabels,
+  visibleColumnKeys,
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget>(null);
@@ -105,9 +110,13 @@ export function KanbanBoard({
     clearDrag();
   };
 
+  const visibleColumns = KANBAN_COLUMNS.filter((meta) =>
+    visibleColumnKeys.includes(meta.key)
+  );
+
   return (
     <div className="admin-kanban-board">
-      {KANBAN_COLUMNS.map((meta) => {
+      {visibleColumns.map((meta) => {
         const col = columns.find((c) => c.key === meta.key)!;
         const isColumnActive = dropTarget?.column === meta.key;
 
@@ -120,21 +129,28 @@ export function KanbanBoard({
             )}
           >
             <header className="admin-kanban-column-header">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <span
-                  className="h-2 w-2 rounded-full"
+                  className="h-2 w-2 shrink-0 rounded-full"
                   style={{
                     background: meta.accent,
                     boxShadow: `0 0 8px ${meta.accent}`,
                   }}
                 />
-                <h3 className="font-headline text-body-sm font-semibold text-foreground">
-                  {meta.title}
+                <h3 className="truncate text-label font-semibold text-foreground">
+                  {meta.title} ({col.items.length})
                 </h3>
               </div>
-              <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-caption font-medium text-muted-foreground">
-                {col.items.length}
-              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => onAddToColumn(meta.key)}
+                aria-label={`Adicionar jogo em ${meta.title}`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
             </header>
 
             <div
@@ -147,7 +163,7 @@ export function KanbanBoard({
                   icon={Layers}
                   title={meta.emptyTitle}
                   description={meta.emptyHint}
-                  className="py-8"
+                  className="py-6"
                 />
               ) : null}
 
@@ -161,8 +177,9 @@ export function KanbanBoard({
                   <KanbanCard
                     item={it}
                     isDragging={draggedId === it.id}
+                    isDropped={meta.key === "dropped"}
+                    onEdit={onEdit}
                     onRemove={onRemove}
-                    onSaveMeta={onSaveMeta}
                     normalizeImageUrl={normalizeImageUrl}
                     streamerLabel={
                       showStreamerBadge && it.streamerId

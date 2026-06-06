@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquare, Plus, BookOpen } from "lucide-react";
+import { MessageSquare, Plus, BookOpen, Search } from "lucide-react";
+import { useCallback, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion } from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,42 +19,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
 import { useBotCommandsPage } from "@features/bot/hooks/use-bot-commands-page.hook";
 import { BotVariablesReference } from "@features/bot/components/BotVariablesReference";
-import {
-  BotCommandAccordionRow,
-  type BotCommandRowState,
-} from "@features/bot/components/BotCommandAccordionRow";
-import type { BotBuiltinCategoryId } from "@services/entities/bot-variables.services";
-
-const BUILTIN_CATEGORY_ORDER: BotBuiltinCategoryId[] = [
-  "general",
-  "raffles",
-  "moderator",
-  "streamer",
-];
+import { BotCommandCategoryFilters } from "@features/bot/components/BotCommandCategoryFilters";
+import { BotCommandsTable } from "@features/bot/components/BotCommandsTable";
+import { BotCommandEditDialog } from "@features/bot/components/BotCommandEditDialog";
+import type { BotCommandRowState } from "@features/bot/types/bot-command.types";
 
 export default function BotCommandsPage() {
   const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BotCommandRowState | null>(null);
 
   const {
     loading,
     search,
     setSearch,
+    categoryFilter,
+    setCategoryFilter,
+    categoryCounts,
+    filteredRows,
     catalog,
     catalogLoading,
     allVariables,
     emotes,
     emotesLoading,
-    openAccordion,
-    setOpenAccordion,
-    builtinRows,
-    builtinRowsByCategory,
-    builtinCategoryLabels: builtinCategoryLabelsFromCatalog,
-    customRows,
-    draftRows,
     savingIds,
     addDraftRow,
     updateRow,
@@ -61,54 +53,88 @@ export default function BotCommandsPage() {
     toggleEnabled,
     removeDraftRow,
     deleteCustomCommand,
-    isRowDirty,
+    getRowById,
+    revertLocalEdits,
   } = useBotCommandsPage();
 
-  const handleSaveRow = async (row: BotCommandRowState) => {
-    const ok = await persistRow(row);
-    if (ok) {
-      toast({
-        title: "Comando salvo",
-        description: "As alterações deste comando foram aplicadas.",
-      });
-    } else {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar. Verifique trigger e mensagem.",
-        variant: "destructive",
-      });
+  const editingCommand = getRowById(editingId);
+
+  const openDialog = useCallback((id: string) => {
+    setSaveError(false);
+    setEditingId(id);
+    setDialogOpen(true);
+  }, []);
+
+  const handleAddCommand = () => {
+    const id = addDraftRow();
+    openDialog(id);
+  };
+
+  const handleEdit = (row: BotCommandRowState) => {
+    openDialog(row.id);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setSaveError(false);
+      if (editingId) {
+        const row = getRowById(editingId);
+        if (row?.isDraft) {
+          removeDraftRow(editingId);
+        } else {
+          revertLocalEdits(editingId);
+        }
+        setEditingId(null);
+      }
     }
   };
 
-  const renderRow = (row: BotCommandRowState) => (
-    <BotCommandAccordionRow
-      key={row.id}
-      command={row}
-      variables={allVariables}
-      emotes={emotes}
-      emotesLoading={emotesLoading}
-      saving={savingIds.has(row.id)}
-      hasUnsavedChanges={
-        (isRowDirty(row.id) || Boolean(row.isDraft)) && !savingIds.has(row.id)
-      }
-      onChange={(patch) => updateRow(row.id, patch)}
-      onSave={() => void handleSaveRow(row)}
-      onDelete={
-        row.isDraft
-          ? () => removeDraftRow(row.id)
-          : row.isBuiltin
-            ? undefined
-            : () => setDeleteTarget(row)
-      }
-      onToggleEnabled={(enabled) => void toggleEnabled(row, enabled)}
-    />
-  );
+  const handleCancelEdit = () => {
+    if (!editingId) return;
+    const row = getRowById(editingId);
+    if (row?.isDraft) {
+      removeDraftRow(editingId);
+    } else {
+      revertLocalEdits(editingId);
+    }
+    setEditingId(null);
+    setSaveError(false);
+    setDialogOpen(false);
+  };
+
+  const handleSave = async () => {
+    if (!editingCommand) return;
+    setSaveError(false);
+    const savedId = await persistRow(editingCommand);
+    if (savedId) {
+      toast({
+        title: "Comando atualizado",
+        description: "As alterações deste comando foram aplicadas.",
+      });
+      setTimeout(() => {
+        setEditingId(null);
+        setDialogOpen(false);
+      }, 150);
+    } else {
+      setSaveError(true);
+    }
+  };
+
+  const handleDeleteFromDialog = () => {
+    if (!editingCommand || editingCommand.isBuiltin) return;
+    setDeleteTarget(editingCommand);
+  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     const ok = await deleteCustomCommand(deleteTarget);
     if (ok) {
       toast({ title: "Comando excluído" });
+      if (editingId === deleteTarget.id) {
+        setDialogOpen(false);
+        setEditingId(null);
+      }
       setDeleteTarget(null);
     } else {
       toast({
@@ -120,10 +146,10 @@ export default function BotCommandsPage() {
   };
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <div className="admin-page-stack overflow-x-hidden">
       <AdminPageHeader
         title="Comandos"
-        description="Comandos padrão do StreaminHub e personalizados do seu canal. Use o botão Salvar em cada linha para aplicar as alterações."
+        description="Comandos padrão do StreaminHub e personalizados do seu canal."
       >
         <Button variant="outline" size="sm" asChild>
           <Link href="/admin/bot/variables">
@@ -131,7 +157,7 @@ export default function BotCommandsPage() {
             Guia de variáveis
           </Link>
         </Button>
-        <Button onClick={addDraftRow}>
+        <Button onClick={handleAddCommand}>
           <Plus className="mr-2 h-4 w-4" />
           Adicionar comando
         </Button>
@@ -139,85 +165,82 @@ export default function BotCommandsPage() {
 
       <BotVariablesReference catalog={catalog} loading={catalogLoading} />
 
-      <Input
-        placeholder="Buscar por trigger…"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        className="max-w-sm"
-      />
+      <div className="admin-subsection-stack">
+        <div className="relative max-w-sm">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            placeholder="Buscar por comando ou resposta…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <BotCommandCategoryFilters
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          counts={categoryCounts}
+        />
+      </div>
 
       {loading ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <Skeleton key={index} className="h-14 w-full rounded-lg" />
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton key={index} className="h-11 w-full rounded-lg" />
           ))}
         </div>
+      ) : filteredRows.length === 0 ? (
+        <AdminEmptyState
+          icon={MessageSquare}
+          title={
+            search || categoryFilter !== "all"
+              ? "Nenhum comando neste filtro"
+              : "Crie seus primeiros comandos customizados"
+          }
+          description={
+            search || categoryFilter !== "all"
+              ? "Ajuste a busca ou a categoria para ver outros comandos."
+              : "Comandos personalizados respondem à sua comunidade com mensagens únicas do seu canal."
+          }
+          action={
+            search || categoryFilter !== "all" ? undefined : (
+              <Button onClick={handleAddCommand}>
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar comando
+              </Button>
+            )
+          }
+        />
       ) : (
-        <div className="space-y-8">
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              <h2 className="font-headline text-body-md font-semibold">
-                Comandos padrão
-              </h2>
-              <span className="text-body-sm text-muted-foreground">
-                ({builtinRows.length})
-              </span>
-            </div>
-            <p className="text-body-sm text-muted-foreground">
-              Não podem ser removidos. Comandos com link ou PIX permitem mensagem
-              personalizada; os demais são executados automaticamente pelo bot.
-            </p>
-            <Accordion
-              type="multiple"
-              value={openAccordion}
-              onValueChange={setOpenAccordion}
-              className="space-y-6"
-            >
-              {BUILTIN_CATEGORY_ORDER.map((categoryId) => {
-                const rows = builtinRowsByCategory[categoryId] ?? [];
-                if (rows.length === 0) return null;
-
-                return (
-                  <div key={categoryId} className="space-y-2">
-                    <h3 className="text-body-sm font-semibold text-foreground">
-                      {builtinCategoryLabelsFromCatalog[categoryId] ?? categoryId}
-                      <span className="ml-2 font-normal text-muted-foreground">
-                        ({rows.length})
-                      </span>
-                    </h3>
-                    <div className="space-y-2">{rows.map(renderRow)}</div>
-                  </div>
-                );
-              })}
-            </Accordion>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-headline text-body-md font-semibold">
-              Comandos personalizados
-              <span className="ml-2 font-normal text-muted-foreground">
-                ({customRows.length + draftRows.length})
-              </span>
-            </h2>
-            <Accordion
-              type="multiple"
-              value={openAccordion}
-              onValueChange={setOpenAccordion}
-              className="space-y-2"
-            >
-              {customRows.map(renderRow)}
-              {draftRows.map(renderRow)}
-            </Accordion>
-            {customRows.length === 0 && draftRows.length === 0 && (
-              <p className="rounded-lg border border-dashed border-outline-variant/40 px-4 py-8 text-center text-body-sm text-muted-foreground">
-                Nenhum comando personalizado. Clique em &quot;Adicionar comando&quot;
-                para criar uma nova linha.
-              </p>
-            )}
-          </section>
-        </div>
+        <BotCommandsTable
+          rows={filteredRows}
+          savingIds={savingIds}
+          onToggleEnabled={(row, enabled) => void toggleEnabled(row, enabled)}
+          onEdit={handleEdit}
+        />
       )}
+
+      <BotCommandEditDialog
+        open={dialogOpen}
+        command={editingCommand}
+        variables={allVariables}
+        emotes={emotes}
+        emotesLoading={emotesLoading}
+        saving={editingId ? savingIds.has(editingId) : false}
+        saveError={saveError}
+        onOpenChange={handleDialogOpenChange}
+        onChange={(patch) => editingId && updateRow(editingId, patch)}
+        onSave={() => void handleSave()}
+        onCancel={handleCancelEdit}
+        onDelete={
+          editingCommand && !editingCommand.isBuiltin && !editingCommand.isDraft
+            ? handleDeleteFromDialog
+            : undefined
+        }
+      />
 
       <AlertDialog
         open={!!deleteTarget}

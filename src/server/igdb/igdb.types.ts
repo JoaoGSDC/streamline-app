@@ -18,6 +18,7 @@ export interface IgdbSearchResultDto {
   summary?: string;
   genres?: string[];
   platforms?: string[];
+  releaseYear?: number | null;
 }
 
 export interface IgdbGameDetailsDto {

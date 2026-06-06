@@ -120,7 +120,9 @@ export interface EconomyRankingEntryDto {
   twitchUsername: string;
   displayName: string;
   points: number;
+  xp: number;
   level: number;
   levelTitle?: string;
   lastActivityAt: Date | null;
+  createdAt: Date;
 }

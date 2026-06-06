@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
+import { StoreMetricSparkline } from "@features/store/components/StoreMetricSparkline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStoreDashboard } from "@features/store/hooks/use-store-dashboard.hook";
@@ -18,15 +19,18 @@ import { StorePriceLabel } from "@features/store/components/StorePriceLabel";
 import { StoreRarityBadge } from "@features/store/components/StoreRarityBadge";
 import { useAdminContext } from "@/components/admin/AdminProvider";
 import { Button } from "@/components/ui/button";
+import type { StoreDashboardDayMetric } from "@server/store/store.types";
 
 function StatCard({
   title,
   value,
   loading,
+  sparkline,
 }: {
   title: string;
   value: string;
   loading: boolean;
+  sparkline?: StoreDashboardDayMetric[];
 }) {
   return (
     <Card>
@@ -35,14 +39,33 @@ function StatCard({
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-2">
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
           <p className="font-headline text-headline-md font-bold">{value}</p>
         )}
+        {!loading && sparkline ? (
+          <StoreMetricSparkline data={sparkline} />
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function MiniListPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="flex items-center justify-between gap-2 rounded-md border border-dashed border-outline-variant/25 px-3 py-2.5"
+        >
+          <span className="text-caption text-muted-foreground">{label}</span>
+          <span className="text-caption text-muted-foreground">—</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -52,6 +75,9 @@ export default function StoreDashboardPage() {
   const publicUrl = actingAs
     ? `/store/${actingAs.twitchUsername}`
     : undefined;
+
+  const popularItems = (dashboard?.popularProducts ?? []).slice(0, 3);
+  const topRedeemers = (dashboard?.topRedeemers ?? []).slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -73,21 +99,25 @@ export default function StoreDashboardPage() {
           title="Produtos"
           value={`${dashboard?.activeProducts ?? 0} / ${dashboard?.totalProducts ?? 0}`}
           loading={loading}
+          sparkline={dashboard?.metrics7d?.products}
         />
         <StatCard
           title="Resgates"
           value={String(dashboard?.totalRedemptions ?? 0)}
           loading={loading}
+          sparkline={dashboard?.metrics7d?.redemptions}
         />
         <StatCard
           title="Points gastos"
           value={(dashboard?.pointsSpent ?? 0).toLocaleString("pt-BR")}
           loading={loading}
+          sparkline={dashboard?.metrics7d?.pointsSpent}
         />
         <StatCard
           title="Coins gastas"
           value={(dashboard?.coinsSpent ?? 0).toLocaleString("pt-BR")}
           loading={loading}
+          sparkline={dashboard?.metrics7d?.coinsSpent}
         />
       </div>
 
@@ -104,12 +134,10 @@ export default function StoreDashboardPage() {
               Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))
-            ) : (dashboard?.popularProducts.length ?? 0) === 0 ? (
-              <p className="text-body-sm text-muted-foreground">
-                Nenhum resgate ainda.
-              </p>
+            ) : popularItems.length === 0 ? (
+              <MiniListPlaceholder label="Aguardando primeiros resgates" />
             ) : (
-              dashboard?.popularProducts.map(({ product, redemptionCount }) => (
+              popularItems.map(({ product, redemptionCount }) => (
                 <div
                   key={product.id}
                   className="flex items-center justify-between gap-2 rounded-md border border-outline-variant/20 p-3"
@@ -142,7 +170,7 @@ export default function StoreDashboardPage() {
                 Nenhum produto com estoque baixo.
               </p>
             ) : (
-              dashboard?.lowStockProducts.map((product) => (
+              dashboard?.lowStockProducts.slice(0, 3).map((product) => (
                 <div
                   key={product.id}
                   className="flex items-center justify-between rounded-md border border-amber-500/20 bg-amber-500/5 p-3"
@@ -174,7 +202,7 @@ export default function StoreDashboardPage() {
                 Marque produtos como destaque na tela de Produtos.
               </p>
             ) : (
-              dashboard?.featuredProducts.map((product) => (
+              dashboard?.featuredProducts.slice(0, 3).map((product) => (
                 <div
                   key={product.id}
                   className="flex items-center justify-between gap-2 rounded-md border p-3"
@@ -200,12 +228,10 @@ export default function StoreDashboardPage() {
           <CardContent className="space-y-3">
             {loading ? (
               <Skeleton className="h-12 w-full" />
-            ) : (dashboard?.topRedeemers.length ?? 0) === 0 ? (
-              <p className="text-body-sm text-muted-foreground">
-                Ranking aparecerá após os primeiros resgates.
-              </p>
+            ) : topRedeemers.length === 0 ? (
+              <MiniListPlaceholder label="Ranking em formação" />
             ) : (
-              dashboard?.topRedeemers.map((user, index) => (
+              topRedeemers.map((user, index) => (
                 <div
                   key={user.twitchUserId}
                   className="flex items-center justify-between rounded-md border p-3"

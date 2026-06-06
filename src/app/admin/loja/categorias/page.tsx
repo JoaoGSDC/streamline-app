@@ -61,8 +61,8 @@ export default function StoreCategoriesPage() {
       ) : categories.length === 0 ? (
         <AdminEmptyState
           icon={FolderOpen}
-          title="Nenhuma categoria"
-          description="As categorias padrão serão criadas ao acessar a loja."
+          title="Nenhuma categoria criada"
+          description="Organize seus produtos em categorias para facilitar a navegação dos viewers."
         />
       ) : (
         <ul className="divide-y rounded-lg border border-outline-variant/30">

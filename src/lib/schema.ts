@@ -140,6 +140,8 @@ export const botTimers = sqliteTable("bot_timers", {
   /** `live_elapsed` — disparos ancorados ao início da transmissão ao vivo. */
   scheduleMode: text("schedule_mode").notNull().default("live_elapsed"),
   message: text("message").notNull(),
+  /** Mínimo de viewers na live para disparar; null = sem exigência. */
+  minViewers: integer("min_viewers"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

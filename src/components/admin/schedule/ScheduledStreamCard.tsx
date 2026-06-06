@@ -1,6 +1,7 @@
 "use client";
 
-import { Calendar, Clock, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,20 +12,22 @@ export interface ScheduledStreamItem {
   duration: string;
   gameTitle?: string | null;
   gameImage?: string | null;
-  game?: { title?: string; image?: string | null } | null;
+  game?: { title?: string; image?: string | null; synopsis?: string | null } | null;
+  links?: Array<{ url: string; name?: string }>;
+  notes?: string | null;
 }
 
-function normalizeGameImage(raw?: string | null) {
-  if (!raw) return null;
-  const full = raw.startsWith("//") ? `https:${raw}` : raw;
-  let url = full.replace("/t_thumb/", "/t_1080p/");
-  if (url.endsWith(".jpg")) url = url.slice(0, -4) + ".png";
-  return url;
+function formatDateTime(dateValue: Date | string, time: string): string {
+  const dateLabel = new Date(dateValue).toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return `${dateLabel} · ${time}`;
 }
 
 interface ScheduledStreamCardProps {
   stream: ScheduledStreamItem;
-  onClick: () => void;
   onEdit: () => void;
   onDelete: (id: string) => void;
   streamerLabel?: string;
@@ -33,92 +36,106 @@ interface ScheduledStreamCardProps {
 
 export function ScheduledStreamCard({
   stream,
-  onClick,
   onEdit,
   onDelete,
   streamerLabel,
   className,
 }: ScheduledStreamCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const title = stream.game?.title || stream.gameTitle || "Jogo";
-  const img = normalizeGameImage(stream.game?.image || stream.gameImage);
-  const dateLabel = new Date(stream.scheduledDate).toLocaleDateString("pt-BR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  const dateTimeLabel = formatDateTime(stream.scheduledDate, stream.scheduledTime);
+  const validLinks = (stream.links ?? []).filter((link) => link.url.trim());
+  const hasDetails = validLinks.length > 0 || Boolean(stream.notes?.trim());
 
   return (
     <article
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className={cn("admin-schedule-card group", className)}
+      className={cn("admin-schedule-card group", expanded && "admin-schedule-card--expanded", className)}
     >
-      {img ? (
-        <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt="" className="h-full w-full object-cover" />
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+        onClick={() => setExpanded((previous) => !previous)}
+        aria-expanded={expanded}
+      >
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-[13px] text-muted-foreground">{dateTimeLabel}</span>
+          <span className="text-[14px] font-semibold text-foreground">{title}</span>
         </div>
-      ) : (
-        <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-container-highest text-caption font-semibold text-muted-foreground">
-          ?
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate font-headline text-body-md font-semibold text-foreground">
-            {title}
-          </h3>
-          {streamerLabel ? (
-            <span className="rounded-md bg-[hsl(var(--neon-purple-glow)/0.2)] px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              @{streamerLabel}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
-            {dateLabel}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {stream.scheduledTime}
-            {stream.duration ? ` · ${stream.duration}` : ""}
-          </span>
+        <p className="text-[12px] text-muted-foreground">
+          {streamerLabel ? `@${streamerLabel}` : null}
+          {streamerLabel && stream.duration ? " · " : null}
+          {stream.duration || (!streamerLabel ? "Duração não informada" : null)}
         </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      </button>
+
+      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <Button
+          type="button"
           variant="ghost"
-          size="icon"
-          className="opacity-60 transition-opacity hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
+          size="sm"
+          className="h-8 px-2 text-xs"
+          onClick={(event) => {
+            event.stopPropagation();
             onEdit();
           }}
-          aria-label="Editar stream"
         >
-          <Pencil className="h-4 w-4" />
+          ✏️ Editar
         </Button>
         <Button
+          type="button"
           variant="ghost"
-          size="icon"
-          className="opacity-60 transition-opacity hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
+          size="sm"
+          className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+          onClick={(event) => {
+            event.stopPropagation();
             onDelete(stream.id);
           }}
-          aria-label="Remover stream"
         >
-          <Trash2 className="h-4 w-4 text-destructive" />
+          🗑️ Cancelar stream
         </Button>
       </div>
+
+      {expanded && hasDetails ? (
+        <div className="admin-schedule-card-details w-full border-t border-outline-variant/20 pt-3">
+          {validLinks.length > 0 ? (
+            <div className="mb-3 space-y-1.5">
+              <p className="text-caption font-medium text-muted-foreground">Links</p>
+              <ul className="space-y-1">
+                {validLinks.map((link, index) => (
+                  <li key={`${link.url}-${index}`}>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {link.name?.trim() || link.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {stream.notes?.trim() ? (
+            <div>
+              <p className="mb-1 text-caption font-medium text-muted-foreground">
+                Observações
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-foreground/90">
+                {stream.notes}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {expanded && !hasDetails ? (
+        <p className="w-full border-t border-outline-variant/20 pt-3 text-sm text-muted-foreground">
+          Sem links ou observações para esta transmissão.
+        </p>
+      ) : null}
     </article>
   );
 }

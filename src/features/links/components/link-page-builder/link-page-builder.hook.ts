@@ -14,7 +14,10 @@ import { getDefaultNobleLayout } from "@lib/link-page-noble";
 import { applyTemplateTheme } from "@lib/link-page-templates";
 import { emptySocialLink, ensureSocialLinkIds } from "@lib/link-builder-utils";
 import { isValidHttpUrl } from "@/components/admin/links/social-platform";
-import type { LinkPageBuilderProps } from "@features/links/types/links.types";
+import type {
+  LinkPageBuilderProps,
+  LinkPageSaveState,
+} from "@features/links/types/links.types";
 
 export function useLinkPageBuilder({
   streamerId,
@@ -32,11 +35,15 @@ export function useLinkPageBuilder({
     )
   );
   const [config, setConfig] = useState<LinkPageConfig>(initialConfig);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<LinkPageSaveState>("idle");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
-  const [editorTab, setEditorTab] = useState("templates");
+  const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">(
+    "mobile"
+  );
+  const [editorTab, setEditorTab] = useState("appearance");
+  const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
   const [addBlockKey, setAddBlockKey] = useState(0);
 
   const previewLinks = useMemo(() => {
@@ -102,9 +109,6 @@ export function useLinkPageBuilder({
       };
     });
 
-    if (templateId === "noble") {
-      setEditorTab("noble");
-    }
   }, []);
 
   const reorderBlocks = useCallback((fromId: string, toId: string) => {
@@ -123,7 +127,7 @@ export function useLinkPageBuilder({
   }, []);
 
   const handleSave = useCallback(async () => {
-    setSaving(true);
+    setSaveState("saving");
     try {
       const response = await services.socialLinks.admin.update(streamerId, {
         links,
@@ -137,11 +141,13 @@ export function useLinkPageBuilder({
         setConfig(response.pageConfig);
       }
 
+      setSaveState("saved");
       toast({
         title: "Página salva",
         description: "Sua vitrine de links foi atualizada.",
       });
     } catch (saveError) {
+      setSaveState("error");
       toast({
         title: "Erro ao salvar",
         description:
@@ -150,10 +156,14 @@ export function useLinkPageBuilder({
             : "Não foi possível salvar.",
         variant: "destructive",
       });
-    } finally {
-      setSaving(false);
     }
   }, [streamerId, links, config, toast]);
+
+  useEffect(() => {
+    if (saveState !== "saved") return;
+    const timer = setTimeout(() => setSaveState("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [saveState]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
@@ -164,9 +174,10 @@ export function useLinkPageBuilder({
   useEffect(() => {
     onSaveReadyRef.current?.({
       save: () => handleSaveRef.current(),
-      saving,
+      saving: saveState === "saving",
+      saveState,
     });
-  }, [saving]);
+  }, [saveState]);
 
   useEffect(() => {
     return () => onSaveReadyRef.current?.(null);
@@ -188,14 +199,18 @@ export function useLinkPageBuilder({
     setLinks,
     config,
     setConfig,
-    saving,
+    saveState,
     dragId,
     setDragId,
     dropTargetId,
     setDropTargetId,
     mobileView,
     setMobileView,
+    previewDevice,
+    setPreviewDevice,
     editorTab,
+    expandedBlockId,
+    setExpandedBlockId,
     setEditorTab,
     addBlockKey,
     previewLinks,

@@ -1,62 +1,14 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Shield, Plus, Trash2 } from "lucide-react";
+import { Search, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useBotBlacklistPage } from "@features/bot/hooks/use-bot-blacklist-page.hook";
-
-const addTermSchema = z
-  .object({
-    term: z.string().min(1, "Informe o termo").max(100),
-    matchType: z.enum(["exact", "contains"]),
-    action: z.enum(["delete", "timeout"]),
-    timeoutSeconds: z.coerce.number().int().min(1).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.action === "timeout" && !data.timeoutSeconds) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Informe a duração do timeout",
-        path: ["timeoutSeconds"],
-      });
-    }
-  });
-
-type AddTermValues = z.infer<typeof addTermSchema>;
+import { BotBlacklistQuickAdd } from "@features/bot/components/BotBlacklistQuickAdd";
+import { BotBlacklistTable } from "@features/bot/components/BotBlacklistTable";
 
 export default function BotModerationPage() {
   const { toast } = useToast();
@@ -66,43 +18,20 @@ export default function BotModerationPage() {
     search,
     setSearch,
     submitting,
-    dialogOpen,
-    setDialogOpen,
-    deleteTarget,
-    setDeleteTarget,
+    savingIds,
+    recentlyAddedIds,
     addTerm,
+    updateTerm,
     toggleEnabled,
-    confirmDelete,
+    deleteTerm,
   } = useBotBlacklistPage();
 
-  const form = useForm<AddTermValues>({
-    resolver: zodResolver(addTermSchema),
-    defaultValues: {
-      term: "",
-      matchType: "contains",
-      action: "delete",
-      timeoutSeconds: 300,
-    },
-  });
-
-  const action = form.watch("action");
-
-  const handleAdd = form.handleSubmit(async (values) => {
-    const ok = await addTerm({
-      term: values.term,
-      matchType: values.matchType,
-      action: values.action,
-      timeoutSeconds:
-        values.action === "timeout" ? values.timeoutSeconds : undefined,
-    });
+  const handleAdd = async (
+    payload: Parameters<typeof addTerm>[0]
+  ): Promise<boolean> => {
+    const ok = await addTerm(payload);
     if (ok) {
       toast({ title: "Termo adicionado à blacklist" });
-      form.reset({
-        term: "",
-        matchType: "contains",
-        action: "delete",
-        timeoutSeconds: 300,
-      });
     } else {
       toast({
         title: "Erro",
@@ -110,191 +39,91 @@ export default function BotModerationPage() {
         variant: "destructive",
       });
     }
-  });
+    return ok;
+  };
+
+  const handleUpdate = async (
+    row: Parameters<typeof updateTerm>[0],
+    patch: Parameters<typeof updateTerm>[1]
+  ) => {
+    const ok = await updateTerm(row, patch);
+    if (!ok) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o termo.",
+        variant: "destructive",
+      });
+    }
+    return ok;
+  };
+
+  const handleDelete = async (row: Parameters<typeof deleteTerm>[0]) => {
+    const ok = await deleteTerm(row);
+    if (ok) {
+      toast({ title: "Termo removido" });
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o termo.",
+        variant: "destructive",
+      });
+    }
+    return ok;
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="admin-page-stack overflow-x-hidden">
       <AdminPageHeader
         title="Moderação"
         description="Palavras e termos que o bot detectará no chat. Correspondência sem diferenciar maiúsculas/minúsculas."
-      >
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Adicionar termo
-        </Button>
-      </AdminPageHeader>
+      />
 
-      <p className="rounded-md border border-outline-variant/30 bg-muted/30 px-3 py-2 text-body-sm text-muted-foreground">
+      <p className="rounded-lg bg-muted/30 px-5 py-3 text-body-admin text-muted-foreground">
         Regex não é suportado no MVP. Revise termos curtos para evitar falsos
         positivos.
       </p>
 
-      <Input
-        placeholder="Buscar termo…"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        className="max-w-sm"
-      />
+      <BotBlacklistQuickAdd submitting={submitting} onSubmit={handleAdd} />
+
+      <div className="relative max-w-sm">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          placeholder="Buscar termo…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="pl-9"
+        />
+      </div>
 
       {loading ? (
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-11 w-full rounded-lg" />
+          ))}
+        </div>
       ) : items.length === 0 ? (
         <AdminEmptyState
           icon={Shield}
-          title="Blacklist vazia"
-          description="Adicione termos inadequados para o bot moderar automaticamente."
-          action={
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar termo
-            </Button>
+          title={search ? "Nenhum termo nesta busca" : "Blacklist vazia"}
+          description={
+            search
+              ? "Tente outro termo ou limpe a busca."
+              : "Use o formulário acima para adicionar o primeiro termo."
           }
         />
       ) : (
-        <ul className="divide-y divide-outline-variant/20 rounded-lg border border-outline-variant/30">
-          {items.map((row) => (
-            <li
-              key={row.id}
-              className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded bg-muted px-1.5 py-0.5 text-body-sm">
-                  {row.term}
-                </code>
-                <Badge variant="outline">{row.matchType}</Badge>
-                <Badge variant="secondary">
-                  {row.action === "timeout"
-                    ? `timeout ${row.timeoutSeconds}s`
-                    : "deletar"}
-                </Badge>
-                {!row.enabled && (
-                  <Badge variant="secondary">Inativo</Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={row.enabled}
-                  onCheckedChange={() => void toggleEnabled(row)}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteTarget(row)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <BotBlacklistTable
+          rows={items}
+          recentlyAddedIds={recentlyAddedIds}
+          savingIds={savingIds}
+          onUpdate={handleUpdate}
+          onToggleEnabled={(row) => void toggleEnabled(row)}
+          onDelete={handleDelete}
+        />
       )}
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adicionar à blacklist</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="term">Termo</Label>
-              <Input id="term" {...form.register("term")} />
-              {form.formState.errors.term && (
-                <p className="text-body-sm text-destructive">
-                  {form.formState.errors.term.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Correspondência</Label>
-              <Select
-                value={form.watch("matchType")}
-                onValueChange={(value: "exact" | "contains") =>
-                  form.setValue("matchType", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="contains">Contém</SelectItem>
-                  <SelectItem value="exact">Exata</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Ação</Label>
-              <Select
-                value={form.watch("action")}
-                onValueChange={(value: "delete" | "timeout") =>
-                  form.setValue("action", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="delete">Deletar mensagem</SelectItem>
-                  <SelectItem value="timeout">Timeout</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {action === "timeout" && (
-              <div className="space-y-2">
-                <Label htmlFor="timeout">Duração (segundos)</Label>
-                <Input
-                  id="timeout"
-                  type="number"
-                  min={1}
-                  {...form.register("timeoutSeconds")}
-                />
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                Adicionar
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover termo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              &quot;{deleteTarget?.term}&quot; será removido da blacklist.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                const ok = await confirmDelete();
-                if (ok) toast({ title: "Termo removido" });
-              }}
-              disabled={submitting}
-            >
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -20,10 +20,13 @@ export function AdminChannelSwitcher({
   if (channels.length <= 1) {
     return (
       <div className={cn("px-3 py-2", className)}>
-        <p className="font-headline text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <p
+          className="font-semibold uppercase tracking-wider text-muted-foreground"
+          style={{ fontSize: "var(--text-channel-label)" }}
+        >
           Canal
         </p>
-        <p className="mt-1 truncate text-body-sm font-medium text-foreground">
+        <p className="mt-0.5 truncate text-label text-muted-foreground">
           @{actingAs.twitchUsername}
         </p>
       </div>
@@ -32,14 +35,18 @@ export function AdminChannelSwitcher({
 
   return (
     <div className={cn("px-2 pb-2", className)}>
-      <p className="mb-1.5 px-1 font-headline text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Canal ativo
+      <p
+        className="mb-1.5 px-1 font-semibold uppercase tracking-wider text-muted-foreground"
+        style={{ fontSize: "var(--text-channel-label)" }}
+      >
+        Canal
       </p>
       <StreamerSwitcherMenu
         channels={channels}
         actingAs={actingAs}
         onSwitch={onSwitch}
         variant="sidebar"
+        showAvatar={false}
       />
     </div>
   );

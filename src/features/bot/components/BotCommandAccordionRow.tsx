@@ -6,6 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { AdminTypeDot } from "@/components/admin/shared/AdminTypeDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,31 +18,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { BotMessageComposer } from "@features/bot/components/BotMessageComposer";
+import type { BotCommandRowState } from "@features/bot/types/bot-command.types";
 import type { BotVariableItem } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
 
-export interface BotCommandRowState {
-  id: string;
-  trigger: string;
-  response: string;
-  cooldownSeconds: number;
-  enabled: boolean;
-  isBuiltin: boolean;
-  builtinKey?: string | null;
-  description?: string;
-  category?: string;
-  categoryLabel?: string;
-  minRole?: "everyone" | "moderator" | "streamer";
-  argsHint?: string | null;
-  customizableResponse?: boolean;
-  responseTemplate?: string | null;
-  requiresConfirmation?: boolean;
-  confirmationPrompt?: string | null;
-  runtimeNotes?: string | null;
-  externalApiUrlTemplate?: string | null;
-  isDraft?: boolean;
-  isNew?: boolean;
-}
+export type { BotCommandRowState };
 
 interface BotCommandAccordionRowProps {
   command: BotCommandRowState;
@@ -91,44 +72,20 @@ export function BotCommandAccordionRow({
         <AccordionTrigger className="min-w-0 flex-1 gap-2 overflow-hidden py-3 hover:no-underline">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-left sm:flex-row sm:items-center sm:gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-body-sm font-medium">
+              <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-body-admin font-medium">
                 {command.trigger || "novo_comando"}
               </code>
-              {command.isBuiltin ? (
-                <Badge
-                  variant="outline"
-                  className="border-outline-variant/50 bg-transparent shadow-none"
-                >
-                  Padrão
-                </Badge>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className="border-outline-variant/50 bg-transparent shadow-none"
-                >
-                  Personalizado
-                </Badge>
-              )}
-              {command.categoryLabel && (
-                <Badge
-                  variant="outline"
-                  className="hidden border-outline-variant/50 bg-muted/30 shadow-none sm:inline-flex"
-                >
-                  {command.categoryLabel}
-                </Badge>
-              )}
+              <AdminTypeDot type={command.isBuiltin ? "builtin" : "custom"} />
               {roleLabel && (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/40 bg-transparent text-amber-700 shadow-none dark:text-amber-400"
-                >
-                  {roleLabel}
-                </Badge>
+                <span className="text-caption">{roleLabel}</span>
               )}
               {command.argsHint && (
-                <span className="hidden max-w-[8rem] truncate font-mono text-body-xs text-muted-foreground lg:inline">
+                <span className="hidden max-w-[8rem] truncate font-mono text-caption lg:inline">
                   {command.argsHint}
                 </span>
+              )}
+              {command.isDraft && (
+                <Badge variant="draft">Rascunho</Badge>
               )}
               {hasUnsavedChanges && (
                 <Tooltip>
@@ -145,11 +102,6 @@ export function BotCommandAccordionRow({
                   </TooltipTrigger>
                   <TooltipContent side="top">Não salvo</TooltipContent>
                 </Tooltip>
-              )}
-              {command.isDraft && (
-                <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
-                  Rascunho
-                </Badge>
               )}
             </div>
             {previewText ? (

@@ -228,7 +228,7 @@ export function useAdminGamesBoard({
       selectedGame: { id: number; name: string; cover?: { url: string }; summary?: string },
       status: KanbanStatus,
       streamerId: string,
-      meta?: { startedAt?: string }
+      meta?: { startedAt?: string; notes?: string }
     ) => {
       if (!streamerId) return;
 
@@ -245,6 +245,7 @@ export function useAdminGamesBoard({
           gameId: createdGame.id,
           status: status as StreamerGameStatus,
           startedAt: meta?.startedAt,
+          notes: meta?.notes,
         });
 
         const enriched = {
@@ -279,7 +280,7 @@ export function useAdminGamesBoard({
       image: string | undefined,
       status: KanbanStatus,
       streamerId: string,
-      meta?: { startedAt?: string }
+      meta?: { startedAt?: string; notes?: string }
     ) => {
       if (!streamerId) return;
 
@@ -290,6 +291,7 @@ export function useAdminGamesBoard({
           customImage: image || null,
           status: status as StreamerGameStatus,
           startedAt: meta?.startedAt,
+          notes: meta?.notes,
         });
 
         const enriched = {

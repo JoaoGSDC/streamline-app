@@ -45,7 +45,7 @@ export async function queryIgdbGamesSearch(
   limit: number
 ): Promise<IgdbGameRaw[]> {
   const escapedQuery = query.replace(/"/g, '\\"');
-  const body = `search "${escapedQuery}"; fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,websites.url; limit ${limit};`;
+  const body = `search "${escapedQuery}"; fields id,name,cover.url,screenshots.url,summary,genres.name,platforms.name,release_dates.date,websites.url; limit ${limit};`;
   return postIgdbQuery<IgdbGameRaw>("/games", body);
 }
 

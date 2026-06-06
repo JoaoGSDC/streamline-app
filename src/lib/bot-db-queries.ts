@@ -389,6 +389,7 @@ function mapTimerRow(row: typeof botTimers.$inferSelect) {
     firstRunAfterMinutes,
     scheduleMode: row.scheduleMode ?? BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
     message: row.message,
+    minViewers: row.minViewers ?? null,
     enabled: Boolean(row.enabled),
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
@@ -445,6 +446,7 @@ export async function createBotTimer(data: {
   firstRunAfterMinutes?: number;
   scheduleMode?: string;
   message: string;
+  minViewers?: number | null;
   enabled: boolean;
 }) {
   const now = new Date();
@@ -464,6 +466,7 @@ export async function createBotTimer(data: {
       firstRunAfterMinutes,
       scheduleMode: data.scheduleMode ?? BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
       message: data.message.trim(),
+      minViewers: data.minViewers ?? null,
       enabled: data.enabled,
       createdAt: now,
       updatedAt: now,
@@ -483,6 +486,7 @@ export async function updateBotTimer(
     firstRunAfterMinutes: number;
     scheduleMode: string;
     message: string;
+    minViewers: number | null;
     enabled: boolean;
   }>
 ) {
@@ -499,6 +503,7 @@ export async function updateBotTimer(
   }
   if (data.scheduleMode !== undefined) patch.scheduleMode = data.scheduleMode;
   if (data.message !== undefined) patch.message = data.message.trim();
+  if (data.minViewers !== undefined) patch.minViewers = data.minViewers;
   if (data.enabled !== undefined) patch.enabled = data.enabled;
 
   await db

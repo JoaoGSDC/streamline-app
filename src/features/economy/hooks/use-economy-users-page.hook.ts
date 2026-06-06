@@ -28,7 +28,6 @@ export function useEconomyUsersPage() {
   const [addingViewer, setAddingViewer] = useState(false);
   const [resettingAll, setResettingAll] = useState(false);
   const [savingUserIds, setSavingUserIds] = useState<Set<string>>(new Set());
-  const [openAccordion, setOpenAccordion] = useState<string[]>([]);
   const [addUsername, setAddUsername] = useState("");
   const [initialPoints, setInitialPoints] = useState("0");
   const [selectedChannel, setSelectedChannel] =
@@ -290,6 +289,85 @@ export function useEconomyUsersPage() {
     [savingUserIds]
   );
 
+  const applyUserEdit = useCallback(
+    async (payload: {
+      user: ChannelViewerEconomyDto;
+      points: number;
+      originalCoins: number;
+      coins: number;
+      resetXp: boolean;
+      reason: string;
+    }): Promise<boolean> => {
+      const {
+        user,
+        points,
+        originalCoins,
+        coins,
+        resetXp,
+        reason,
+      } = payload;
+      const base = {
+        twitchUserId: user.twitchUserId,
+        twitchUsername: user.twitchUsername,
+        displayName: user.displayName,
+        reason,
+      };
+
+      const userId = findUserId(user.twitchUserId);
+      setSavingUserIds((prev) => new Set(prev).add(userId));
+
+      try {
+        let updatedUser: ChannelViewerEconomyDto | null = null;
+
+        if (points !== user.points) {
+          updatedUser = await services.economy.setPoints({
+            ...base,
+            points,
+          });
+          patchUser(updatedUser);
+        }
+
+        if (coins !== originalCoins) {
+          const delta = coins - originalCoins;
+          await services.economy.adjustCoins({
+            ...base,
+            amount: Math.abs(delta),
+            action: delta > 0 ? "add" : "remove",
+          });
+        }
+
+        if (resetXp) {
+          const resetResult = await services.economy.resetUser({
+            ...base,
+            resetPoints: false,
+            resetXp: true,
+          });
+          patchUser(resetResult);
+        }
+
+        toast({ title: "Alterações aplicadas com sucesso" });
+        return true;
+      } catch (error) {
+        toast({
+          title: "Erro ao aplicar alterações",
+          description: getApiErrorMessage(
+            error,
+            "Verifique os dados e tente novamente."
+          ),
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        setSavingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    },
+    [findUserId, patchUser, toast]
+  );
+
   return {
     items,
     total,
@@ -303,8 +381,7 @@ export function useEconomyUsersPage() {
     loading,
     addingViewer,
     resettingAll,
-    openAccordion,
-    setOpenAccordion,
+    savingUserIds,
     isSavingUser,
     addUsername,
     setAddUsername,
@@ -319,6 +396,7 @@ export function useEconomyUsersPage() {
     adjustCoins,
     resetUser,
     resetAllPoints,
+    applyUserEdit,
     reload: load,
   };
 }

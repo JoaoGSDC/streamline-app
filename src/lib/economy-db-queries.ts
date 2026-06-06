@@ -451,9 +451,11 @@ export async function getChannelRanking(
     twitchUsername: viewer.twitchUsername,
     displayName: viewer.displayName,
     points: viewer.points,
+    xp: viewer.xp,
     level: viewer.level,
     levelTitle: viewer.levelTitle,
     lastActivityAt: viewer.lastActivityAt,
+    createdAt: viewer.createdAt,
   }));
 
   return { items, total: result.total, page: result.page, limit: result.limit };

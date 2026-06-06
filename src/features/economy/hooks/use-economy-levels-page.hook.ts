@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { services } from "@services/index";
 import type {
@@ -13,6 +13,7 @@ export function useEconomyLevelsPage() {
   const [config, setConfig] = useState<EconomyFullConfigDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedRecently, setSavedRecently] = useState(false);
   const [levelsEnabled, setLevelsEnabled] = useState(false);
   const [xpPerMessage, setXpPerMessage] = useState(5);
   const [xpPerMinuteWatching, setXpPerMinuteWatching] = useState(1);
@@ -48,8 +49,28 @@ export function useEconomyLevelsPage() {
     void load();
   }, [load]);
 
+  const isDirty = useMemo(() => {
+    if (!config) return false;
+    return (
+      levelsEnabled !== config.general.levelsEnabled ||
+      xpPerMessage !== config.levels.xpPerMessage ||
+      xpPerMinuteWatching !== config.levels.xpPerMinuteWatching ||
+      xpFormula !== config.levels.xpFormula ||
+      JSON.stringify(levelsDefinition) !==
+        JSON.stringify(config.levels.levelsDefinition)
+    );
+  }, [
+    config,
+    levelsDefinition,
+    levelsEnabled,
+    xpFormula,
+    xpPerMessage,
+    xpPerMinuteWatching,
+  ]);
+
   const save = async () => {
     setSaving(true);
+    setSavedRecently(false);
     try {
       await services.economy.updateGeneral({ levelsEnabled });
       await services.economy.updateLevels({
@@ -63,6 +84,7 @@ export function useEconomyLevelsPage() {
         description: "As regras de XP e níveis foram salvas.",
       });
       await load();
+      setSavedRecently(true);
     } catch {
       toast({
         title: "Erro ao salvar",
@@ -83,10 +105,22 @@ export function useEconomyLevelsPage() {
     );
   };
 
+  useEffect(() => {
+    if (isDirty) setSavedRecently(false);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!savedRecently) return;
+    const timer = setTimeout(() => setSavedRecently(false), 3000);
+    return () => clearTimeout(timer);
+  }, [savedRecently]);
+
   return {
     config,
     loading,
     saving,
+    isDirty,
+    savedRecently,
     levelsEnabled,
     setLevelsEnabled,
     xpPerMessage,

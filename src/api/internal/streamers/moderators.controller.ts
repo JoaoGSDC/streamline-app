@@ -15,6 +15,7 @@ export interface ModeratorDto {
   moderatorId: string;
   moderatorUsername: string;
   createdAt: string;
+  profileImageUrl?: string | null;
 }
 
 export interface ModeratorsListResponse {
@@ -46,8 +47,24 @@ export async function listModeratorsController(
     }
 
     const moderators = await listModeratorsForStreamer(streamerId);
+    const enriched = await Promise.all(
+      moderators.map(async (row) => {
+        const mapped = mapModeratorRow(row);
+        try {
+          const twitchUser = await twitchServerService.getUserByLogin(
+            row.moderatorUsername
+          );
+          return {
+            ...mapped,
+            profileImageUrl: twitchUser?.profileImageUrl ?? null,
+          };
+        } catch {
+          return mapped;
+        }
+      })
+    );
     const payload: ModeratorsListResponse = {
-      moderators: moderators.map(mapModeratorRow),
+      moderators: enriched,
     };
 
     return jsonSuccess(payload);

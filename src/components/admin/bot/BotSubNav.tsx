@@ -66,7 +66,7 @@ export function BotSubNav() {
               aria-disabled="true"
               title="Ative o bot para acessar esta seção"
               className={cn(
-                "flex shrink-0 cursor-not-allowed items-center gap-2 rounded-md px-3 py-2 text-body-sm font-medium",
+                "flex h-9 shrink-0 cursor-not-allowed items-center gap-2 rounded-md px-3 text-body-admin font-medium",
                 "text-muted-foreground/50"
               )}
             >
@@ -82,10 +82,10 @@ export function BotSubNav() {
             href={href}
             prefetch
             className={cn(
-              "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-body-sm font-medium transition-colors",
+              "flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-body-admin font-medium transition-colors",
               isActiveRoute
-                ? "bg-primary-container/30 text-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                ? "bg-[hsl(var(--sidebar-active-bg))] text-white"
+                : "text-muted-foreground hover:bg-surface-container-high/60 hover:text-foreground"
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />

@@ -48,6 +48,7 @@ interface StreamerSwitcherMenuProps {
   actingAs: AdminChannel;
   onSwitch: (streamerId: string) => Promise<void>;
   variant?: "sidebar" | "header";
+  showAvatar?: boolean;
   className?: string;
 }
 
@@ -56,6 +57,7 @@ export function StreamerSwitcherMenu({
   actingAs,
   onSwitch,
   variant = "header",
+  showAvatar,
   className,
 }: StreamerSwitcherMenuProps) {
   const [switching, setSwitching] = useState(false);
@@ -71,6 +73,7 @@ export function StreamerSwitcherMenu({
   };
 
   const isHeader = variant === "header";
+  const displayAvatar = showAvatar ?? isHeader;
 
   return (
     <DropdownMenu>
@@ -85,14 +88,24 @@ export function StreamerSwitcherMenu({
           )}
         >
           <span className="flex min-w-0 items-center gap-2.5">
-            <ChannelAvatar channel={actingAs} size={isHeader ? "md" : "sm"} />
+            {displayAvatar && (
+              <ChannelAvatar channel={actingAs} size={isHeader ? "md" : "sm"} />
+            )}
             <span className="min-w-0 text-left">
-              <span className="block truncate text-body-sm font-medium text-foreground">
-                {actingAs.name}
-              </span>
-              <span className="block truncate text-caption text-muted-foreground">
-                @{actingAs.twitchUsername}
-              </span>
+              {displayAvatar ? (
+                <>
+                  <span className="block truncate text-body-sm font-medium text-foreground">
+                    {actingAs.name}
+                  </span>
+                  <span className="block truncate text-caption text-muted-foreground">
+                    @{actingAs.twitchUsername}
+                  </span>
+                </>
+              ) : (
+                <span className="block truncate text-label text-muted-foreground">
+                  @{actingAs.twitchUsername}
+                </span>
+              )}
             </span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />

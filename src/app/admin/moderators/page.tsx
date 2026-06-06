@@ -1,8 +1,10 @@
 "use client";
 
-import { Trash2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeratorUserSearch } from "@/components/admin/ModeratorUserSearch";
+import { ModeratorAvatar } from "@/components/admin/moderators/ModeratorAvatar";
+import { ModeratorListItem } from "@/components/admin/moderators/ModeratorListItem";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminSection } from "@/components/admin/shared/AdminSection";
 import { AdminStreamerFormSelect } from "@/components/admin/shared/AdminStreamerFormSelect";
@@ -11,17 +13,25 @@ import { useAdminModeratorsPage } from "@features/admin/hooks/use-admin-moderato
 export default function AdminModeratorsPage() {
   const {
     ownerChannel,
+    moderatedChannels,
+    canModerateOthers,
     manageTarget,
     setManageTarget,
     moderators,
     username,
-    setUsername,
+    pendingUser,
+    isSearching,
+    searchFeedback,
     loading,
     submitting,
     canManageModerators,
     channelLabel,
     excludeLogins,
-    handleAdd,
+    handleUsernameChange,
+    handleUserSelect,
+    handleSearchingChange,
+    handleSearchComplete,
+    handleConfirmAdd,
     handleRemove,
   } = useAdminModeratorsPage();
 
@@ -52,37 +62,101 @@ export default function AdminModeratorsPage() {
 
       <AdminSection
         title="Canal"
-        description="Selecione para qual streamer você está configurando moderadores."
+        description={
+          canModerateOthers
+            ? "Selecione para qual streamer você está configurando moderadores."
+            : undefined
+        }
         contentClassName="space-y-4"
       >
-        <AdminStreamerFormSelect
-          value={manageTarget}
-          onChange={setManageTarget}
-          ownerChannel={ownerChannel}
-          moderatedChannels={[]}
-          alwaysShow
-          label="Streamer"
-          disabledHint="Os moderadores serão adicionados ao seu canal."
-          enabledHint="Canal para o qual você deseja adicionar moderadores."
-        />
+        {canModerateOthers ? (
+          <AdminStreamerFormSelect
+            value={manageTarget}
+            onChange={setManageTarget}
+            ownerChannel={ownerChannel}
+            moderatedChannels={moderatedChannels}
+            label="Streamer"
+            disabledHint="Os moderadores serão adicionados ao seu canal."
+            enabledHint="Canal para o qual você deseja adicionar moderadores."
+          />
+        ) : (
+          <p className="text-body-sm text-muted-foreground">
+            Gerenciando moderadores de {channelLabel}
+          </p>
+        )}
       </AdminSection>
 
       <AdminSection
         title="Adicionar moderador"
         description={`Busque o canal na Twitch e adicione à lista de ${channelLabel}. A pessoa precisa ter conta na Twitch; ao fazer login no Streaminhub, verá o canal no painel.`}
       >
-        <form onSubmit={handleAdd} className="flex flex-col gap-3 sm:flex-row">
-          <ModeratorUserSearch
-            value={username}
-            onChange={setUsername}
-            disabled={submitting}
-            className="sm:flex-1"
-            excludeLogins={excludeLogins}
-          />
-          <Button type="submit" disabled={submitting || !username.trim()}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Adicionar
-          </Button>
+        <form onSubmit={handleConfirmAdd} className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="space-y-2 sm:flex-1">
+              <ModeratorUserSearch
+                value={username}
+                onChange={handleUsernameChange}
+                onSelect={handleUserSelect}
+                onSearchingChange={handleSearchingChange}
+                onSearchComplete={handleSearchComplete}
+                disabled={submitting}
+                excludeLogins={excludeLogins}
+              />
+
+              {searchFeedback === "not_found" ? (
+                <p className="text-body-sm text-destructive/80">
+                  Usuário não encontrado na Twitch.
+                </p>
+              ) : null}
+
+              {searchFeedback === "already_moderator" ? (
+                <p className="text-body-sm text-destructive/80">
+                  Este usuário já é moderador deste canal.
+                </p>
+              ) : null}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submitting || isSearching || !pendingUser}
+              className="shrink-0"
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Buscando...
+                </>
+              ) : pendingUser ? (
+                <>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Confirmar adição
+                </>
+              ) : (
+                <>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Adicionar
+                </>
+              )}
+            </Button>
+          </div>
+
+          {pendingUser ? (
+            <div className="flex items-center gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low/50 px-3 py-2.5">
+              <ModeratorAvatar
+                username={pendingUser.login}
+                imageUrl={pendingUser.thumbnailUrl}
+                size={40}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {pendingUser.displayName}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  @{pendingUser.login}
+                </p>
+              </div>
+            </div>
+          ) : null}
         </form>
       </AdminSection>
 
@@ -98,32 +172,12 @@ export default function AdminModeratorsPage() {
           </p>
         ) : (
           <ul className="divide-y divide-outline-variant/30">
-            {moderators.map((mod) => (
-              <li
-                key={mod.id}
-                className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-              >
-                <div>
-                  <p className="font-medium text-foreground">
-                    @{mod.moderatorUsername}
-                  </p>
-                  <p className="text-caption text-muted-foreground">
-                    Desde{" "}
-                    {new Date(mod.createdAt).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Remover @${mod.moderatorUsername}`}
-                  onClick={() =>
-                    handleRemove(mod.moderatorId, mod.moderatorUsername)
-                  }
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </li>
+            {moderators.map((moderator) => (
+              <ModeratorListItem
+                key={moderator.id}
+                moderator={moderator}
+                onRemove={handleRemove}
+              />
             ))}
           </ul>
         )}

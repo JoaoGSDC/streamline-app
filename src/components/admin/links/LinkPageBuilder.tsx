@@ -2,13 +2,16 @@
 
 import { useLinkPageBuilder } from "@features/links/components/link-page-builder/link-page-builder.hook";
 import {
+  ChevronDown,
   Eye,
   GripVertical,
   Layers,
-  Palette,
-  Plus,
-  Sparkles,
   Link2,
+  Monitor,
+  Plus,
+  Palette,
+  Smartphone,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,8 +71,12 @@ export function LinkPageBuilder({
     setDropTargetId,
     mobileView,
     setMobileView,
+    previewDevice,
+    setPreviewDevice,
     editorTab,
     setEditorTab,
+    expandedBlockId,
+    setExpandedBlockId,
     addBlockKey,
     previewLinks,
     isNoble,
@@ -94,29 +101,14 @@ export function LinkPageBuilder({
       onValueChange={setEditorTab}
       className="w-full max-w-none"
     >
-      <TabsList
-        className={cn(
-          "mb-4 grid w-full",
-          isNoble ? "grid-cols-5" : "grid-cols-4"
-        )}
-      >
-        <TabsTrigger value="templates" className="gap-1 text-xs sm:text-sm">
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline">Templates</span>
-        </TabsTrigger>
-        {isNoble ? (
-          <TabsTrigger value="noble" className="gap-1 text-xs sm:text-sm">
-            <Layers className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden sm:inline">Noble</span>
-          </TabsTrigger>
-        ) : null}
-        <TabsTrigger value="style" className="gap-1 text-xs sm:text-sm">
+      <TabsList className="mb-4 grid w-full grid-cols-3">
+        <TabsTrigger value="appearance" className="gap-1 text-xs sm:text-sm">
           <Palette className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline">Visual</span>
+          <span className="hidden sm:inline">Aparência</span>
         </TabsTrigger>
-        <TabsTrigger value="blocks" className="gap-1 text-xs sm:text-sm">
+        <TabsTrigger value="content" className="gap-1 text-xs sm:text-sm">
           <Layers className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline">Blocos</span>
+          <span className="hidden sm:inline">Conteúdo</span>
         </TabsTrigger>
         <TabsTrigger value="links" className="gap-1 text-xs sm:text-sm">
           <Link2 className="h-3.5 w-3.5 shrink-0" />
@@ -124,46 +116,36 @@ export function LinkPageBuilder({
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="templates" className="w-full space-y-3">
-        <p className="text-body-sm text-muted-foreground">
-          Escolha um estilo base gamer — personalize depois em Visual.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {LINK_PAGE_TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={cn(
-                "link-template-card",
-                config.theme.templateId === t.id && "link-template-card--active"
-              )}
-              onClick={() => applyTemplate(t.id)}
-            >
-              <div className={cn("link-template-preview", t.previewClass)} />
-              <p className="font-headline text-caption font-semibold text-foreground">
-                {t.name}
-              </p>
-              <p className="mt-0.5 text-caption text-muted-foreground line-clamp-2">
-                {t.description}
-              </p>
-            </button>
-          ))}
-        </div>
-      </TabsContent>
+      <TabsContent value="appearance" className="w-full space-y-0">
+        <EditorSection title="Template">
+          <p className="mb-3 text-body-sm text-muted-foreground">
+            Escolha um estilo base — personalize cores e fundo abaixo.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {LINK_PAGE_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={cn(
+                  "link-template-card",
+                  config.theme.templateId === t.id && "link-template-card--active"
+                )}
+                onClick={() => applyTemplate(t.id)}
+              >
+                <div className={cn("link-template-preview", t.previewClass)} />
+                <p className="font-headline text-caption font-semibold text-foreground">
+                  {t.name}
+                </p>
+                <p className="mt-0.5 text-caption text-muted-foreground line-clamp-2">
+                  {t.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        </EditorSection>
 
-      {isNoble ? (
-        <TabsContent value="noble" className="w-full space-y-4">
-          <PageMetaFields config={config} setConfig={setConfig} streamer={streamer} />
-          <NobleLayoutEditor
-            layout={config.nobleLayout ?? getDefaultNobleLayout()}
-            onChange={(layout) =>
-              setConfig((p) => ({ ...p, nobleLayout: layout }))
-            }
-          />
-        </TabsContent>
-      ) : null}
-
-      <TabsContent value="style" className="w-full space-y-4">
+        <EditorSection title="Customização visual">
+        <div className="space-y-4">
         <PageMetaFields config={config} setConfig={setConfig} streamer={streamer} />
 
         <ColorPickerField
@@ -336,35 +318,43 @@ export function LinkPageBuilder({
             onChange={(e) => updateTheme({ backgroundValue: e.target.value })}
           />
         </div>
+        </div>
+        </EditorSection>
+
+        {isNoble ? (
+          <EditorSection title="Configurações Noble">
+            <NobleLayoutEditor
+              layout={config.nobleLayout ?? getDefaultNobleLayout()}
+              onChange={(layout) =>
+                setConfig((p) => ({ ...p, nobleLayout: layout }))
+              }
+            />
+          </EditorSection>
+        ) : null}
       </TabsContent>
 
-      <TabsContent value="blocks" className="w-full space-y-3">
+      <TabsContent value="content" className="w-full space-y-3">
         {isNoble ? (
           <p className="rounded-lg border border-outline-variant/30 bg-surface-container-low/30 px-3 py-2 text-caption text-muted-foreground">
-            No template Noble, links e redes vêm das abas{" "}
-            <strong className="text-foreground">Links</strong> e{" "}
-            <strong className="text-foreground">Noble</strong>. Os blocos abaixo
+            No template Noble, links e redes vêm da aba{" "}
+            <strong className="text-foreground">Links</strong>. Os blocos abaixo
             são extras (bio, embeds, agenda).
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            key={addBlockKey}
-            onValueChange={(type) => addBlock(type)}
-          >
-            <SelectTrigger className="h-9 w-full max-w-[14rem] input-cinematic">
-              <SelectValue placeholder="Adicionar bloco…" />
-            </SelectTrigger>
-            <SelectContent>
-              {ADDABLE_BLOCK_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {getBlockLabel(type)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select key={addBlockKey} onValueChange={(type) => addBlock(type)}>
+          <SelectTrigger className="h-9 w-full max-w-[12rem] gap-2 border-dashed sm:w-auto">
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>Adicionar bloco</span>
+          </SelectTrigger>
+          <SelectContent>
+            {ADDABLE_BLOCK_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>
+                {getBlockLabel(type)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <ul className="space-y-2">
           {config.blocks.map((block) => (
@@ -400,9 +390,26 @@ export function LinkPageBuilder({
                 )}
               >
                 <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1 text-body-sm font-medium">
-                  {getBlockLabel(block.type)}
-                </span>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-body-sm font-medium"
+                  onClick={() =>
+                    setExpandedBlockId((current) =>
+                      current === block.id ? null : block.id
+                    )
+                  }
+                >
+                  <span className="truncate">{getBlockLabel(block.type)}</span>
+                  {blockHasPropsEditor(block.type) ? (
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                        expandedBlockId === block.id && "rotate-180"
+                      )}
+                      aria-hidden
+                    />
+                  ) : null}
+                </button>
                 <Switch
                   checked={block.visible}
                   onCheckedChange={(checked) =>
@@ -432,7 +439,8 @@ export function LinkPageBuilder({
                   </Button>
                 ) : null}
               </div>
-              {blockHasPropsEditor(block.type) ? (
+              {blockHasPropsEditor(block.type) &&
+              expandedBlockId === block.id ? (
                 <div className="link-builder-block-props">
                   <BlockPropsEditor
                     block={block}
@@ -495,10 +503,47 @@ export function LinkPageBuilder({
 
   const previewPanel = (
     <div className="link-builder__preview-wrap w-full">
-      <p className="mb-3 text-caption text-muted-foreground">
-        Preview ao vivo — @{twitchUsername}/links
-      </p>
-      <div className="link-builder__preview-frame w-full">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-caption text-muted-foreground">
+          Preview ao vivo — @{twitchUsername}/links
+        </p>
+        <div className="inline-flex rounded-lg border border-outline-variant/30 p-0.5">
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-caption transition-colors",
+              previewDevice === "mobile"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setPreviewDevice("mobile")}
+          >
+            <Smartphone className="h-3.5 w-3.5" aria-hidden />
+            Mobile
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-caption transition-colors",
+              previewDevice === "desktop"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => setPreviewDevice("desktop")}
+          >
+            <Monitor className="h-3.5 w-3.5" aria-hidden />
+            Desktop
+          </button>
+        </div>
+      </div>
+      <div
+        className={cn(
+          "link-builder__preview-frame w-full",
+          previewDevice === "mobile"
+            ? "link-builder__preview-frame--mobile"
+            : "link-builder__preview-frame--desktop"
+        )}
+      >
         <LinkPageRenderer
           config={config}
           streamer={streamer}
@@ -548,6 +593,21 @@ export function LinkPageBuilder({
         {previewPanel}
       </div>
     </div>
+  );
+}
+
+function EditorSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="link-builder-editor-section space-y-3">
+      <h3 className="link-builder-editor-section-title">{title}</h3>
+      {children}
+    </section>
   );
 }
 

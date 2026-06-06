@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 
 interface AdminSectionProps {
+  id?: string;
   title?: string;
   description?: string;
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface AdminSectionProps {
 }
 
 export function AdminSection({
+  id,
   title,
   description,
   children,
@@ -18,22 +20,18 @@ export function AdminSection({
   contentClassName,
 }: AdminSectionProps) {
   return (
-    <section className={cn("admin-section-panel rounded-xl", className)}>
+    <section id={id} className={cn("admin-section-panel rounded-xl", className)}>
       {(title || description) && (
-        <header className="border-b border-outline-variant/30 px-5 py-4 sm:px-6">
+        <header className="px-5 pt-5">
           {title && (
-            <h2 className="font-headline text-title-md font-semibold text-foreground">
-              {title}
-            </h2>
+            <h2 className="text-section-title text-foreground">{title}</h2>
           )}
           {description && (
-            <p className="mt-0.5 text-body-sm text-muted-foreground">
-              {description}
-            </p>
+            <p className="mt-1 text-caption">{description}</p>
           )}
         </header>
       )}
-      <div className={cn("p-5 sm:p-6", contentClassName)}>{children}</div>
+      <div className={cn("p-5", contentClassName)}>{children}</div>
     </section>
   );
 }

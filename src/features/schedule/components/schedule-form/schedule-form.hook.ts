@@ -123,6 +123,12 @@ export function useScheduleForm({
     setCustomGameTitle("");
   }, []);
 
+  const handleClearGame = useCallback(() => {
+    setSelectedGame(null);
+    setIsCustomGame(false);
+    setCustomGameTitle("");
+  }, []);
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
@@ -219,6 +225,7 @@ export function useScheduleForm({
     handleLinkChange,
     handleUseCustomGame,
     handleUseIgdbSearch,
+    handleClearGame,
     handleSubmit,
     onCancelEdit,
   };

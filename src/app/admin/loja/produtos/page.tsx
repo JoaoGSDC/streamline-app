@@ -5,10 +5,11 @@ import { Package, Plus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AdminPageHeader } from "@/components/admin/shared/AdminPageHeader";
 import { AdminEmptyState } from "@/components/admin/shared/AdminEmptyState";
+import { StoreProductEditDrawer } from "@features/store/components/StoreProductEditDrawer";
+import { StoreProductsTable } from "@features/store/components/StoreProductsTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion } from "@/components/ui/accordion";
 import {
   Select,
   SelectContent,
@@ -28,14 +29,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useStoreProductsPage } from "@features/store/hooks/use-store-products-page.hook";
 import { useStoreCategories } from "@features/store/hooks/use-store-categories.hook";
-import {
-  StoreProductAccordionRow,
-  type StoreProductRowState,
-} from "@features/store/components/StoreProductAccordionRow";
+import type { StoreProductRowState } from "@features/store/types/store-product.types";
 
 export default function StoreProductsPage() {
   const { toast } = useToast();
   const { categories } = useStoreCategories();
+  const [editProduct, setEditProduct] = useState<StoreProductRowState | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<StoreProductRowState | null>(
     null
   );
@@ -46,23 +46,23 @@ export default function StoreProductsPage() {
     setSearch,
     statusFilter,
     setStatusFilter,
-    openAccordion,
-    setOpenAccordion,
     allRows,
-    draftRows,
     savingIds,
     addDraftRow,
-    updateRow,
     persistRow,
     toggleActive,
     removeDraftRow,
     duplicateProduct,
     archiveProduct,
-    isRowDirty,
   } = useStoreProductsPage();
 
   const defaultCategoryId =
     categories.find((c) => c.isDefault)?.id ?? categories[0]?.id ?? "";
+
+  const openEdit = (row: StoreProductRowState) => {
+    setEditProduct(row);
+    setDrawerOpen(true);
+  };
 
   const handleAddProduct = () => {
     if (!defaultCategoryId) {
@@ -73,16 +73,19 @@ export default function StoreProductsPage() {
       });
       return;
     }
-    addDraftRow(defaultCategoryId);
+    const draft = addDraftRow(defaultCategoryId);
+    openEdit(draft);
   };
 
-  const handleSaveRow = async (row: StoreProductRowState) => {
-    const ok = await persistRow(row);
-    if (ok) {
+  const handleSave = async (product: StoreProductRowState) => {
+    const result = await persistRow(product);
+    if (result) {
       toast({
-        title: row.isDraft ? "Produto criado" : "Produto salvo",
+        title: product.isDraft ? "Produto criado" : "Produto salvo",
         description: "As alterações foram aplicadas.",
       });
+      setDrawerOpen(false);
+      setEditProduct(null);
     } else {
       toast({
         title: "Erro ao salvar",
@@ -98,47 +101,20 @@ export default function StoreProductsPage() {
     if (ok) {
       toast({ title: "Produto arquivado" });
       setArchiveTarget(null);
+      if (editProduct?.id === archiveTarget.id) {
+        setDrawerOpen(false);
+        setEditProduct(null);
+      }
     } else {
-      toast({
-        title: "Erro ao arquivar",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao arquivar", variant: "destructive" });
     }
   };
-
-  const renderRow = (row: StoreProductRowState) => (
-    <StoreProductAccordionRow
-      key={row.id}
-      product={row}
-      categories={categories}
-      saving={savingIds.has(row.id)}
-      hasUnsavedChanges={
-        (isRowDirty(row.id) || Boolean(row.isDraft)) && !savingIds.has(row.id)
-      }
-      onChange={(patch) => updateRow(row.id, patch)}
-      onSave={() => void handleSaveRow(row)}
-      onToggleActive={(active) => void toggleActive(row, active)}
-      onDuplicate={
-        row.isDraft
-          ? undefined
-          : () =>
-              void duplicateProduct(row).then((ok) => {
-                if (ok) toast({ title: "Produto duplicado" });
-                else toast({ title: "Erro ao duplicar", variant: "destructive" });
-              })
-      }
-      onArchive={
-        row.isDraft ? undefined : () => setArchiveTarget(row)
-      }
-      onRemoveDraft={row.isDraft ? () => removeDraftRow(row.id) : undefined}
-    />
-  );
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title="Produtos"
-        description="Cadastre recompensas inline — expanda cada linha, edite e clique em Salvar produto."
+        description="Gerencie recompensas resgatáveis com tabela compacta e edição em drawer."
       >
         <Button onClick={handleAddProduct}>
           <Plus className="mr-2 h-4 w-4" />
@@ -181,31 +157,55 @@ export default function StoreProductsPage() {
       ) : allRows.length === 0 ? (
         <AdminEmptyState
           icon={Package}
-          title="Nenhum produto"
-          description='Clique em "Novo produto" para abrir uma linha em rascunho e preencher os campos.'
+          title="Sua loja ainda não tem produtos"
+          description="Crie itens resgatáveis para engajar viewers e recompensar quem participa da live."
           action={
             <Button onClick={handleAddProduct}>
               <Plus className="mr-2 h-4 w-4" />
-              Criar produto
+              Criar primeiro produto
             </Button>
           }
         />
       ) : (
-        <Accordion
-          type="multiple"
-          value={openAccordion}
-          onValueChange={setOpenAccordion}
-          className="space-y-2"
-        >
-          {allRows.map(renderRow)}
-        </Accordion>
+        <StoreProductsTable
+          rows={allRows}
+          savingIds={savingIds}
+          onEdit={openEdit}
+          onToggleActive={(row, active) => void toggleActive(row, active)}
+          onDuplicate={(row) =>
+            void duplicateProduct(row).then((created) => {
+              if (created) {
+                toast({ title: "Produto duplicado" });
+                openEdit(created);
+              } else {
+                toast({ title: "Erro ao duplicar", variant: "destructive" });
+              }
+            })
+          }
+          onArchive={(row) => setArchiveTarget(row)}
+        />
       )}
 
-      {!loading && allRows.length > 0 && draftRows.length > 0 && (
-        <p className="text-body-sm text-muted-foreground">
-          {draftRows.length} rascunho(s) — salve ou descarte antes de sair da página.
-        </p>
-      )}
+      <StoreProductEditDrawer
+        open={drawerOpen}
+        product={editProduct}
+        categories={categories}
+        saving={editProduct ? savingIds.has(editProduct.id) : false}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) setEditProduct(null);
+        }}
+        onSave={(product) => void handleSave(product)}
+        onDiscardDraft={
+          editProduct?.isDraft
+            ? () => {
+                removeDraftRow(editProduct.id);
+                setDrawerOpen(false);
+                setEditProduct(null);
+              }
+            : undefined
+        }
+      />
 
       <AlertDialog
         open={!!archiveTarget}
@@ -215,8 +215,7 @@ export default function StoreProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Arquivar produto?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{archiveTarget?.name}</strong> será ocultado da loja ativa. Você
-              pode filtrar por arquivados para revisá-lo depois.
+              <strong>{archiveTarget?.name}</strong> será ocultado da loja ativa.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

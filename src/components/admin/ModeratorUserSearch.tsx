@@ -10,6 +10,8 @@ export interface ModeratorUserSearchProps {
   value: string;
   onChange: (login: string) => void;
   onSelect?: (channel: TwitchChannelResult) => void;
+  onSearchingChange?: (searching: boolean) => void;
+  onSearchComplete?: (results: TwitchChannelResult[], query: string) => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -23,6 +25,8 @@ export function ModeratorUserSearch({
   value,
   onChange,
   onSelect,
+  onSearchingChange,
+  onSearchComplete,
   disabled = false,
   placeholder = "Buscar usuário na Twitch...",
   className,
@@ -68,11 +72,14 @@ export function ModeratorUserSearch({
       setResults([]);
       setIsOpen(false);
       setActiveIndex(-1);
+      onSearchingChange?.(false);
+      onSearchComplete?.([], trimmed);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
+      onSearchingChange?.(true);
       setIsOpen(true);
 
       try {
@@ -98,14 +105,17 @@ export function ModeratorUserSearch({
         );
         setResults(items);
         setActiveIndex(items.length > 0 ? 0 : -1);
+        onSearchComplete?.(items, trimmed);
       } catch (error) {
         if ((error as Error)?.name !== "AbortError") {
           console.error("Error searching Twitch users:", error);
         }
         setResults([]);
         setActiveIndex(-1);
+        onSearchComplete?.([], trimmed);
       } finally {
         setIsSearching(false);
+        onSearchingChange?.(false);
         abortRef.current = null;
       }
     }, 350);
@@ -113,7 +123,7 @@ export function ModeratorUserSearch({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [value, excluded]);
+  }, [value, excluded, onSearchingChange, onSearchComplete]);
 
   useEffect(() => {
     const handleClickOutside = (e: Event) => {

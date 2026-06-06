@@ -1,0 +1,85 @@
+import type { BotBuiltinCategoryId } from "@services/entities/bot-variables.services";
+
+export interface BotCommandRowState {
+  id: string;
+  trigger: string;
+  response: string;
+  cooldownSeconds: number;
+  enabled: boolean;
+  isBuiltin: boolean;
+  builtinKey?: string | null;
+  description?: string;
+  category?: string;
+  categoryLabel?: string;
+  minRole?: "everyone" | "moderator" | "streamer";
+  argsHint?: string | null;
+  customizableResponse?: boolean;
+  responseTemplate?: string | null;
+  requiresConfirmation?: boolean;
+  confirmationPrompt?: string | null;
+  runtimeNotes?: string | null;
+  externalApiUrlTemplate?: string | null;
+  isDraft?: boolean;
+  isNew?: boolean;
+}
+
+export type BotCommandCategoryFilter =
+  | "all"
+  | BotBuiltinCategoryId
+  | "custom";
+
+export const BUILTIN_CATEGORY_ORDER: BotBuiltinCategoryId[] = [
+  "general",
+  "raffles",
+  "moderator",
+  "streamer",
+];
+
+export const CATEGORY_FILTER_LABELS: Record<
+  BotCommandCategoryFilter,
+  string
+> = {
+  all: "Todos",
+  general: "Gerais",
+  raffles: "Sorteios",
+  moderator: "Moderadores",
+  streamer: "Streamer",
+  custom: "Personalizados",
+};
+
+export const CATEGORY_SHORT_LABELS: Record<BotBuiltinCategoryId | "custom", string> =
+  {
+    general: "Geral",
+    raffles: "Sorteios",
+    moderator: "Moderadores",
+    streamer: "Streamer",
+    custom: "Personalizado",
+  };
+
+export function canEditCommandResponse(command: BotCommandRowState): boolean {
+  return !command.isBuiltin || command.customizableResponse !== false;
+}
+
+export function canOpenCommandEditor(command: BotCommandRowState): boolean {
+  if (command.isDraft || command.isNew) return true;
+  if (!command.isBuiltin) return true;
+  return canEditCommandResponse(command);
+}
+
+export function getCommandCategoryShort(command: BotCommandRowState): string {
+  if (!command.isBuiltin) return CATEGORY_SHORT_LABELS.custom;
+  const category = (command.category as BotBuiltinCategoryId) ?? "general";
+  return CATEGORY_SHORT_LABELS[category] ?? CATEGORY_SHORT_LABELS.general;
+}
+
+export function getResponsePreview(command: BotCommandRowState): string {
+  return (
+    command.response.trim() ||
+    command.responseTemplate?.trim() ||
+    ""
+  );
+}
+
+export function isAutomaticCommand(command: BotCommandRowState): boolean {
+  return !canEditCommandResponse(command);
+}

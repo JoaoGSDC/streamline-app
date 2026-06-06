@@ -13,14 +13,22 @@ const FALLBACK_GAME_IMAGE =
   "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
 
 export function mapIgdbSearchResults(games: IgdbGameRaw[]): IgdbSearchResultDto[] {
-  return games.map((game) => ({
-    id: game.id,
-    name: game.name,
-    cover: game.cover,
-    summary: game.summary,
-    genres: game.genres?.map((genre) => genre.name),
-    platforms: game.platforms?.map((platform) => platform.name),
-  }));
+  return games.map((game) => {
+    const releaseTimestamp = game.release_dates?.[0]?.date;
+    const releaseYear = releaseTimestamp
+      ? new Date(releaseTimestamp * 1000).getFullYear()
+      : null;
+
+    return {
+      id: game.id,
+      name: game.name,
+      cover: game.cover,
+      summary: game.summary,
+      genres: game.genres?.map((genre) => genre.name),
+      platforms: game.platforms?.map((platform) => platform.name),
+      releaseYear,
+    };
+  });
 }
 
 export function mapIgdbGameDetails(game: IgdbGameRaw): IgdbGameDetailsDto {

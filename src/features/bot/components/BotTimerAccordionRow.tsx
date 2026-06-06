@@ -24,17 +24,9 @@ import {
 import type { BotVariableItem } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
 
-export interface BotTimerRowState {
-  id: string;
-  name: string;
-  intervalMinutes: number;
-  firstRunAfterMinutes: number;
-  scheduleMode: "live_elapsed";
-  message: string;
-  enabled: boolean;
-  isDraft?: boolean;
-  isNew?: boolean;
-}
+import type { BotTimerRowState } from "@features/bot/types/bot-timer.types";
+
+export type { BotTimerRowState };
 
 interface BotTimerAccordionRowProps {
   timer: BotTimerRowState;
@@ -78,25 +70,14 @@ export function BotTimerAccordionRow({
               <span className="font-medium text-foreground">
                 {timer.name.trim() || "Timer sem nome"}
               </span>
-              <Badge
-                variant="outline"
-                className="border-outline-variant/50 bg-transparent shadow-none"
-              >
+              <span className="text-caption">
                 a cada {timer.intervalMinutes} min
-              </Badge>
-              {!timer.enabled && (
-                <Badge
-                  variant="outline"
-                  className="border-outline-variant/50 bg-muted/30 shadow-none"
-                >
-                  Pausado
-                </Badge>
-              )}
-              {timer.isDraft && (
-                <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-700 shadow-none">
-                  Rascunho
-                </Badge>
-              )}
+              </span>
+              {timer.isDraft ? (
+                <Badge variant="draft">Rascunho</Badge>
+              ) : !timer.enabled ? (
+                <Badge variant="inactive">Inativo</Badge>
+              ) : null}
               {hasUnsavedChanges && (
                 <Tooltip>
                   <TooltipTrigger asChild>

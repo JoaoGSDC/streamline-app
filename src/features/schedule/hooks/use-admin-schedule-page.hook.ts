@@ -79,10 +79,6 @@ export function useAdminSchedulePage({
   viewFilterRef.current = viewFilter;
 
   const [streams, setStreams] = useState<AdminScheduledStream[]>([]);
-  const [selectedStream, setSelectedStream] = useState<AdminScheduledStream | null>(
-    null
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStream, setEditingStream] = useState<ScheduleFormEditStream | null>(
     null
   );
@@ -174,8 +170,6 @@ export function useAdminSchedulePage({
 
   const handleEditStream = useCallback(
     (stream: AdminScheduledStream) => {
-      setSelectedStream(null);
-      setIsModalOpen(false);
       setEditingStream({
         id: stream.id,
         streamerId: stream.streamerId || resolveFormStreamerId(formTarget),
@@ -216,20 +210,8 @@ export function useAdminSchedulePage({
     [editingStream]
   );
 
-  const handleStreamClick = useCallback((stream: AdminScheduledStream) => {
-    setSelectedStream(stream);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-    setSelectedStream(null);
-  }, []);
-
   return {
     streams,
-    selectedStream,
-    isModalOpen,
     editingStream,
     period,
     page,
@@ -245,7 +227,5 @@ export function useAdminSchedulePage({
     handleEditStream,
     handleCancelEdit,
     handleDeleteStream,
-    handleStreamClick,
-    handleCloseModal,
   };
 }

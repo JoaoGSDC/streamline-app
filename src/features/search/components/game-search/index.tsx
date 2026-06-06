@@ -10,6 +10,8 @@ export function GameSearch({
   onGameSelect,
   placeholder = "Buscar jogos (use IGDB)...",
   className,
+  variant = "default",
+  recentSuggestions,
 }: GameSearchProps) {
   const {
     query,
@@ -20,6 +22,7 @@ export function GameSearch({
     listboxId,
     showDropdown,
     showEmpty,
+    showRecentHeader,
     activeIndex,
     pickGame,
     clearSearch,
@@ -28,7 +31,9 @@ export function GameSearch({
     handleKeyDown,
     handleOptionHover,
     getCoverUrl,
-  } = useGameSearch({ onGameSelect });
+  } = useGameSearch({ onGameSelect, recentSuggestions });
+
+  const isCompact = variant === "compact";
 
   return (
     <div
@@ -84,9 +89,14 @@ export function GameSearch({
           role="listbox"
           onMouseDown={(event) => event.preventDefault()}
         >
+          {showRecentHeader ? (
+            <li className="px-3 py-2 text-caption font-medium text-muted-foreground">
+              Jogos recentes do canal
+            </li>
+          ) : null}
           {results.map((game, index) => (
             <li
-              key={game.id}
+              key={`${game.id}-${index}`}
               role="option"
               aria-selected={index === activeIndex}
             >
@@ -95,7 +105,8 @@ export function GameSearch({
                 onMouseEnter={() => handleOptionHover(index)}
                 onClick={() => pickGame(game)}
                 className={cn(
-                  "flex w-full items-center gap-3 p-3 text-left transition-colors",
+                  "flex w-full items-center gap-3 text-left transition-colors",
+                  isCompact ? "px-3 py-2" : "p-3",
                   index === activeIndex
                     ? "bg-accent text-foreground"
                     : "hover:bg-accent/80"
@@ -104,15 +115,25 @@ export function GameSearch({
                 <img
                   src={getCoverUrl(game)}
                   alt=""
-                  className="h-20 w-16 shrink-0 rounded object-cover"
+                  className={cn(
+                    "shrink-0 rounded object-cover",
+                    isCompact ? "h-11 w-8" : "h-20 w-16"
+                  )}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{game.name}</p>
-                  {game.summary && (
+                  <p className={cn("font-semibold", isCompact && "text-sm")}>
+                    {game.name}
+                  </p>
+                  {isCompact && game.releaseYear ? (
+                    <p className="text-xs text-muted-foreground">
+                      {game.releaseYear}
+                    </p>
+                  ) : null}
+                  {!isCompact && game.summary ? (
                     <p className="line-clamp-2 text-sm text-muted-foreground">
                       {game.summary}
                     </p>
-                  )}
+                  ) : null}
                 </div>
               </button>
             </li>

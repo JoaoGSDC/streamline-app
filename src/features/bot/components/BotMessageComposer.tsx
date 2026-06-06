@@ -25,6 +25,7 @@ interface BotMessageComposerProps {
   disabled?: boolean;
   onSave?: () => void;
   saving?: boolean;
+  variant?: "default" | "compact";
 }
 
 function groupVariablesByCategory(variables: BotVariableItem[]) {
@@ -57,7 +58,9 @@ export function BotMessageComposer({
   disabled = false,
   onSave,
   saving = false,
+  variant = "default",
 }: BotMessageComposerProps) {
+  const isCompact = variant === "compact";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [emotesOpen, setEmotesOpen] = useState(false);
@@ -92,17 +95,34 @@ export function BotMessageComposer({
         ref={textareaRef}
         value={value}
         onChange={(event) => onChange(event.target.value.slice(0, maxLength))}
-        rows={4}
+        rows={isCompact ? 3 : 4}
         placeholder={placeholder}
         disabled={disabled}
-        className="max-w-full break-words font-mono text-body-sm"
+        className={
+          isCompact
+            ? "min-h-[80px] max-w-full resize-none text-sm leading-relaxed"
+            : "max-w-full break-words font-mono text-body-sm"
+        }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={
+          isCompact
+            ? "flex items-center justify-between gap-2"
+            : "flex flex-wrap items-center gap-2"
+        }
+      >
+        <div className="flex gap-2">
         <Popover open={variablesOpen} onOpenChange={setVariablesOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" size="sm" disabled={disabled}>
-              <Braces className="mr-2 h-4 w-4" />
+            <Button
+              type="button"
+              variant={isCompact ? "ghost" : "outline"}
+              size="sm"
+              disabled={disabled}
+              className={isCompact ? "h-7 px-2.5 text-xs" : undefined}
+            >
+              <Braces className={isCompact ? "mr-1.5 h-3 w-3" : "mr-2 h-4 w-4"} />
               Variáveis
             </Button>
           </PopoverTrigger>
@@ -144,8 +164,14 @@ export function BotMessageComposer({
 
         <Popover open={emotesOpen} onOpenChange={setEmotesOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" size="sm" disabled={disabled}>
-              <Smile className="mr-2 h-4 w-4" />
+            <Button
+              type="button"
+              variant={isCompact ? "ghost" : "outline"}
+              size="sm"
+              disabled={disabled}
+              className={isCompact ? "h-7 px-2.5 text-xs" : undefined}
+            >
+              <Smile className={isCompact ? "mr-1.5 h-3 w-3" : "mr-2 h-4 w-4"} />
               Emotes do canal
             </Button>
           </PopoverTrigger>
@@ -209,8 +235,15 @@ export function BotMessageComposer({
             {saving ? "Salvando…" : "Salvar"}
           </Button>
         )}
+        </div>
 
-        <span className="ml-auto text-body-sm text-muted-foreground">
+        <span
+          className={
+            isCompact
+              ? "text-xs tabular-nums text-muted-foreground"
+              : "ml-auto text-body-sm text-muted-foreground"
+          }
+        >
           {value.length}/{maxLength}
         </span>
       </div>

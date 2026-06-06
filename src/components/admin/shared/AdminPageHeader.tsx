@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminBreadcrumb } from "@/components/admin/shared/AdminBreadcrumb";
 import { cn } from "@/lib/utils";
 
 interface AdminPageHeaderProps {
@@ -18,16 +19,15 @@ export function AdminPageHeader({
   return (
     <header
       className={cn(
-        "mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+        "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
         className
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h1 className="font-headline text-headline-lg font-bold tracking-tight text-foreground">
-          {title}
-        </h1>
+        <AdminBreadcrumb />
+        <h1 className="text-page-title text-foreground">{title}</h1>
         {description && (
-          <p className="max-w-2xl text-body-sm text-muted-foreground">
+          <p className="max-w-2xl text-body-admin text-muted-foreground">
             {description}
           </p>
         )}

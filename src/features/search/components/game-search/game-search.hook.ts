@@ -13,7 +13,10 @@ const formatImageUrl = createImageUrlFormatter();
 const FALLBACK_COVER =
   "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=800&q=80";
 
-export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSelect">) {
+export function useGameSearch({
+  onGameSelect,
+  recentSuggestions = [],
+}: Pick<GameSearchProps, "onGameSelect" | "recentSuggestions">) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GameSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -57,8 +60,13 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
   const handleInputFocus = useCallback(() => {
     if (query.trim().length >= MIN_QUERY_LENGTH) {
       setIsOpen(true);
+      return;
     }
-  }, [query]);
+    if (recentSuggestions.length > 0) {
+      setIsOpen(true);
+      setActiveIndex(0);
+    }
+  }, [query, recentSuggestions.length]);
 
   const handleOptionHover = useCallback((index: number) => {
     setActiveIndex(index);
@@ -75,9 +83,15 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
     const trimmedQuery = query.trim();
     if (!trimmedQuery || trimmedQuery.length < MIN_QUERY_LENGTH) {
       setResults([]);
-      setIsOpen(false);
-      setActiveIndex(-1);
       setIsSearching(false);
+      const inputFocused = document.activeElement === inputRef.current;
+      if (recentSuggestions.length > 0 && inputFocused) {
+        setIsOpen(true);
+        setActiveIndex(0);
+      } else {
+        setIsOpen(false);
+        setActiveIndex(-1);
+      }
       return;
     }
 
@@ -113,7 +127,7 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, recentSuggestions.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -143,28 +157,31 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
     };
   }, [isOpen]);
 
+  const isSearchingMode = query.trim().length >= MIN_QUERY_LENGTH;
+  const dropdownItems = isSearchingMode ? results : recentSuggestions;
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        if (isOpen && activeIndex >= 0 && results[activeIndex]) {
-          pickGame(results[activeIndex]);
+        if (isOpen && activeIndex >= 0 && dropdownItems[activeIndex]) {
+          pickGame(dropdownItems[activeIndex]);
         }
         return;
       }
 
-      if (!isOpen || results.length === 0) return;
+      if (!isOpen || dropdownItems.length === 0) return;
 
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setActiveIndex((previous) => (previous + 1) % results.length);
+        setActiveIndex((previous) => (previous + 1) % dropdownItems.length);
         return;
       }
 
       if (event.key === "ArrowUp") {
         event.preventDefault();
         setActiveIndex((previous) =>
-          previous <= 0 ? results.length - 1 : previous - 1
+          previous <= 0 ? dropdownItems.length - 1 : previous - 1
         );
         return;
       }
@@ -174,15 +191,16 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
         setActiveIndex(-1);
       }
     },
-    [activeIndex, isOpen, pickGame, results]
+    [activeIndex, dropdownItems, isOpen, pickGame]
   );
-
-  const showDropdown = isOpen && query.trim().length >= MIN_QUERY_LENGTH;
-  const showEmpty = showDropdown && !isSearching && results.length === 0;
+  const showDropdown = isOpen && dropdownItems.length > 0;
+  const showEmpty =
+    isOpen && isSearchingMode && !isSearching && results.length === 0;
+  const showRecentHeader = isOpen && !isSearchingMode && recentSuggestions.length > 0;
 
   return {
     query,
-    results,
+    results: dropdownItems,
     isSearching,
     isOpen,
     activeIndex,
@@ -191,6 +209,8 @@ export function useGameSearch({ onGameSelect }: Pick<GameSearchProps, "onGameSel
     listboxId: "game-search-listbox",
     showDropdown,
     showEmpty,
+    showRecentHeader,
+    isSearchingMode,
     pickGame,
     clearSearch,
     handleQueryChange,

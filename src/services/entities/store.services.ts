@@ -8,6 +8,7 @@ import type {
   StorePublicBalanceDto,
   StorePublicCatalogDto,
   StoreRedemptionDto,
+  StoreRedemptionStatusCounts,
 } from "@server/store/store.types";
 
 export interface PaginatedResponse<T> {
@@ -155,11 +156,32 @@ export const store = {
     productId?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResponse<StoreRedemptionDto>> => {
+  }): Promise<
+    PaginatedResponse<StoreRedemptionDto> & {
+      statusCounts?: StoreRedemptionStatusCounts;
+    }
+  > => {
     const response = await httpClient.get<
-      PaginatedResponse<StoreRedemptionDto>
+      PaginatedResponse<StoreRedemptionDto> & {
+        statusCounts?: StoreRedemptionStatusCounts;
+      }
     >(ENDPOINTS.Internal.Store.Redemptions, { params });
-    return response.data ?? { items: [], total: 0, page: 1, limit: 20 };
+    return (
+      response.data ?? {
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        statusCounts: {
+          all: 0,
+          pending: 0,
+          approved: 0,
+          delivered: 0,
+          cancelled: 0,
+          refunded: 0,
+        },
+      }
+    );
   },
 
   updateRedemption: async (
