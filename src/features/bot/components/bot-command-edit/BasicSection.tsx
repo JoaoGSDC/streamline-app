@@ -4,7 +4,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { BotMessageComposer } from "@features/bot/components/BotMessageComposer";
-import { canEditCommandResponse } from "@features/bot/types/bot-command.types";
 import type { BotVariableItem } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
 import { AliasTagInput } from "./AliasTagInput";
@@ -23,101 +22,84 @@ export function BasicSection({
   onChange,
   disabled = false,
   triggerError,
-  isBuiltin,
   variables,
   emotes,
   emotesLoading,
 }: BasicSectionProps) {
-  const canEditResponse = canEditCommandResponse(command);
-
   return (
     <div className="space-y-3">
-      {!isBuiltin ? (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Comando
-          </Label>
-          <Input
-            value={command.trigger}
-            disabled={disabled}
-            maxLength={TRIGGER_MAX_LENGTH}
-            onChange={(event) =>
-              onChange({
-                trigger: event.target.value.replace(/\s/g, "").slice(0, TRIGGER_MAX_LENGTH),
-              })
-            }
-            placeholder="!meucomando"
-            className="font-mono"
-          />
-          {triggerError ? (
-            <p className="text-xs text-destructive">{triggerError}</p>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Comando
+        </Label>
+        <Input
+          value={command.trigger}
+          disabled={disabled}
+          maxLength={TRIGGER_MAX_LENGTH}
+          onChange={(event) =>
+            onChange({
+              trigger: event.target.value.replace(/\s/g, "").slice(0, TRIGGER_MAX_LENGTH),
+            })
+          }
+          placeholder="!meucomando"
+          className="font-mono"
+        />
+        {triggerError ? (
+          <p className="text-xs text-destructive">{triggerError}</p>
+        ) : null}
+      </div>
 
-      {!isBuiltin ? (
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Aliases{" "}
-            <span className="font-normal normal-case">
-              (triggers alternativos, máx. 5)
-            </span>
-          </Label>
-          <AliasTagInput
-            value={command.aliases}
-            onChange={(aliases) => onChange({ aliases })}
-            maxItems={5}
-            disabled={disabled}
-          />
-        </div>
-      ) : null}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Aliases{" "}
+          <span className="font-normal normal-case">
+            (triggers alternativos, máx. 5)
+          </span>
+        </Label>
+        <AliasTagInput
+          value={command.aliases}
+          onChange={(aliases) => onChange({ aliases })}
+          maxItems={5}
+          disabled={disabled}
+        />
+      </div>
 
-      {canEditResponse ? (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Resposta
-            </Label>
-            {!isBuiltin ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  Múltiplas respostas
-                </span>
-                <Switch
-                  checked={command.responseType === "random"}
-                  disabled={disabled}
-                  onCheckedChange={(checked) =>
-                    onChange({ responseType: checked ? "random" : "text" })
-                  }
-                />
-              </div>
-            ) : null}
-          </div>
-          <BotMessageComposer
-            value={command.response}
-            onChange={(response) => onChange({ response })}
-            variables={variables}
-            emotes={emotes}
-            emotesLoading={emotesLoading}
-            disabled={disabled}
-            placeholder="Mensagem que o bot enviará no chat..."
-            maxLength={500}
-            variant="compact"
-          />
-        </div>
-      ) : command.responseTemplate ? (
-        <div className="space-y-1.5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
           <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Resposta
           </Label>
-          <p className="rounded-md bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
-            {command.responseTemplate}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Texto montado automaticamente pelo bot com dados da live.
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Múltiplas respostas
+            </span>
+            <Switch
+              checked={command.responseType === "random"}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onChange({ responseType: checked ? "random" : "text" })
+              }
+            />
+          </div>
         </div>
-      ) : null}
+        <BotMessageComposer
+          value={command.response}
+          onChange={(response) => onChange({ response })}
+          variables={variables}
+          emotes={emotes}
+          emotesLoading={emotesLoading}
+          disabled={disabled}
+          placeholder="Mensagem que o bot enviará no chat..."
+          maxLength={500}
+          variant="compact"
+        />
+        {command.responseTemplate && !command.response.trim() ? (
+          <p className="text-xs text-muted-foreground">
+            Modelo padrão do sistema:{" "}
+            <span className="font-mono">{command.responseTemplate}</span>
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -47,18 +47,12 @@ function ToggleRow({
   );
 }
 
-interface AdvancedSectionProps extends CommandFormBinding {
-  isBuiltin: boolean;
-}
-
 export function AdvancedSection({
   command,
   onChange,
   disabled = false,
-  isBuiltin,
-}: AdvancedSectionProps) {
+}: CommandFormBinding) {
   const [regexTestOpen, setRegexTestOpen] = useState(false);
-  const sectionDisabled = disabled || isBuiltin;
 
   return (
     <>
@@ -73,33 +67,29 @@ export function AdvancedSection({
               label="Requer confirmação"
               description='O bot pergunta "Confirma? (sim/não)" antes de executar.'
               checked={command.requiresConfirmation}
-              disabled={sectionDisabled}
+              disabled={disabled}
               onCheckedChange={(requiresConfirmation) =>
                 onChange({ requiresConfirmation })
               }
             />
-            {!isBuiltin ? (
-              <ToggleRow
-                label="Resposta como ação (/me)"
-                description="Bot envia a mensagem como /me (texto em itálico/colorido)."
-                checked={command.isActionResponse}
-                disabled={disabled}
-                onCheckedChange={(isActionResponse) =>
-                  onChange({ isActionResponse })
-                }
-              />
-            ) : null}
-            {!isBuiltin ? (
-              <ToggleRow
-                label="Case sensitive"
-                description="!Hugs e !hugs serão tratados como comandos diferentes."
-                checked={command.isCaseSensitive}
-                disabled={disabled}
-                onCheckedChange={(isCaseSensitive) =>
-                  onChange({ isCaseSensitive })
-                }
-              />
-            ) : null}
+            <ToggleRow
+              label="Resposta como ação (/me)"
+              description="Bot envia a mensagem como /me (texto em itálico/colorido)."
+              checked={command.isActionResponse}
+              disabled={disabled}
+              onCheckedChange={(isActionResponse) =>
+                onChange({ isActionResponse })
+              }
+            />
+            <ToggleRow
+              label="Case sensitive"
+              description="!Hugs e !hugs serão tratados como comandos diferentes."
+              checked={command.isCaseSensitive}
+              disabled={disabled}
+              onCheckedChange={(isCaseSensitive) =>
+                onChange({ isCaseSensitive })
+              }
+            />
           </div>
 
           <div className="space-y-2">
@@ -108,7 +98,7 @@ export function AdvancedSection({
             </Label>
             <Select
               value={command.argValidationType}
-              disabled={sectionDisabled}
+              disabled={disabled}
               onValueChange={(value) =>
                 onChange({
                   argValidationType: value as typeof command.argValidationType,
@@ -133,7 +123,7 @@ export function AdvancedSection({
                   <div className="flex gap-2">
                     <Input
                       value={command.argRegexPattern || ""}
-                      disabled={sectionDisabled}
+                      disabled={disabled}
                       onChange={(event) =>
                         onChange({ argRegexPattern: event.target.value })
                       }
@@ -155,7 +145,7 @@ export function AdvancedSection({
                 </div>
                 <Input
                   value={command.argValidationError || ""}
-                  disabled={sectionDisabled}
+                  disabled={disabled}
                   onChange={(event) =>
                     onChange({ argValidationError: event.target.value })
                   }
@@ -170,12 +160,6 @@ export function AdvancedSection({
               </div>
             ) : null}
           </div>
-
-          {isBuiltin ? (
-            <p className="text-xs text-muted-foreground/70">
-              Opções avançadas de comandos padrão são definidas pelo sistema.
-            </p>
-          ) : null}
         </div>
       </CollapsibleSection>
 

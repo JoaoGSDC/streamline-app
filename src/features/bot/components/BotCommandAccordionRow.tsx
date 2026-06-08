@@ -50,7 +50,6 @@ export function BotCommandAccordionRow({
   onToggleEnabled,
 }: BotCommandAccordionRowProps) {
   const isCustom = !command.isBuiltin;
-  const canEditResponse = isCustom || command.customizableResponse !== false;
   const roleLabel =
     command.minRole === "moderator"
       ? "Mod"
@@ -141,8 +140,7 @@ export function BotCommandAccordionRow({
           </p>
         )}
 
-        {isCustom && (
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={`trigger-${command.id}`}>Trigger</Label>
               <Input
@@ -170,45 +168,26 @@ export function BotCommandAccordionRow({
                 }
               />
             </div>
-          </div>
-        )}
+        </div>
 
-        {canEditResponse ? (
-          <div className="space-y-2">
-            <Label>Mensagem de resposta</Label>
-            <BotMessageComposer
-              value={command.response}
-              onChange={(response) => onChange({ response })}
-              variables={variables}
-              emotes={emotes}
-              emotesLoading={emotesLoading}
-              disabled={saving}
-              onSave={onSave}
-              saving={saving}
-            />
-          </div>
-        ) : command.responseTemplate ? (
-          <div className="space-y-2">
-            <Label>Mensagem no chat (modelo)</Label>
-            <p className="line-clamp-3 break-words rounded-md border border-outline-variant/30 bg-muted/20 px-3 py-2 font-mono text-body-xs text-muted-foreground">
-              {command.responseTemplate}
-            </p>
-            {command.requiresConfirmation && command.confirmationPrompt && (
-              <p className="text-body-xs text-muted-foreground">
-                Confirmação: {command.confirmationPrompt}
-              </p>
-            )}
+        <div className="space-y-2">
+          <Label>Mensagem de resposta</Label>
+          <BotMessageComposer
+            value={command.response}
+            onChange={(response) => onChange({ response })}
+            variables={variables}
+            emotes={emotes}
+            emotesLoading={emotesLoading}
+            disabled={saving}
+            onSave={onSave}
+            saving={saving}
+          />
+          {command.responseTemplate && !command.response.trim() ? (
             <p className="text-body-xs text-muted-foreground">
-              Texto montado automaticamente pelo bot com dados da live. Não é
-              editável aqui.
+              Modelo padrão: {command.responseTemplate}
             </p>
-          </div>
-        ) : (
-          <p className="text-body-sm text-muted-foreground">
-            Este comando é executado automaticamente pelo bot. Você pode apenas
-            ativá-lo ou desativá-lo.
-          </p>
-        )}
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap gap-2">
           {isCustom && onDelete && (
@@ -224,8 +203,7 @@ export function BotCommandAccordionRow({
           )}
           {command.isBuiltin && (
             <p className="text-body-sm text-muted-foreground">
-              Comandos padrão não podem ser removidos — apenas desativados
-              {canEditResponse ? " ou com mensagem personalizada" : ""}.
+              Comando padrão — não pode ser excluído, apenas desativado.
             </p>
           )}
         </div>

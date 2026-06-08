@@ -10,10 +10,8 @@ import {
   updateBotCommand,
 } from "@lib/bot-db-queries";
 import { commandDtoToValidationShape } from "@server/bot/bot.validators";
-import { getBuiltinDefinition } from "@server/bot/bot-builtin-commands";
 import {
   formatZodErrorMessages,
-  updateBotBuiltinCommandSchema,
   updateBotCommandSchema,
   validateMergedBotCommandUpdate,
 } from "@server/bot/bot.validators";
@@ -74,68 +72,6 @@ export async function patchBotCommandController(
     }
 
     const body = await request.json();
-
-    if (isBuiltinBotCommand(existing)) {
-      const parsed = updateBotBuiltinCommandSchema.safeParse(body);
-      if (!parsed.success) {
-        return jsonError(
-          formatZodErrorMessages(parsed.error),
-          400,
-          "VALIDATION_ERROR"
-        );
-      }
-
-      const builtinDef = existing.builtinKey
-        ? getBuiltinDefinition(existing.builtinKey)
-        : undefined;
-
-      if (
-        parsed.data.response !== undefined &&
-        builtinDef &&
-        !builtinDef.customizableResponse
-      ) {
-        return jsonError(
-          "Este comando padrão é processado automaticamente e não permite personalizar a mensagem.",
-          400,
-          "BUILTIN_RESPONSE_NOT_CUSTOMIZABLE"
-        );
-      }
-
-      const builtinPatch: Partial<{ response: string; enabled: boolean }> = {};
-      if (parsed.data.response !== undefined) {
-        builtinPatch.response = parsed.data.response;
-      }
-      if (parsed.data.enabled !== undefined) {
-        builtinPatch.enabled = parsed.data.enabled;
-      }
-
-      const { command, configVersion } = await updateBotCommand(
-        id,
-        resolved.streamerId,
-        builtinPatch
-      );
-
-      if (!command) {
-        throw new HttpError("Comando não encontrado", 404, "NOT_FOUND");
-      }
-
-      await recordBotAudit({
-        id: createRandomString(16),
-        streamerId: resolved.streamerId,
-        actorUserId: resolved.user.id,
-        actorUsername: resolveActorUsername(resolved.user),
-        targetType: "bot_command",
-        targetId: id,
-        action: "command_updated",
-        diff: buildCommandAuditDiff(
-          commandDtoToValidationShape(existing) as Record<string, unknown>,
-          commandDtoToValidationShape(command) as Record<string, unknown>
-        ),
-      });
-      invalidateCommandCache(resolved.streamerId);
-
-      return jsonSuccess({ ...command, configVersion });
-    }
 
     const parsed = updateBotCommandSchema.safeParse(body);
     if (!parsed.success) {

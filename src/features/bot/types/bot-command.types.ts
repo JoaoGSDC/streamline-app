@@ -56,14 +56,12 @@ export const CATEGORY_SHORT_LABELS: Record<BotBuiltinCategoryId | "custom", stri
     custom: "Personalizado",
   };
 
-export function canEditCommandResponse(command: BotCommandRowState): boolean {
-  return !command.isBuiltin || command.customizableResponse !== false;
+export function canEditCommandResponse(_command: BotCommandRowState): boolean {
+  return true;
 }
 
 export function canOpenCommandEditor(command: BotCommandRowState): boolean {
-  if (command.isDraft || command.isNew) return true;
-  if (!command.isBuiltin) return true;
-  return canEditCommandResponse(command);
+  return Boolean(command.isDraft || command.isNew || command.id);
 }
 
 export function getCommandCategoryShort(command: BotCommandRowState): string {
@@ -80,6 +78,6 @@ export function getResponsePreview(command: BotCommandRowState): string {
   );
 }
 
-export function isAutomaticCommand(command: BotCommandRowState): boolean {
-  return !canEditCommandResponse(command);
+export function isAutomaticCommand(_command: BotCommandRowState): boolean {
+  return false;
 }

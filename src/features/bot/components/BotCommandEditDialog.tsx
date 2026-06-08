@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { services } from "@services";
 import {
-  canEditCommandResponse,
   getCommandCategoryShort,
   type BotCommandRowState,
 } from "@features/bot/types/bot-command.types";
@@ -46,7 +45,9 @@ function BuiltinNotice() {
     <div className="flex items-start gap-2.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-3.5 py-2.5">
       <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-400" />
       <p className="text-xs leading-relaxed text-purple-300">
-        Comando padrão — apenas a resposta pode ser editada.
+        Comando padrão — vem pré-configurado para todos os canais. Você pode
+        personalizar todos os campos; apenas a exclusão não é permitida (desative
+        se não quiser usar).
       </p>
     </div>
   );
@@ -94,16 +95,14 @@ export function BotCommandEditDialog({
   }, [open, command?.id, command?.isDraft, command?.isNew]);
 
   const triggerError = useMemo(() => {
-    if (!command || command.isBuiltin) return null;
+    if (!command) return null;
     return validateTrigger(command.trigger);
   }, [command]);
 
   if (!command) return null;
 
   const isBuiltin = command.isBuiltin;
-  const isCustom = !isBuiltin;
   const isNew = command.isDraft || command.isNew;
-  const canEditResponse = canEditCommandResponse(command);
   const categoryLabel = getCommandCategoryShort(command);
 
   const handleCancel = () => {
@@ -112,8 +111,7 @@ export function BotCommandEditDialog({
   };
 
   const handleSave = () => {
-    if (isCustom && triggerError) return;
-    if (!canEditResponse && isBuiltin) return;
+    if (triggerError) return;
     onSave();
   };
 
@@ -173,13 +171,13 @@ export function BotCommandEditDialog({
             emotesLoading={emotesLoading}
           />
 
-          {isCustom ? <MultipleResponsesSection {...formBinding} /> : null}
+          <MultipleResponsesSection {...formBinding} />
 
-          <PermissionSection {...formBinding} isBuiltin={isBuiltin} />
+          <PermissionSection {...formBinding} />
 
-          <UsageLimitsSection {...formBinding} isBuiltin={isBuiltin} />
+          <UsageLimitsSection {...formBinding} />
 
-          <AdvancedSection {...formBinding} isBuiltin={isBuiltin} />
+          <AdvancedSection {...formBinding} />
 
           {command.runtimeNotes ? (
             <p className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -195,7 +193,7 @@ export function BotCommandEditDialog({
         ) : null}
 
         <DialogFooter className="shrink-0 border-t border-border/40 px-6 py-4 sm:justify-end">
-          {isCustom && onDelete && !isNew ? (
+          {!isBuiltin && onDelete && !isNew ? (
             <Button
               type="button"
               variant="ghost"
@@ -222,7 +220,7 @@ export function BotCommandEditDialog({
           <Button
             type="button"
             size="sm"
-            disabled={saving || Boolean(isCustom && triggerError)}
+            disabled={saving || Boolean(triggerError)}
             onClick={handleSave}
             className="bg-purple-600 text-white hover:bg-purple-700"
           >

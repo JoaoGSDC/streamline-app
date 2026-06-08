@@ -299,15 +299,10 @@ export function useBotCommandsPage() {
           return created.id;
         }
 
-        const updated = merged.isBuiltin
-          ? await services.botCommands.update(merged.id, {
-              response: merged.response,
-              enabled: merged.enabled,
-            })
-          : await services.botCommands.update(
-              merged.id,
-              buildCustomCommandPayload(merged)
-            );
+        const updated = await services.botCommands.update(
+          merged.id,
+          buildCustomCommandPayload(merged)
+        );
 
         upsertSavedRow(updated);
 

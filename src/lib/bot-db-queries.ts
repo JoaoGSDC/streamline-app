@@ -5,7 +5,6 @@ import {
   DEPRECATED_BUILTIN_KEYS,
   getBuiltinDefinition,
 } from "@server/bot/bot-builtin-commands";
-import { isLegacyRuntimePlaceholder } from "@server/bot/builtin-commands/helpers";
 import {
   BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
   resolveFirstRunAfterMinutes,
@@ -140,26 +139,13 @@ export async function ensureBuiltinBotCommands(streamerId: string) {
       .limit(1);
 
     if (existing[0]) {
-      if (
-        isLegacyRuntimePlaceholder(existing[0].response) ||
-        (!builtin.customizableResponse && existing[0].response?.trim())
-      ) {
-        await db
-          .update(botCommands)
-          .set({ response: "", updatedAt: now })
-          .where(
-            and(
-              eq(botCommands.streamerId, streamerId),
-              eq(botCommands.builtinKey, builtin.key)
-            )
-          );
-      }
       continue;
     }
 
-    const dbResponse = builtin.customizableResponse
-      ? builtin.defaultResponse
-      : "";
+    const dbResponse =
+      builtin.defaultResponse?.trim() ||
+      builtin.responseTemplate?.trim() ||
+      "";
 
     await db.insert(botCommands).values({
       id: `builtin-${builtin.key}-${streamerId}`,

@@ -37,17 +37,12 @@ const SEASONAL_TYPES = [
   { value: "custom_interval", label: "Intervalo personalizado..." },
 ] as const;
 
-interface UsageLimitsSectionProps extends CommandFormBinding {
-  isBuiltin: boolean;
-}
-
 export function UsageLimitsSection({
   command,
   onChange,
   disabled = false,
-  isBuiltin,
-}: UsageLimitsSectionProps) {
-  const sectionDisabled = disabled || isBuiltin;
+}: CommandFormBinding) {
+  const sectionDisabled = disabled;
 
   return (
     <CollapsibleSection
@@ -166,11 +161,6 @@ export function UsageLimitsSection({
           </p>
         ) : null}
 
-        {isBuiltin ? (
-          <p className="text-xs text-muted-foreground/70">
-            Limites de comandos padrão são gerenciados pelo sistema.
-          </p>
-        ) : null}
       </div>
     </CollapsibleSection>
   );

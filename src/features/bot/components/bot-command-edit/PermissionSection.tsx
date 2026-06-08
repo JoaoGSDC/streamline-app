@@ -30,17 +30,12 @@ const BYPASS_OPTIONS: BotCommandBypassCooldownRole[] = [
   "streamer",
 ];
 
-interface PermissionSectionProps extends CommandFormBinding {
-  isBuiltin: boolean;
-}
-
 export function PermissionSection({
   command,
   onChange,
   disabled = false,
-  isBuiltin,
-}: PermissionSectionProps) {
-  const sectionDisabled = disabled || isBuiltin;
+}: CommandFormBinding) {
+  const sectionDisabled = disabled;
 
   const toggleBypass = (
     role: BotCommandBypassCooldownRole,
@@ -106,11 +101,6 @@ export function PermissionSection({
             </label>
           ))}
         </div>
-        {isBuiltin ? (
-          <p className="text-xs text-muted-foreground/70">
-            Comandos padrão usam as permissões definidas pelo sistema.
-          </p>
-        ) : null}
       </div>
     </CollapsibleSection>
   );
