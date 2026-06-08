@@ -1,12 +1,28 @@
 import { httpClient } from "@services/axios";
 import { ENDPOINTS } from "@services/paths";
 
+export type BotVariableCategoryId =
+  | "global"
+  | "args"
+  | "counter"
+  | "timer"
+  | "meta"
+  | "live"
+  | "user"
+  | "points"
+  | "random"
+  | "datetime"
+  | "usage"
+  | "text"
+  | "math"
+  | "conditional";
+
 export interface BotVariableItem {
   key: string;
   label: string;
   description: string;
   usage: string;
-  category: "global" | "args" | "counter" | "timer" | "meta";
+  category: BotVariableCategoryId;
   example?: string;
 }
 
@@ -42,6 +58,7 @@ export interface BotVariablesCatalogResponse {
   counters: BotVariableItem[];
   timers: BotVariableItem[];
   runtimeTemplateVariables?: BotVariableItem[];
+  expandedGroups?: Partial<Record<Exclude<BotVariableCategoryId, "global" | "args" | "counter" | "timer" | "meta">, BotVariableItem[]>>;
   confirmation?: {
     defaultPrompt: string;
     acceptWords: string[];

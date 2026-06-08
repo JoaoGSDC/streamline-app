@@ -36,6 +36,7 @@ export const ENDPOINTS = {
       Activation: "/api/internal/bot/activation",
       Commands: "/api/internal/bot/commands",
       CommandById: (id: string) => `/api/internal/bot/commands/${id}`,
+      CommandUsage: (id: string) => `/api/internal/bot/commands/${id}/usage`,
       Timers: "/api/internal/bot/timers",
       TimerById: (id: string) => `/api/internal/bot/timers/${id}`,
       Blacklist: "/api/internal/bot/blacklist",

@@ -1,7 +1,12 @@
 import { httpClient } from "@services/axios";
 import { ENDPOINTS } from "@services/paths";
+import type {
+  BotCommandAdvancedFields,
+  BotCommandUsagePeriod,
+  BotCommandUsageStatsDto,
+} from "@server/bot/bot-command.types";
 
-export interface BotCommandRecord {
+export interface BotCommandRecord extends BotCommandAdvancedFields {
   id: string;
   streamerId: string;
   trigger: string;
@@ -27,6 +32,23 @@ export interface CreateBotCommandPayload {
   response: string;
   cooldownSeconds?: number;
   enabled?: boolean;
+  userCooldown?: number;
+  minPermission?: BotCommandAdvancedFields["minPermission"];
+  bypassCooldownFor?: BotCommandAdvancedFields["bypassCooldownFor"];
+  maxUsesPerStream?: number;
+  maxUsesPerUserPerStream?: number;
+  seasonalLimitType?: BotCommandAdvancedFields["seasonalLimitType"];
+  seasonalLimitAmount?: number;
+  seasonalLimitDays?: number;
+  requiresConfirmation?: boolean;
+  isActionResponse?: boolean;
+  isCaseSensitive?: boolean;
+  aliases?: string[];
+  argValidationType?: BotCommandAdvancedFields["argValidationType"];
+  argRegexPattern?: string | null;
+  argValidationError?: string | null;
+  responseType?: BotCommandAdvancedFields["responseType"];
+  responseAlternatives?: string[];
 }
 
 export const botCommands = {
@@ -79,5 +101,16 @@ export const botCommands = {
 
   remove: async (id: string): Promise<void> => {
     await httpClient.delete(ENDPOINTS.Internal.Bot.CommandById(id));
+  },
+
+  getUsage: async (
+    id: string,
+    period: BotCommandUsagePeriod = "stream"
+  ): Promise<BotCommandUsageStatsDto> => {
+    const response = await httpClient.get<BotCommandUsageStatsDto>(
+      ENDPOINTS.Internal.Bot.CommandUsage(id),
+      { params: { period } }
+    );
+    return response.data;
   },
 };

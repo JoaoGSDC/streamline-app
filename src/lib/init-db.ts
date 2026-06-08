@@ -105,9 +105,55 @@ const BOT_COMMANDS_TABLE = `
     cooldown_seconds INTEGER NOT NULL DEFAULT 0,
     enabled INTEGER NOT NULL DEFAULT 1,
     builtin_key TEXT,
+    user_cooldown INTEGER NOT NULL DEFAULT 0,
+    min_permission TEXT NOT NULL DEFAULT 'everyone',
+    bypass_cooldown_for TEXT NOT NULL DEFAULT '[]',
+    max_uses_per_stream INTEGER NOT NULL DEFAULT 0,
+    max_uses_per_user_per_stream INTEGER NOT NULL DEFAULT 0,
+    seasonal_limit_type TEXT NOT NULL DEFAULT 'none',
+    seasonal_limit_amount INTEGER NOT NULL DEFAULT 0,
+    seasonal_limit_days INTEGER NOT NULL DEFAULT 0,
+    requires_confirmation INTEGER NOT NULL DEFAULT 0,
+    is_action_response INTEGER NOT NULL DEFAULT 0,
+    is_case_sensitive INTEGER NOT NULL DEFAULT 0,
+    aliases TEXT NOT NULL DEFAULT '[]',
+    arg_validation_type TEXT NOT NULL DEFAULT 'none',
+    arg_regex_pattern TEXT,
+    arg_validation_error TEXT,
+    response_type TEXT NOT NULL DEFAULT 'text',
+    response_alternatives TEXT NOT NULL DEFAULT '[]',
+    use_count INTEGER NOT NULL DEFAULT 0,
     deleted_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
+const BOT_COMMAND_USAGE_TABLE = `
+  CREATE TABLE IF NOT EXISTS bot_command_usage (
+    id TEXT PRIMARY KEY,
+    command_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    twitch_user_id TEXT NOT NULL,
+    twitch_login TEXT,
+    stream_id TEXT,
+    used_at INTEGER NOT NULL,
+    FOREIGN KEY (command_id) REFERENCES bot_commands(id) ON DELETE CASCADE
+  );
+`;
+
+const BOT_AUDIT_LOG_TABLE = `
+  CREATE TABLE IF NOT EXISTS bot_audit_log (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    actor_user_id TEXT NOT NULL,
+    actor_username TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    diff TEXT,
+    created_at INTEGER NOT NULL,
     FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
   );
 `;
@@ -517,6 +563,24 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE streamers ADD COLUMN link_page_config TEXT`,
     `ALTER TABLE streamer_games ADD COLUMN rating REAL`,
     `ALTER TABLE bot_commands ADD COLUMN builtin_key TEXT`,
+    `ALTER TABLE bot_commands ADD COLUMN user_cooldown INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN min_permission TEXT NOT NULL DEFAULT 'everyone'`,
+    `ALTER TABLE bot_commands ADD COLUMN bypass_cooldown_for TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE bot_commands ADD COLUMN max_uses_per_stream INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN max_uses_per_user_per_stream INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN seasonal_limit_type TEXT NOT NULL DEFAULT 'none'`,
+    `ALTER TABLE bot_commands ADD COLUMN seasonal_limit_amount INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN seasonal_limit_days INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN requires_confirmation INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN is_action_response INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN is_case_sensitive INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN aliases TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE bot_commands ADD COLUMN arg_validation_type TEXT NOT NULL DEFAULT 'none'`,
+    `ALTER TABLE bot_commands ADD COLUMN arg_regex_pattern TEXT`,
+    `ALTER TABLE bot_commands ADD COLUMN arg_validation_error TEXT`,
+    `ALTER TABLE bot_commands ADD COLUMN response_type TEXT NOT NULL DEFAULT 'text'`,
+    `ALTER TABLE bot_commands ADD COLUMN response_alternatives TEXT NOT NULL DEFAULT '[]'`,
+    `ALTER TABLE bot_commands ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE bot_timers ADD COLUMN first_run_after_minutes INTEGER`,
     `ALTER TABLE bot_timers ADD COLUMN schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed'`,
     `ALTER TABLE bot_timers ADD COLUMN min_viewers INTEGER`,
@@ -528,6 +592,45 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
       await execute(sql);
     } catch {
       /* coluna já existe */
+    }
+  }
+
+  try {
+    await execute(BOT_COMMAND_USAGE_TABLE);
+  } catch {
+    /* tabela já existe */
+  }
+
+  try {
+    await execute(BOT_AUDIT_LOG_TABLE);
+  } catch {
+    /* tabela já existe */
+  }
+
+  const auditIndexes = [
+    `CREATE INDEX IF NOT EXISTS idx_bot_audit_log_streamer_created
+      ON bot_audit_log(streamer_id, created_at DESC)`,
+  ];
+
+  for (const sql of auditIndexes) {
+    try {
+      await execute(sql);
+    } catch {
+      /* índice já existe */
+    }
+  }
+
+  const usageIndexes = [
+    `CREATE INDEX IF NOT EXISTS idx_usage_command_stream ON bot_command_usage(command_id, stream_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_command_user_stream ON bot_command_usage(command_id, twitch_user_id, stream_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_usage_command_user_date ON bot_command_usage(command_id, twitch_user_id, used_at)`,
+  ];
+
+  for (const sql of usageIndexes) {
+    try {
+      await execute(sql);
+    } catch {
+      /* índice já existe */
     }
   }
 

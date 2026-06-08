@@ -11,16 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { BotMessageComposer } from "@features/bot/components/BotMessageComposer";
+import { services } from "@services";
 import {
   canEditCommandResponse,
   getCommandCategoryShort,
@@ -28,6 +19,12 @@ import {
 } from "@features/bot/types/bot-command.types";
 import type { BotVariableItem } from "@services/entities/bot-variables.services";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
+import { AdvancedSection } from "@features/bot/components/bot-command-edit/AdvancedSection";
+import { BasicSection } from "@features/bot/components/bot-command-edit/BasicSection";
+import { MultipleResponsesSection } from "@features/bot/components/bot-command-edit/MultipleResponsesSection";
+import { PermissionSection } from "@features/bot/components/bot-command-edit/PermissionSection";
+import { UsageLimitsSection } from "@features/bot/components/bot-command-edit/UsageLimitsSection";
+import { validateTrigger } from "@features/bot/components/bot-command-edit/command-form.utils";
 
 interface BotCommandEditDialogProps {
   open: boolean;
@@ -44,28 +41,15 @@ interface BotCommandEditDialogProps {
   onDelete?: () => void;
 }
 
-const TRIGGER_MAX_LENGTH = 20;
-
-function cooldownToDisplay(seconds: number, unit: "seconds" | "minutes") {
-  if (unit === "minutes") return seconds >= 60 ? Math.round(seconds / 60) : 0;
-  return seconds;
-}
-
-function displayToCooldown(value: number, unit: "seconds" | "minutes") {
-  return unit === "minutes" ? value * 60 : value;
-}
-
-function validateTrigger(trigger: string): string | null {
-  if (!trigger.startsWith("!")) {
-    return "Comandos devem começar com !";
-  }
-  if (/\s/.test(trigger)) {
-    return "Comandos não podem conter espaços";
-  }
-  if (trigger.length > TRIGGER_MAX_LENGTH) {
-    return `Máximo de ${TRIGGER_MAX_LENGTH} caracteres`;
-  }
-  return null;
+function BuiltinNotice() {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-3.5 py-2.5">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-400" />
+      <p className="text-xs leading-relaxed text-purple-300">
+        Comando padrão — apenas a resposta pode ser editada.
+      </p>
+    </div>
+  );
 }
 
 export function BotCommandEditDialog({
@@ -82,16 +66,32 @@ export function BotCommandEditDialog({
   onCancel,
   onDelete,
 }: BotCommandEditDialogProps) {
-  const [cooldownUnit, setCooldownUnit] = useState<"seconds" | "minutes">("seconds");
+  const [lastUsedLabel, setLastUsedLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!command) return;
-    setCooldownUnit(
-      command.cooldownSeconds > 0 && command.cooldownSeconds % 60 === 0
-        ? "minutes"
-        : "seconds"
-    );
-  }, [command?.id, command?.cooldownSeconds]);
+    if (!open || !command || command.isDraft || command.isNew) {
+      setLastUsedLabel(null);
+      return;
+    }
+
+    let cancelled = false;
+    void services.botCommands
+      .getUsage(command.id, "month")
+      .then((stats) => {
+        if (cancelled || stats.totalUses === 0) return;
+        const top = stats.topUsers[0];
+        if (top) {
+          setLastUsedLabel(`@${top.login} usou ${top.count}x este mês`);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLastUsedLabel(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, command?.id, command?.isDraft, command?.isNew]);
 
   const triggerError = useMemo(() => {
     if (!command || command.isBuiltin) return null;
@@ -100,10 +100,10 @@ export function BotCommandEditDialog({
 
   if (!command) return null;
 
-  const isCustom = !command.isBuiltin;
-  const canEditResponse = canEditCommandResponse(command);
+  const isBuiltin = command.isBuiltin;
+  const isCustom = !isBuiltin;
   const isNew = command.isDraft || command.isNew;
-  const cooldownDisplay = cooldownToDisplay(command.cooldownSeconds, cooldownUnit);
+  const canEditResponse = canEditCommandResponse(command);
   const categoryLabel = getCommandCategoryShort(command);
 
   const handleCancel = () => {
@@ -113,22 +113,40 @@ export function BotCommandEditDialog({
 
   const handleSave = () => {
     if (isCustom && triggerError) return;
+    if (!canEditResponse && isBuiltin) return;
     onSave();
+  };
+
+  const formBinding = {
+    command,
+    onChange,
+    disabled: saving,
+    triggerError,
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg gap-0 overflow-hidden rounded-xl p-0 duration-100 [&>button.absolute]:hidden">
-        <DialogHeader className="border-b border-border/40 px-6 py-4 text-left">
+      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden rounded-xl p-0 duration-100 [&>button.absolute]:hidden">
+        <DialogHeader className="shrink-0 border-b border-border/40 px-6 py-4 text-left">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold">
-                {isNew ? "Novo comando" : `Editar ${command.trigger}`}
+              <DialogTitle className="font-mono text-base font-semibold">
+                {isNew
+                  ? "Novo comando"
+                  : isBuiltin
+                    ? command.trigger
+                    : `Editar ${command.trigger}`}
               </DialogTitle>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {command.isBuiltin ? "Comando padrão" : "Comando personalizado"} ·{" "}
+                {isBuiltin ? "Comando padrão" : "Comando personalizado"} ·{" "}
                 {categoryLabel}
               </p>
+              {command.useCount > 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground/60">
+                  {command.useCount.toLocaleString("pt-BR")} usos totais
+                  {lastUsedLabel ? ` · ${lastUsedLabel}` : ""}
+                </p>
+              ) : null}
             </div>
             <DialogClose
               className="rounded-md p-1 transition-colors hover:bg-muted"
@@ -140,134 +158,33 @@ export function BotCommandEditDialog({
           </div>
         </DialogHeader>
 
-        {command.isBuiltin ? (
-          <div className="mx-6 mt-4 flex items-start gap-2.5 rounded-lg border border-purple-500/20 bg-purple-500/10 px-3.5 py-2.5">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-400" />
-            <p className="text-xs leading-relaxed text-purple-300">
-              Comando padrão — apenas a resposta pode ser editada.
-            </p>
-          </div>
-        ) : null}
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          {isBuiltin ? <BuiltinNotice /> : null}
 
-        {command.description ? (
-          <p className="px-6 pt-4 text-xs text-muted-foreground">{command.description}</p>
-        ) : null}
-
-        <div className="space-y-4 px-6 pb-2 pt-4">
-          {isCustom ? (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Comando
-              </Label>
-              <Input
-                value={command.trigger}
-                disabled={saving}
-                maxLength={TRIGGER_MAX_LENGTH}
-                onChange={(event) =>
-                  onChange({
-                    trigger: event.target.value.replace(/\s/g, "").slice(0, TRIGGER_MAX_LENGTH),
-                  })
-                }
-                placeholder="!meucomando"
-                className="font-mono"
-              />
-              {triggerError ? (
-                <p className="text-xs text-destructive/80">{triggerError}</p>
-              ) : null}
-            </div>
+          {command.description ? (
+            <p className="text-xs text-muted-foreground">{command.description}</p>
           ) : null}
 
-          {canEditResponse ? (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Resposta
-              </Label>
-              <BotMessageComposer
-                value={command.response}
-                onChange={(response) => onChange({ response })}
-                variables={variables}
-                emotes={emotes}
-                emotesLoading={emotesLoading}
-                disabled={saving}
-                placeholder="Digite a resposta do comando..."
-                maxLength={500}
-                variant="compact"
-              />
-            </div>
-          ) : command.responseTemplate ? (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Resposta
-              </Label>
-              <p className="rounded-md bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
-                {command.responseTemplate}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Texto montado automaticamente pelo bot com dados da live.
-              </p>
-            </div>
-          ) : null}
+          <BasicSection
+            {...formBinding}
+            isBuiltin={isBuiltin}
+            variables={variables}
+            emotes={emotes}
+            emotesLoading={emotesLoading}
+          />
 
-          {isCustom ? (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Cooldown
-              </Label>
-              <div className="flex gap-1.5">
-                <Input
-                  type="number"
-                  min={0}
-                  max={cooldownUnit === "minutes" ? 60 : 3600}
-                  value={cooldownDisplay}
-                  disabled={saving}
-                  onChange={(event) => {
-                    const raw = parseInt(event.target.value, 10) || 0;
-                    onChange({
-                      cooldownSeconds: displayToCooldown(raw, cooldownUnit),
-                    });
-                  }}
-                  className="w-16 text-center tabular-nums"
-                />
-                <Select
-                  value={cooldownUnit}
-                  disabled={saving}
-                  onValueChange={(value: "seconds" | "minutes") => {
-                    setCooldownUnit(value);
-                    const current = cooldownToDisplay(command.cooldownSeconds, value);
-                    onChange({
-                      cooldownSeconds: displayToCooldown(current, value),
-                    });
-                  }}
-                >
-                  <SelectTrigger className="w-28 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="seconds">segundos</SelectItem>
-                    <SelectItem value="minutes">minutos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          ) : null}
+          {isCustom ? <MultipleResponsesSection {...formBinding} /> : null}
+
+          <PermissionSection {...formBinding} isBuiltin={isBuiltin} />
+
+          <UsageLimitsSection {...formBinding} isBuiltin={isBuiltin} />
+
+          <AdvancedSection {...formBinding} isBuiltin={isBuiltin} />
 
           {command.runtimeNotes ? (
             <p className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               {command.runtimeNotes}
             </p>
-          ) : null}
-
-          {isCustom && onDelete && !isNew ? (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={onDelete}
-              disabled={saving}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir comando
-            </Button>
           ) : null}
         </div>
 
@@ -277,7 +194,20 @@ export function BotCommandEditDialog({
           </p>
         ) : null}
 
-        <DialogFooter className="mt-2 border-t border-border/40 px-6 py-4 sm:justify-end">
+        <DialogFooter className="shrink-0 border-t border-border/40 px-6 py-4 sm:justify-end">
+          {isCustom && onDelete && !isNew ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mr-auto text-destructive hover:text-destructive"
+              onClick={onDelete}
+              disabled={saving}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Excluir
+            </Button>
+          ) : null}
           <DialogClose asChild>
             <Button
               type="button"
@@ -298,7 +228,7 @@ export function BotCommandEditDialog({
           >
             {saving ? (
               <>
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 Salvando...
               </>
             ) : (

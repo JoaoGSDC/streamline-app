@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
-import { resolveActiveBotOwnerStreamerId } from "@lib/bot-auth";
+import { resolveActiveBotChannelManager } from "@lib/bot-auth";
+import { buildCommandAuditDiff, recordBotAudit } from "@lib/bot-audit";
+import { invalidateCommandCache } from "@lib/bot-command-cache";
 import {
   createBotCommand,
-  getBotCommandByTrigger,
+  findBotCommandTriggerConflict,
   listBotCommands,
 } from "@lib/bot-db-queries";
 import {
@@ -11,10 +13,18 @@ import {
 } from "@server/bot/bot.validators";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
 import { createRandomString } from "@utils/factories/create-random-string";
+import {
+  advancedFieldsFromValidated,
+  collectTriggersForConflictCheck,
+  enforceBotCommandMutationRateLimit,
+  formatTriggerConflictMessage,
+  logInvalidRegexAttempt,
+  resolveActorUsername,
+} from "./bot-commands-shared";
 
 export async function listBotCommandsController(request: NextRequest) {
   try {
-    const resolved = await resolveActiveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotChannelManager(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
@@ -38,14 +48,23 @@ export async function listBotCommandsController(request: NextRequest) {
 
 export async function createBotCommandController(request: NextRequest) {
   try {
-    const resolved = await resolveActiveBotOwnerStreamerId(request);
+    const resolved = await resolveActiveBotChannelManager(request);
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
 
+    const rateLimited = enforceBotCommandMutationRateLimit(resolved.user.id);
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
     const parsed = createBotCommandSchema.safeParse(body);
     if (!parsed.success) {
+      await logInvalidRegexAttempt({
+        streamerId: resolved.streamerId,
+        actor: resolved.user,
+        error: parsed.error,
+        body,
+      });
       return jsonError(
         formatZodErrorMessages(parsed.error),
         400,
@@ -53,22 +72,40 @@ export async function createBotCommandController(request: NextRequest) {
       );
     }
 
-    const duplicate = await getBotCommandByTrigger(
+    const conflict = await findBotCommandTriggerConflict(
       resolved.streamerId,
-      parsed.data.trigger
+      collectTriggersForConflictCheck(parsed.data)
     );
-    if (duplicate) {
-      return jsonError("Já existe um comando com este trigger", 409, "CONFLICT");
+    if (conflict) {
+      return jsonError(
+        formatTriggerConflictMessage(conflict),
+        409,
+        "CONFLICT"
+      );
     }
 
+    const commandId = createRandomString(12);
     const { command, configVersion } = await createBotCommand({
-      id: createRandomString(12),
+      id: commandId,
       streamerId: resolved.streamerId,
       trigger: parsed.data.trigger,
       response: parsed.data.response,
       cooldownSeconds: parsed.data.cooldownSeconds ?? 0,
       enabled: parsed.data.enabled ?? true,
+      ...advancedFieldsFromValidated(parsed.data),
     });
+
+    await recordBotAudit({
+      id: createRandomString(16),
+      streamerId: resolved.streamerId,
+      actorUserId: resolved.user.id,
+      actorUsername: resolveActorUsername(resolved.user),
+      targetType: "bot_command",
+      targetId: commandId,
+      action: "command_created",
+      diff: buildCommandAuditDiff(null, parsed.data as Record<string, unknown>),
+    });
+    invalidateCommandCache(resolved.streamerId);
 
     return jsonSuccess({ ...command, configVersion }, 201);
   } catch (error) {

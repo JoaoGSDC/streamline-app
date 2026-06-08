@@ -56,6 +56,30 @@ export async function resolveActiveBotOwnerStreamerId(
   return resolved;
 }
 
+/** Dono do canal ou moderador — nunca usa streamerId do body. */
+export async function resolveActiveBotChannelManager(
+  request: NextRequest
+): Promise<
+  | { streamerId: string; user: SessionUser }
+  | { error: string; status: number; code?: string }
+> {
+  const resolved = await resolveActingStreamerId(request);
+  if ("error" in resolved) {
+    return resolved;
+  }
+
+  const active = await isBotChannelActive(resolved.streamerId);
+  if (!active) {
+    return {
+      error: "Ative o bot no seu canal antes de usar esta funcionalidade.",
+      status: 403,
+      code: BOT_CHANNEL_NOT_ACTIVE,
+    };
+  }
+
+  return resolved;
+}
+
 export function getTwitchBotUsername(): string {
   return (
     process.env.TWITCH_BOT_USERNAME?.trim() ||

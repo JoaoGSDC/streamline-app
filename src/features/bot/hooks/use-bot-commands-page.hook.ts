@@ -15,6 +15,9 @@ import {
   type BotCommandCategoryFilter,
   type BotCommandRowState,
 } from "@features/bot/types/bot-command.types";
+import { BOT_COMMAND_ADVANCED_DEFAULTS } from "@server/bot/bot-command.types";
+import { buildCustomCommandPayload } from "@features/bot/components/bot-command-edit/command-form.utils";
+import { flattenCatalogVariables } from "@features/bot/utils/bot-variables.utils";
 import { createRandomString } from "@utils/factories/create-random-string";
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -32,6 +35,25 @@ function recordToRow(
     enabled: record.enabled,
     isBuiltin: Boolean(record.isBuiltin ?? record.builtinKey),
     builtinKey: record.builtinKey,
+    userCooldown: record.userCooldown,
+    minPermission: record.minPermission,
+    bypassCooldownFor: record.bypassCooldownFor,
+    maxUsesPerStream: record.maxUsesPerStream,
+    maxUsesPerUserPerStream: record.maxUsesPerUserPerStream,
+    seasonalLimitType: record.seasonalLimitType,
+    seasonalLimitAmount: record.seasonalLimitAmount,
+    seasonalLimitDays: record.seasonalLimitDays,
+    requiresConfirmation:
+      catalogItem?.requiresConfirmation ?? record.requiresConfirmation,
+    isActionResponse: record.isActionResponse,
+    isCaseSensitive: record.isCaseSensitive,
+    aliases: record.aliases,
+    argValidationType: record.argValidationType,
+    argRegexPattern: record.argRegexPattern,
+    argValidationError: record.argValidationError,
+    responseType: record.responseType,
+    responseAlternatives: record.responseAlternatives,
+    useCount: record.useCount,
     description: catalogItem?.description,
     category: catalogItem?.category,
     categoryLabel,
@@ -41,7 +63,6 @@ function recordToRow(
     runtimeNotes: catalogItem?.runtimeNotes,
     externalApiUrlTemplate: catalogItem?.externalApiUrlTemplate,
     responseTemplate: catalogItem?.responseTemplate,
-    requiresConfirmation: catalogItem?.requiresConfirmation,
     confirmationPrompt: catalogItem?.confirmationPrompt,
   };
 }
@@ -118,15 +139,7 @@ export function useBotCommandsPage() {
   );
 
   const allVariables = useMemo(
-    () =>
-      catalog
-        ? [
-            ...catalog.globals,
-            ...(catalog.commandArgs ?? []),
-            ...catalog.counters,
-            ...catalog.timers,
-          ]
-        : [],
+    () => flattenCatalogVariables(catalog),
     [catalog]
   );
 
@@ -272,12 +285,9 @@ export function useBotCommandsPage() {
       setSavingIds((prev) => new Set(prev).add(row.id));
       try {
         if (merged.isDraft || merged.isNew) {
-          const created = await services.botCommands.create({
-            trigger: merged.trigger,
-            response: merged.response,
-            cooldownSeconds: merged.cooldownSeconds,
-            enabled: merged.enabled,
-          });
+          const created = await services.botCommands.create(
+            buildCustomCommandPayload(merged)
+          );
           setDraftRows((prev) => prev.filter((draft) => draft.id !== merged.id));
           upsertSavedRow(created);
           setLocalEdits((prev) => {
@@ -294,12 +304,10 @@ export function useBotCommandsPage() {
               response: merged.response,
               enabled: merged.enabled,
             })
-          : await services.botCommands.update(merged.id, {
-              trigger: merged.trigger,
-              response: merged.response,
-              cooldownSeconds: merged.cooldownSeconds,
-              enabled: merged.enabled,
-            });
+          : await services.botCommands.update(
+              merged.id,
+              buildCustomCommandPayload(merged)
+            );
 
         upsertSavedRow(updated);
 
@@ -387,6 +395,7 @@ export function useBotCommandsPage() {
       isBuiltin: false,
       isDraft: true,
       isNew: true,
+      ...BOT_COMMAND_ADVANCED_DEFAULTS,
     };
     setDraftRows((prev) => [...prev, draft]);
     return id;

@@ -1,4 +1,4 @@
-import { and, eq, isNull, like, ne } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, like, ne } from "drizzle-orm";
 import {
   BOT_BUILTIN_CATEGORY_ORDER,
   BOT_BUILTIN_COMMANDS,
@@ -10,18 +10,44 @@ import {
   BOT_TIMER_SCHEDULE_LIVE_ELAPSED,
   resolveFirstRunAfterMinutes,
 } from "@lib/bot-timer-schedule";
+import {
+  mapBotCommandAdvancedFields,
+  serializeJsonStringArray,
+} from "./bot-command-fields";
 import { db } from "./db";
 import {
   botActiveChannels,
   botBlacklistTerms,
   botChannelConfig,
+  botCommandUsage,
   botCommands,
   botTimers,
 } from "./schema";
+import type {
+  BotCommandDto,
+  BotCommandUsageDto,
+  BotCommandUsagePeriod,
+  BotCommandUsageStatsDto,
+} from "@server/bot/bot-command.types";
+import {
+  SAFE_TRIGGER,
+  sanitizeResponse,
+} from "@server/bot/sanitize-response";
 
 export function normalizeBotTrigger(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
-  return trimmed.startsWith("!") ? trimmed : `!${trimmed}`;
+  const normalized = trimmed.startsWith("!") ? trimmed : `!${trimmed}`;
+  if (!SAFE_TRIGGER.test(normalized)) {
+    throw new Error("INVALID_BOT_TRIGGER");
+  }
+  return normalized;
+}
+
+function sanitizeStoredResponse(
+  response: string,
+  isAction: boolean
+): string {
+  return sanitizeResponse(response, isAction).trim();
 }
 
 export function normalizeBlacklistTerm(raw: string): string {
@@ -66,7 +92,7 @@ export async function touchBotConfig(streamerId: string): Promise<number> {
   return bumpBotConfigVersion(streamerId);
 }
 
-function mapCommandRow(row: typeof botCommands.$inferSelect) {
+function mapCommandRow(row: typeof botCommands.$inferSelect): BotCommandDto {
   const builtinKey = row.builtinKey ?? null;
   return {
     id: row.id,
@@ -79,8 +105,24 @@ function mapCommandRow(row: typeof botCommands.$inferSelect) {
     isBuiltin: Boolean(builtinKey),
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
+    ...mapBotCommandAdvancedFields(row),
   };
 }
+
+function mapCommandUsageRow(
+  row: typeof botCommandUsage.$inferSelect
+): BotCommandUsageDto {
+  return {
+    id: row.id,
+    commandId: row.commandId,
+    channelId: row.channelId,
+    twitchUserId: row.twitchUserId,
+    twitchLogin: row.twitchLogin ?? null,
+    streamId: row.streamId ?? null,
+    usedAt: row.usedAt,
+  };
+}
+
 
 export async function ensureBuiltinBotCommands(streamerId: string) {
   const now = new Date();
@@ -283,6 +325,196 @@ export async function getBotCommandByTrigger(
   return row ? mapCommandRow(row) : null;
 }
 
+export type BotCommandWriteAdvancedFields = Partial<{
+  userCooldown: number;
+  minPermission: string;
+  bypassCooldownFor: string[];
+  maxUsesPerStream: number;
+  maxUsesPerUserPerStream: number;
+  seasonalLimitType: string;
+  seasonalLimitAmount: number;
+  seasonalLimitDays: number;
+  requiresConfirmation: boolean;
+  isActionResponse: boolean;
+  isCaseSensitive: boolean;
+  aliases: string[];
+  argValidationType: string;
+  argRegexPattern: string | null;
+  argValidationError: string | null;
+  responseType: string;
+  responseAlternatives: string[];
+}>;
+
+function applyAdvancedFieldsToPatch(
+  patch: Partial<typeof botCommands.$inferInsert>,
+  data: BotCommandWriteAdvancedFields
+) {
+  if (data.userCooldown !== undefined) patch.userCooldown = data.userCooldown;
+  if (data.minPermission !== undefined) patch.minPermission = data.minPermission;
+  if (data.bypassCooldownFor !== undefined) {
+    patch.bypassCooldownFor = serializeJsonStringArray(data.bypassCooldownFor);
+  }
+  if (data.maxUsesPerStream !== undefined) {
+    patch.maxUsesPerStream = data.maxUsesPerStream;
+  }
+  if (data.maxUsesPerUserPerStream !== undefined) {
+    patch.maxUsesPerUserPerStream = data.maxUsesPerUserPerStream;
+  }
+  if (data.seasonalLimitType !== undefined) {
+    patch.seasonalLimitType = data.seasonalLimitType;
+  }
+  if (data.seasonalLimitAmount !== undefined) {
+    patch.seasonalLimitAmount = data.seasonalLimitAmount;
+  }
+  if (data.seasonalLimitDays !== undefined) {
+    patch.seasonalLimitDays = data.seasonalLimitDays;
+  }
+  if (data.requiresConfirmation !== undefined) {
+    patch.requiresConfirmation = data.requiresConfirmation;
+  }
+  if (data.isActionResponse !== undefined) {
+    patch.isActionResponse = data.isActionResponse;
+  }
+  if (data.isCaseSensitive !== undefined) {
+    patch.isCaseSensitive = data.isCaseSensitive;
+  }
+  if (data.aliases !== undefined) {
+    patch.aliases = serializeJsonStringArray(
+      data.aliases.map((alias) => normalizeBotTrigger(alias))
+    );
+  }
+  if (data.argValidationType !== undefined) {
+    patch.argValidationType = data.argValidationType;
+  }
+  if (data.argRegexPattern !== undefined) {
+    patch.argRegexPattern = data.argRegexPattern;
+  }
+  if (data.argValidationError !== undefined) {
+    patch.argValidationError = data.argValidationError;
+  }
+  if (data.responseType !== undefined) patch.responseType = data.responseType;
+  if (data.responseAlternatives !== undefined) {
+    patch.responseAlternatives = serializeJsonStringArray(
+      data.responseAlternatives
+    );
+  }
+}
+
+/** Retorna o trigger normalizado em conflito, ou null se livre. */
+export async function findBotCommandTriggerConflict(
+  streamerId: string,
+  triggers: string[],
+  excludeId?: string
+): Promise<string | null> {
+  const normalizedTargets = triggers.map((trigger) => normalizeBotTrigger(trigger));
+  const seen = new Set<string>();
+  for (const target of normalizedTargets) {
+    if (seen.has(target)) return target;
+    seen.add(target);
+  }
+
+  const rows = await db
+    .select()
+    .from(botCommands)
+    .where(
+      and(eq(botCommands.streamerId, streamerId), isNull(botCommands.deletedAt))
+    );
+
+  for (const row of rows) {
+    if (excludeId && row.id === excludeId) continue;
+
+    const advanced = mapBotCommandAdvancedFields(row);
+    const occupied = [
+      normalizeBotTrigger(row.trigger),
+      ...advanced.aliases.map((alias) => normalizeBotTrigger(alias)),
+    ];
+
+    for (const target of normalizedTargets) {
+      if (occupied.includes(target)) return target;
+    }
+  }
+
+  return null;
+}
+
+export async function getBotCommandUsageStats(
+  commandId: string,
+  channelId: string,
+  period: BotCommandUsagePeriod
+): Promise<BotCommandUsageStatsDto> {
+  const empty: BotCommandUsageStatsDto = {
+    commandId,
+    period,
+    totalUses: 0,
+    uniqueUsers: 0,
+    topUsers: [],
+  };
+
+  const conditions = [
+    eq(botCommandUsage.commandId, commandId),
+    eq(botCommandUsage.channelId, channelId),
+  ];
+
+  if (period === "stream") {
+    const latestStream = await db
+      .select()
+      .from(botCommandUsage)
+      .where(
+        and(
+          eq(botCommandUsage.commandId, commandId),
+          eq(botCommandUsage.channelId, channelId),
+          isNotNull(botCommandUsage.streamId)
+        )
+      )
+      .orderBy(desc(botCommandUsage.usedAt))
+      .limit(1);
+
+    const streamId = latestStream[0]?.streamId;
+    if (!streamId) return empty;
+    conditions.push(eq(botCommandUsage.streamId, streamId));
+  } else {
+    const windowMs =
+      period === "day"
+        ? 24 * 60 * 60 * 1000
+        : period === "week"
+          ? 7 * 24 * 60 * 60 * 1000
+          : 30 * 24 * 60 * 60 * 1000;
+    conditions.push(gte(botCommandUsage.usedAt, new Date(Date.now() - windowMs)));
+  }
+
+  const rows = await db
+    .select()
+    .from(botCommandUsage)
+    .where(and(...conditions));
+
+  const userCounts = new Map<string, { login: string; count: number }>();
+  const uniqueUserIds = new Set<string>();
+
+  for (const row of rows) {
+    uniqueUserIds.add(row.twitchUserId);
+    const login = row.twitchLogin?.trim() || row.twitchUserId;
+    const current = userCounts.get(row.twitchUserId);
+    if (current) {
+      current.count += 1;
+    } else {
+      userCounts.set(row.twitchUserId, { login, count: 1 });
+    }
+  }
+
+  const topUsers = [...userCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map(({ login, count }) => ({ login, count }));
+
+  return {
+    commandId,
+    period,
+    totalUses: rows.length,
+    uniqueUsers: uniqueUserIds.size,
+    topUsers,
+  };
+}
+
 export async function createBotCommand(data: {
   id: string;
   streamerId: string;
@@ -290,21 +522,25 @@ export async function createBotCommand(data: {
   response: string;
   cooldownSeconds: number;
   enabled: boolean;
-}) {
+} & BotCommandWriteAdvancedFields) {
   const now = new Date();
-  const [row] = await db
-    .insert(botCommands)
-    .values({
-      id: data.id,
-      streamerId: data.streamerId,
-      trigger: normalizeBotTrigger(data.trigger),
-      response: data.response.trim(),
-      cooldownSeconds: data.cooldownSeconds,
-      enabled: data.enabled,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
+  const values: typeof botCommands.$inferInsert = {
+    id: data.id,
+    streamerId: data.streamerId,
+    trigger: normalizeBotTrigger(data.trigger),
+    response: sanitizeStoredResponse(
+      data.response,
+      data.isActionResponse ?? false
+    ),
+    cooldownSeconds: data.cooldownSeconds,
+    enabled: data.enabled,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  applyAdvancedFieldsToPatch(values, data);
+
+  const [row] = await db.insert(botCommands).values(values).returning();
 
   const configVersion = await touchBotConfig(data.streamerId);
   return { command: mapCommandRow(row), configVersion };
@@ -318,7 +554,8 @@ export async function updateBotCommand(
     response: string;
     cooldownSeconds: number;
     enabled: boolean;
-  }>
+  }> &
+    BotCommandWriteAdvancedFields
 ) {
   const patch: Partial<typeof botCommands.$inferInsert> = {
     updatedAt: new Date(),
@@ -328,7 +565,10 @@ export async function updateBotCommand(
     patch.trigger = normalizeBotTrigger(data.trigger);
   }
   if (data.response !== undefined) {
-    patch.response = data.response.trim();
+    patch.response = sanitizeStoredResponse(
+      data.response,
+      data.isActionResponse ?? false
+    );
   }
   if (data.cooldownSeconds !== undefined) {
     patch.cooldownSeconds = data.cooldownSeconds;
@@ -336,6 +576,8 @@ export async function updateBotCommand(
   if (data.enabled !== undefined) {
     patch.enabled = data.enabled;
   }
+
+  applyAdvancedFieldsToPatch(patch, data);
 
   await db
     .update(botCommands)

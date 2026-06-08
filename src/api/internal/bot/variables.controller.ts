@@ -11,10 +11,11 @@ import {
   DEFAULT_MOD_STREAMER_CONFIRMATION_PROMPT,
 } from "@server/bot/bot-builtin-commands";
 import {
+  BOT_CATEGORY_LABELS,
+  BOT_EXPANDED_VARIABLE_GROUPS,
   BOT_GLOBAL_VARIABLES,
   BOT_RUNTIME_TEMPLATE_VARIABLES,
   BOT_TIMER_VARIABLE_HINT,
-  BOT_CATEGORY_LABELS,
   type BotVariableDefinition,
 } from "@server/bot/bot-variables.catalog";
 import { BOT_COMMAND_ARG_VARIABLES } from "@lib/bot-message-substitution";
@@ -72,6 +73,7 @@ export async function listBotVariablesController(request: NextRequest) {
       counters: dynamicCounters,
       timers: dynamicTimers,
       runtimeTemplateVariables: BOT_RUNTIME_TEMPLATE_VARIABLES,
+      expandedGroups: BOT_EXPANDED_VARIABLE_GROUPS,
       confirmation: {
         defaultPrompt: DEFAULT_MOD_STREAMER_CONFIRMATION_PROMPT,
         acceptWords: [...DEFAULT_CONFIRMATION_ACCEPT_WORDS],

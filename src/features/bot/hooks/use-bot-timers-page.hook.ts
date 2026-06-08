@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { services } from "@services";
 import type { BotTimerRecord } from "@services/entities/bot-timers.services";
 import type { BotVariablesCatalogResponse } from "@services/entities/bot-variables.services";
+import { flattenCatalogVariables } from "@features/bot/utils/bot-variables.utils";
 import type { TwitchChannelEmote } from "@services/entities/bot-emotes.services";
 import type { BotTimerRowState } from "@features/bot/types/bot-timer.types";
 import { createRandomString } from "@utils/factories/create-random-string";
@@ -51,15 +52,7 @@ export function useBotTimersPage() {
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
 
   const allVariables = useMemo(
-    () =>
-      catalog
-        ? [
-            ...catalog.globals,
-            ...(catalog.commandArgs ?? []),
-            ...catalog.counters,
-            ...catalog.timers,
-          ]
-        : [],
+    () => flattenCatalogVariables(catalog),
     [catalog]
   );
 

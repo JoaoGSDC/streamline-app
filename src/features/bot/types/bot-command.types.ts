@@ -1,6 +1,7 @@
+import type { BotCommandAdvancedFields } from "@server/bot/bot-command.types";
 import type { BotBuiltinCategoryId } from "@services/entities/bot-variables.services";
 
-export interface BotCommandRowState {
+export interface BotCommandRowState extends BotCommandAdvancedFields {
   id: string;
   trigger: string;
   response: string;
@@ -15,7 +16,6 @@ export interface BotCommandRowState {
   argsHint?: string | null;
   customizableResponse?: boolean;
   responseTemplate?: string | null;
-  requiresConfirmation?: boolean;
   confirmationPrompt?: string | null;
   runtimeNotes?: string | null;
   externalApiUrlTemplate?: string | null;

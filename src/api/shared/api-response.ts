@@ -12,9 +12,10 @@ export function jsonSuccess<T>(
 export function jsonError(
   message: string,
   status = 500,
-  code = "INTERNAL_ERROR"
+  code = "INTERNAL_ERROR",
+  headers?: HeadersInit
 ): NextResponse {
-  return NextResponse.json({ error: message, code }, { status });
+  return NextResponse.json({ error: message, code }, { status, headers });
 }
 
 export function handleRouteError(error: unknown, fallbackMessage: string): NextResponse {

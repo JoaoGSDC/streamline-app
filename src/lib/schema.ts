@@ -119,9 +119,66 @@ export const botCommands = sqliteTable("bot_commands", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   /** Chave fixa para comandos padrão (discord, redes, …) — não removíveis */
   builtinKey: text("builtin_key"),
+  userCooldown: integer("user_cooldown").notNull().default(0),
+  minPermission: text("min_permission").notNull().default("everyone"),
+  /** JSON array: subscriber | vip | moderator | streamer */
+  bypassCooldownFor: text("bypass_cooldown_for").notNull().default("[]"),
+  maxUsesPerStream: integer("max_uses_per_stream").notNull().default(0),
+  maxUsesPerUserPerStream: integer("max_uses_per_user_per_stream")
+    .notNull()
+    .default(0),
+  seasonalLimitType: text("seasonal_limit_type").notNull().default("none"),
+  seasonalLimitAmount: integer("seasonal_limit_amount").notNull().default(0),
+  seasonalLimitDays: integer("seasonal_limit_days").notNull().default(0),
+  requiresConfirmation: integer("requires_confirmation", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  isActionResponse: integer("is_action_response", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  isCaseSensitive: integer("is_case_sensitive", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  /** JSON array de triggers alternativos */
+  aliases: text("aliases").notNull().default("[]"),
+  argValidationType: text("arg_validation_type").notNull().default("none"),
+  argRegexPattern: text("arg_regex_pattern"),
+  argValidationError: text("arg_validation_error"),
+  responseType: text("response_type").notNull().default("text"),
+  /** JSON array de respostas para response_type = random */
+  responseAlternatives: text("response_alternatives").notNull().default("[]"),
+  useCount: integer("use_count").notNull().default(0),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Auditoria de comandos do bot (CRUD, regex inválida, limites) */
+export const botAuditLog = sqliteTable("bot_audit_log", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  actorUserId: text("actor_user_id").notNull(),
+  actorUsername: text("actor_username").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  action: text("action").notNull(),
+  diff: text("diff"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Rastreamento de uso de comandos (limites por stream / sazonal) */
+export const botCommandUsage = sqliteTable("bot_command_usage", {
+  id: text("id").primaryKey(),
+  commandId: text("command_id")
+    .notNull()
+    .references(() => botCommands.id, { onDelete: "cascade" }),
+  channelId: text("channel_id").notNull(),
+  twitchUserId: text("twitch_user_id").notNull(),
+  twitchLogin: text("twitch_login"),
+  streamId: text("stream_id"),
+  usedAt: integer("used_at", { mode: "timestamp" }).notNull(),
 });
 
 /** Timers automáticos de mensagens no chat */

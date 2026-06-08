@@ -45,7 +45,7 @@ export default function BotVariablesPage() {
       {loading ? (
         <Skeleton className="h-64 w-full rounded-lg" />
       ) : (
-        <BotVariablesReference catalog={catalog} defaultExpanded />
+        <BotVariablesReference catalog={catalog} layout="page" />
       )}
 
       {catalog && (
