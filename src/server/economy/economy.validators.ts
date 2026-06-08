@@ -5,6 +5,18 @@ export function formatZodErrorMessages(error: z.ZodError): string {
   return error.issues.map((issue: ZodIssue) => issue.message).join("; ");
 }
 
+const optionalEconomyReasonSchema = z
+  .string()
+  .max(500)
+  .optional()
+  .transform((value) => value?.trim() || "Ajuste manual pelo painel");
+
+const optionalRemoveReasonSchema = z
+  .string()
+  .max(500)
+  .optional()
+  .transform((value) => value?.trim() || "Removido da lista pelo painel");
+
 const levelDefinitionSchema = z.object({
   level: z.coerce.number().int().min(1).max(999),
   xpRequired: z.coerce.number().int().min(0),
@@ -50,7 +62,7 @@ export const economyUserAdjustSchema = z.object({
   twitchUsername: z.string().min(1).max(64),
   displayName: z.string().min(1).max(64),
   amount: z.coerce.number().int().min(1).max(10_000_000),
-  reason: z.string().min(3, "Informe um motivo com pelo menos 3 caracteres").max(500),
+  reason: optionalEconomyReasonSchema,
 });
 
 export const economyUserResetSchema = z.object({
@@ -59,7 +71,7 @@ export const economyUserResetSchema = z.object({
   displayName: z.string().min(1).max(64),
   resetPoints: z.boolean().optional().default(false),
   resetXp: z.boolean().optional().default(false),
-  reason: z.string().min(3, "Informe um motivo com pelo menos 3 caracteres").max(500),
+  reason: optionalEconomyReasonSchema,
 });
 
 export const economyResetAllPointsSchema = z.object({
@@ -82,7 +94,7 @@ export const economyRemoveViewerSchema = z.object({
   twitchUserId: z.string().min(1),
   twitchUsername: z.string().min(1).max(64),
   displayName: z.string().min(1).max(64),
-  reason: z.string().min(3, "Informe um motivo com pelo menos 3 caracteres").max(500),
+  reason: optionalRemoveReasonSchema,
 });
 
 export const economySetPointsSchema = z.object({
@@ -90,7 +102,7 @@ export const economySetPointsSchema = z.object({
   twitchUsername: z.string().min(1).max(64),
   displayName: z.string().min(1).max(64),
   points: z.coerce.number().int().min(0).max(10_000_000),
-  reason: z.string().min(3, "Informe um motivo com pelo menos 3 caracteres").max(500),
+  reason: optionalEconomyReasonSchema,
 });
 
 export const botAdjustPointsSchema = z.object({

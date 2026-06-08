@@ -21,7 +21,7 @@ export interface EconomyUserAdjustPayload {
   twitchUsername: string;
   displayName: string;
   amount: number;
-  reason: string;
+  reason?: string;
   action: "add" | "remove";
 }
 
@@ -31,7 +31,7 @@ export interface EconomyUserResetPayload {
   displayName: string;
   resetPoints?: boolean;
   resetXp?: boolean;
-  reason: string;
+  reason?: string;
 }
 
 export const economy = {
@@ -141,7 +141,7 @@ export const economy = {
     twitchUsername: string;
     displayName: string;
     points: number;
-    reason: string;
+    reason?: string;
   }): Promise<ChannelViewerEconomyDto> => {
     const response = await httpClient.post<ChannelViewerEconomyDto>(
       ENDPOINTS.Internal.Economy.SetPoints,
@@ -175,7 +175,7 @@ export const economy = {
     twitchUserId: string;
     twitchUsername: string;
     displayName: string;
-    reason: string;
+    reason?: string;
   }): Promise<void> => {
     await httpClient.post(ENDPOINTS.Internal.Economy.RemoveUser, payload);
   },

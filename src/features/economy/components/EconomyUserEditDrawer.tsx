@@ -12,12 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { services } from "@services/index";
 import type { ChannelViewerEconomyDto } from "@server/economy/economy.types";
 
 const QUICK_ADJUST = [-100, -10, 10, 100] as const;
-const MIN_REASON_LENGTH = 3;
 
 interface EconomyUserEditDrawerProps {
   open: boolean;
@@ -30,14 +28,12 @@ interface EconomyUserEditDrawerProps {
     originalCoins: number;
     coins: number;
     resetXp: boolean;
-    reason: string;
   }) => Promise<boolean>;
   onRemove?: (payload: {
     viewerId: string;
     twitchUserId: string;
     twitchUsername: string;
     displayName: string;
-    reason: string;
   }) => Promise<boolean>;
 }
 
@@ -54,7 +50,6 @@ export function EconomyUserEditDrawer({
   const [coins, setCoins] = useState(0);
   const [baselineCoins, setBaselineCoins] = useState(0);
   const [resetXp, setResetXp] = useState(false);
-  const [reason, setReason] = useState("");
   const [loadingCoins, setLoadingCoins] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -65,7 +60,6 @@ export function EconomyUserEditDrawer({
     setPoints(initialPoints);
     setBaselinePoints(initialPoints);
     setResetXp(false);
-    setReason("");
     setConfirmRemove(false);
 
     let cancelled = false;
@@ -95,12 +89,10 @@ export function EconomyUserEditDrawer({
 
   if (!user) return null;
 
-  const reasonOk = reason.trim().length >= MIN_REASON_LENGTH;
   const hasPointChange = points !== baselinePoints;
   const hasCoinsChange = !loadingCoins && coins !== baselineCoins;
   const hasChanges = hasPointChange || hasCoinsChange || resetXp;
-  const canApply = reasonOk && hasChanges;
-  const canRemove = reasonOk && Boolean(onRemove);
+  const canApply = hasChanges;
 
   const handleQuickAdjust = (delta: number) => {
     setPoints((current) => Math.max(0, current + delta));
@@ -114,19 +106,17 @@ export function EconomyUserEditDrawer({
       originalCoins: baselineCoins,
       coins,
       resetXp,
-      reason: reason.trim(),
     });
     if (ok) onOpenChange(false);
   };
 
   const handleRemove = async () => {
-    if (!onRemove || !canRemove || saving) return;
+    if (!onRemove || saving) return;
     const ok = await onRemove({
       viewerId: user.id,
       twitchUserId: user.twitchUserId,
       twitchUsername: user.twitchUsername,
       displayName: user.displayName,
-      reason: reason.trim(),
     });
     if (ok) onOpenChange(false);
   };
@@ -210,33 +200,11 @@ export function EconomyUserEditDrawer({
             Zerar XP junto
           </label>
 
-          <div className="space-y-2">
-            <Label htmlFor="edit-reason">
-              Motivo da alteração{" "}
-              <span className="text-caption">
-                (mín. {MIN_REASON_LENGTH} caracteres)
-              </span>
-            </Label>
-            <Textarea
-              id="edit-reason"
-              rows={3}
-              value={reason}
-              disabled={saving}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="Descreva o motivo desta alteração…"
-            />
-            {!reasonOk && hasChanges ? (
-              <p className="text-xs text-destructive/80">
-                Informe um motivo com pelo menos {MIN_REASON_LENGTH} caracteres
-                para salvar ou remover.
-              </p>
-            ) : null}
-            {reasonOk && !hasChanges ? (
-              <p className="text-xs text-muted-foreground">
-                Altere pontos, coins ou marque zerar XP para habilitar o salvar.
-              </p>
-            ) : null}
-          </div>
+          {!hasChanges ? (
+            <p className="text-xs text-muted-foreground">
+              Altere pontos, coins ou marque zerar XP para habilitar o salvar.
+            </p>
+          ) : null}
 
           {onRemove ? (
             <div className="border-t border-outline-variant/20 pt-4">
@@ -263,7 +231,7 @@ export function EconomyUserEditDrawer({
                       type="button"
                       variant="destructive"
                       size="sm"
-                      disabled={saving || !canRemove}
+                      disabled={saving}
                       onClick={() => void handleRemove()}
                     >
                       {saving ? "Removendo…" : "Confirmar remoção"}

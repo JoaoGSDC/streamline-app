@@ -295,7 +295,6 @@ export function useEconomyUsersPage() {
       twitchUserId: string;
       twitchUsername: string;
       displayName: string;
-      reason: string;
     }): Promise<boolean> => {
       setSavingUserIds((prev) => new Set(prev).add(payload.viewerId));
       try {
@@ -335,21 +334,12 @@ export function useEconomyUsersPage() {
       originalCoins: number;
       coins: number;
       resetXp: boolean;
-      reason: string;
     }): Promise<boolean> => {
-      const {
-        user,
-        points,
-        originalCoins,
-        coins,
-        resetXp,
-        reason,
-      } = payload;
+      const { user, points, originalCoins, coins, resetXp } = payload;
       const base = {
         twitchUserId: user.twitchUserId,
         twitchUsername: user.twitchUsername,
         displayName: user.displayName,
-        reason,
       };
 
       const userId = findUserId(user.twitchUserId);
