@@ -1,5 +1,6 @@
 import {
   getFeature,
+  PANEL_FEATURES,
   planSatisfies,
   type PlanTier,
 } from "@/config/panel-features";
@@ -71,4 +72,27 @@ export function resolveUserChoice(
   if (!planSatisfies(userPlan, feature.requiredPlan)) return false;
 
   return featureKey in overrides ? overrides[featureKey] : feature.defaultEnabled;
+}
+
+export type ResolvedFeatureMap = Record<
+  string,
+  ResolvedFeatureStateResult & { userEnabled: boolean }
+>;
+
+/** Pure resolver — safe for client components (no database imports). */
+export function buildResolvedFeatures(
+  plan: PlanTier,
+  overrides: Record<string, boolean>
+): ResolvedFeatureMap {
+  const features: ResolvedFeatureMap = {};
+
+  for (const feature of PANEL_FEATURES) {
+    const state = resolveFeatureState(feature.key, plan, overrides);
+    features[feature.key] = {
+      ...state,
+      userEnabled: resolveUserChoice(feature.key, plan, overrides),
+    };
+  }
+
+  return features;
 }

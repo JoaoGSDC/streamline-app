@@ -4,12 +4,12 @@ import {
   canManageStreamer,
   parseSessionFromCookie,
 } from "@lib/admin-auth";
+import { getPanelConfigForStreamer } from "@server/panel/panel-config.service";
+import { PANEL_FEATURES, type PlanTier } from "@/config/panel-features";
 import {
   buildResolvedFeatures,
-  getPanelConfigForStreamer,
-} from "@server/panel/panel-config.service";
-import { PANEL_FEATURES, type PlanTier } from "@/config/panel-features";
-import type { ResolvedFeatureStateResult } from "@/types/panel-config";
+  type ResolvedFeatureStateResult,
+} from "@/types/panel-config";
 
 export interface PanelConfigInitialData {
   streamerId: string;

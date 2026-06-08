@@ -12,8 +12,8 @@ import {
 import { compactOverrides } from "@server/panel/resolve-panel-config";
 import { resolveStreamerPlan } from "@server/panel/streamer-plan";
 import {
+  buildResolvedFeatures,
   resolveFeatureState,
-  resolveUserChoice,
   type ResolvedFeatureStateResult,
 } from "@/types/panel-config";
 
@@ -55,22 +55,7 @@ export async function loadPanelConfigContext(
   };
 }
 
-export function buildResolvedFeatures(
-  plan: PlanTier,
-  overrides: Record<string, boolean>
-): PanelConfigGetResponse["features"] {
-  const features: PanelConfigGetResponse["features"] = {};
-
-  for (const feature of PANEL_FEATURES) {
-    const state = resolveFeatureState(feature.key, plan, overrides);
-    features[feature.key] = {
-      ...state,
-      userEnabled: resolveUserChoice(feature.key, plan, overrides),
-    };
-  }
-
-  return features;
-}
+export { buildResolvedFeatures };
 
 export async function getPanelConfigForStreamer(
   streamerId: string

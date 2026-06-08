@@ -17,8 +17,10 @@ import {
   type PanelFeature,
   type PlanTier,
 } from "@/config/panel-features";
-import { buildResolvedFeatures } from "@server/panel/panel-config.service";
-import type { ResolvedFeatureStateResult } from "@/types/panel-config";
+import {
+  buildResolvedFeatures,
+  type ResolvedFeatureStateResult,
+} from "@/types/panel-config";
 import { ENDPOINTS } from "@services/paths";
 
 export type ResolvedFeatureState = ResolvedFeatureStateResult & {
