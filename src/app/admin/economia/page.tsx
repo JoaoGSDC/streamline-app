@@ -110,10 +110,9 @@ export default function EconomyOverviewPage() {
               <code>streamers.id</code> no Turso.
             </p>
             <p className="text-muted-foreground">
-              No servidor do bot, configure{" "}
-              <code>STREAMLINE_APP_URL</code> (ou <code>STREAMINHUB_API_URL</code>) e{" "}
-              <code>BOT_SERVICE_TOKEN</code> — o mesmo valor definido no{" "}
-              <code>.env</code> deste app.
+              No servidor do bot, use o mesmo <code>DATABASE_URL</code> do Turso
+              (padrão <code>ECONOMY_SOURCE=db</code>). O bot grava pontos direto no
+              banco — o streamline-app não precisa estar online.
             </p>
             {!overview?.enabled && (
               <p className="text-amber-600">

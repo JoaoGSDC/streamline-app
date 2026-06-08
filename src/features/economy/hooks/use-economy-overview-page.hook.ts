@@ -46,7 +46,7 @@ export function useEconomyOverviewPage() {
       toast({
         title: enabled ? "Pontuação ativada" : "Pontuação desativada",
         description: enabled
-          ? "Pontos e níveis foram habilitados. O bot precisa de STREAMLINE_APP_URL + BOT_SERVICE_TOKEN no .env."
+          ? "Pontos e níveis foram habilitados. O bot usa o mesmo Turso (DATABASE_URL) — não precisa do app online."
           : "Nenhum ponto ou XP novo será distribuído enquanto estiver desligado.",
       });
       await load();
