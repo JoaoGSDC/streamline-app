@@ -9,6 +9,7 @@ import {
   getEconomyOverview,
   getViewerBalance,
   listChannelViewers,
+  removeChannelViewer,
   resetAllChannelPoints,
   resetViewerEconomy,
   setViewerPoints,
@@ -18,6 +19,7 @@ import {
 } from "@lib/economy-db-queries";
 import {
   economyAddViewerSchema,
+  economyRemoveViewerSchema,
   economyResetAllPointsSchema,
   economySetPointsSchema,
   economyUserAdjustSchema,
@@ -402,6 +404,38 @@ export async function postEconomyResetUserController(request: NextRequest) {
     return jsonSuccess(viewer);
   } catch (error) {
     return handleRouteError(error, "Falha ao resetar usuário");
+  }
+}
+
+export async function postEconomyRemoveUserController(request: NextRequest) {
+  try {
+    const resolved = await resolveEconomyOwnerStreamerId(request);
+    if ("error" in resolved) {
+      return jsonError(resolved.error, resolved.status, resolved.code);
+    }
+
+    const body = await request.json();
+    const parsed = economyRemoveViewerSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    await removeChannelViewer({
+      auditId: createRandomString(16),
+      streamerId: resolved.streamerId,
+      actorUserId: resolved.user.id,
+      actorUsername:
+        resolved.user.twitchUsername ?? resolved.user.name ?? resolved.user.id,
+      viewerId: parsed.data.viewerId,
+      twitchUserId: parsed.data.twitchUserId,
+      twitchUsername: parsed.data.twitchUsername,
+      displayName: parsed.data.displayName,
+      reason: parsed.data.reason,
+    });
+
+    return jsonSuccess({ success: true });
+  } catch (error) {
+    return handleRouteError(error, "Falha ao remover usuário da lista");
   }
 }
 

@@ -1051,6 +1051,46 @@ export async function resetViewerEconomy(input: {
   );
 }
 
+export async function removeChannelViewer(input: {
+  auditId: string;
+  streamerId: string;
+  actorUserId: string;
+  actorUsername: string;
+  viewerId: string;
+  twitchUserId: string;
+  twitchUsername: string;
+  displayName: string;
+  reason: string;
+}): Promise<void> {
+  const viewer = await getViewerRowById(input.viewerId);
+  if (!viewer || viewer.streamerId !== input.streamerId) {
+    throw new Error("Usuário não encontrado neste canal");
+  }
+
+  await recordAuditLog({
+    id: input.auditId,
+    streamerId: input.streamerId,
+    actorUserId: input.actorUserId,
+    actorUsername: input.actorUsername,
+    targetTwitchUserId: input.twitchUserId,
+    targetTwitchUsername: input.twitchUsername,
+    action: "remove_viewer",
+    currencyType: "points",
+    previousValue: viewer.points,
+    newValue: 0,
+    reason: input.reason,
+  });
+
+  await db
+    .delete(channelViewerEconomy)
+    .where(
+      and(
+        eq(channelViewerEconomy.id, input.viewerId),
+        eq(channelViewerEconomy.streamerId, input.streamerId)
+      )
+    );
+}
+
 export async function resetAllChannelPoints(input: {
   auditId: string;
   streamerId: string;

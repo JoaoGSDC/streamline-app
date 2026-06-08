@@ -77,6 +77,14 @@ export const economyAddViewerSchema = z.object({
   initialPoints: z.coerce.number().int().min(0).max(10_000_000).optional().default(0),
 });
 
+export const economyRemoveViewerSchema = z.object({
+  viewerId: z.string().min(1),
+  twitchUserId: z.string().min(1),
+  twitchUsername: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(64),
+  reason: z.string().min(3, "Informe um motivo com pelo menos 3 caracteres").max(500),
+});
+
 export const economySetPointsSchema = z.object({
   twitchUserId: z.string().min(1),
   twitchUsername: z.string().min(1).max(64),

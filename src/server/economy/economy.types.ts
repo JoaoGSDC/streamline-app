@@ -20,7 +20,8 @@ export type EconomyAuditAction =
   | "remove_coins"
   | "reset_points"
   | "reset_xp"
-  | "reset_all_channel_points";
+  | "reset_all_channel_points"
+  | "remove_viewer";
 
 export type EconomyCurrencyType = "points" | "coins" | "xp";
 

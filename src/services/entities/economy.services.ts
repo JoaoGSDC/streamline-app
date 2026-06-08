@@ -170,6 +170,16 @@ export const economy = {
     return response.data;
   },
 
+  removeUser: async (payload: {
+    viewerId: string;
+    twitchUserId: string;
+    twitchUsername: string;
+    displayName: string;
+    reason: string;
+  }): Promise<void> => {
+    await httpClient.post(ENDPOINTS.Internal.Economy.RemoveUser, payload);
+  },
+
   resetAllPoints: async (payload: {
     reason: string;
     confirmPhrase: "RESETAR TODOS OS PONTOS";

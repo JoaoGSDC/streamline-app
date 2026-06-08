@@ -289,6 +289,45 @@ export function useEconomyUsersPage() {
     [savingUserIds]
   );
 
+  const removeUser = useCallback(
+    async (payload: {
+      viewerId: string;
+      twitchUserId: string;
+      twitchUsername: string;
+      displayName: string;
+      reason: string;
+    }): Promise<boolean> => {
+      setSavingUserIds((prev) => new Set(prev).add(payload.viewerId));
+      try {
+        await services.economy.removeUser(payload);
+        setItems((prev) => prev.filter((item) => item.id !== payload.viewerId));
+        setTotal((prev) => Math.max(0, prev - 1));
+        toast({
+          title: "Usuário removido",
+          description: `@${payload.twitchUsername} foi removido da lista do canal.`,
+        });
+        return true;
+      } catch (error) {
+        toast({
+          title: "Erro ao remover usuário",
+          description: getApiErrorMessage(
+            error,
+            "Verifique os dados e tente novamente."
+          ),
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        setSavingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(payload.viewerId);
+          return next;
+        });
+      }
+    },
+    [toast]
+  );
+
   const applyUserEdit = useCallback(
     async (payload: {
       user: ChannelViewerEconomyDto;
@@ -397,6 +436,7 @@ export function useEconomyUsersPage() {
     resetUser,
     resetAllPoints,
     applyUserEdit,
+    removeUser,
     reload: load,
   };
 }

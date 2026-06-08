@@ -65,6 +65,7 @@ export const ENDPOINTS = {
       SetPoints: "/api/internal/economy/users/set-points",
       AdjustCoins: "/api/internal/economy/users/adjust-coins",
       ResetUser: "/api/internal/economy/users/reset",
+      RemoveUser: "/api/internal/economy/users/remove",
       ResetAllPoints: "/api/internal/economy/users/reset-all-points",
       InternalConfig: (streamerId: string) =>
         `/api/internal/economy/internal/channels/${streamerId}/config`,

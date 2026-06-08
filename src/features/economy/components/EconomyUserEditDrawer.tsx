@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +17,7 @@ import { services } from "@services/index";
 import type { ChannelViewerEconomyDto } from "@server/economy/economy.types";
 
 const QUICK_ADJUST = [-100, -10, 10, 100] as const;
-const MIN_REASON_LENGTH = 10;
+const MIN_REASON_LENGTH = 3;
 
 interface EconomyUserEditDrawerProps {
   open: boolean;
@@ -31,6 +32,13 @@ interface EconomyUserEditDrawerProps {
     resetXp: boolean;
     reason: string;
   }) => Promise<boolean>;
+  onRemove?: (payload: {
+    viewerId: string;
+    twitchUserId: string;
+    twitchUsername: string;
+    displayName: string;
+    reason: string;
+  }) => Promise<boolean>;
 }
 
 export function EconomyUserEditDrawer({
@@ -39,21 +47,26 @@ export function EconomyUserEditDrawer({
   saving = false,
   onOpenChange,
   onApply,
+  onRemove,
 }: EconomyUserEditDrawerProps) {
   const [points, setPoints] = useState(0);
-  const [exactPoints, setExactPoints] = useState("");
+  const [baselinePoints, setBaselinePoints] = useState(0);
   const [coins, setCoins] = useState(0);
-  const [originalCoins, setOriginalCoins] = useState(0);
+  const [baselineCoins, setBaselineCoins] = useState(0);
   const [resetXp, setResetXp] = useState(false);
   const [reason, setReason] = useState("");
   const [loadingCoins, setLoadingCoins] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   useEffect(() => {
     if (!user || !open) return;
-    setPoints(user.points);
-    setExactPoints(String(user.points));
+
+    const initialPoints = Number(user.points) || 0;
+    setPoints(initialPoints);
+    setBaselinePoints(initialPoints);
     setResetXp(false);
     setReason("");
+    setConfirmRemove(false);
 
     let cancelled = false;
     setLoadingCoins(true);
@@ -63,12 +76,12 @@ export function EconomyUserEditDrawer({
         if (cancelled) return;
         const loaded = balance.coins?.coins ?? 0;
         setCoins(loaded);
-        setOriginalCoins(loaded);
+        setBaselineCoins(loaded);
       })
       .catch(() => {
         if (!cancelled) {
           setCoins(0);
-          setOriginalCoins(0);
+          setBaselineCoins(0);
         }
       })
       .finally(() => {
@@ -78,42 +91,41 @@ export function EconomyUserEditDrawer({
     return () => {
       cancelled = true;
     };
-  }, [user, open]);
+  }, [user?.id, open]);
 
   if (!user) return null;
 
   const reasonOk = reason.trim().length >= MIN_REASON_LENGTH;
-  const exactChanged =
-    exactPoints.trim() !== "" &&
-    Math.max(0, Number(exactPoints) || 0) !== user.points;
-  const targetPoints = exactChanged
-    ? Math.max(0, Number(exactPoints) || 0)
-    : points;
-  const hasPointChange = targetPoints !== user.points;
-  const hasCoinsChange = coins !== originalCoins;
-  const canApply =
-    reasonOk && (hasPointChange || hasCoinsChange || resetXp);
-
-  const applyExact = (value: string) => {
-    setExactPoints(value);
-    const parsed = Math.max(0, Number(value) || 0);
-    setPoints(parsed);
-  };
+  const hasPointChange = points !== baselinePoints;
+  const hasCoinsChange = !loadingCoins && coins !== baselineCoins;
+  const hasChanges = hasPointChange || hasCoinsChange || resetXp;
+  const canApply = reasonOk && hasChanges;
+  const canRemove = reasonOk && Boolean(onRemove);
 
   const handleQuickAdjust = (delta: number) => {
-    const next = Math.max(0, points + delta);
-    setPoints(next);
-    setExactPoints(String(next));
+    setPoints((current) => Math.max(0, current + delta));
   };
 
   const handleApply = async () => {
     if (!canApply || saving) return;
     const ok = await onApply({
       user,
-      points: targetPoints,
-      originalCoins,
+      points,
+      originalCoins: baselineCoins,
       coins,
       resetXp,
+      reason: reason.trim(),
+    });
+    if (ok) onOpenChange(false);
+  };
+
+  const handleRemove = async () => {
+    if (!onRemove || !canRemove || saving) return;
+    const ok = await onRemove({
+      viewerId: user.id,
+      twitchUserId: user.twitchUserId,
+      twitchUsername: user.twitchUsername,
+      displayName: user.displayName,
       reason: reason.trim(),
     });
     if (ok) onOpenChange(false);
@@ -161,27 +173,13 @@ export function EconomyUserEditDrawer({
               min={0}
               value={points}
               disabled={saving}
-              onChange={(e) => {
-                const next = Math.max(0, Number(e.target.value) || 0);
-                setPoints(next);
-                setExactPoints(String(next));
-              }}
+              onChange={(event) =>
+                setPoints(Math.max(0, Number(event.target.value) || 0))
+              }
             />
-            <p className="text-caption">
-              Saldo atual: {user.points.toLocaleString("pt-BR")} pts
+            <p className="text-caption text-muted-foreground">
+              Saldo atual: {baselinePoints.toLocaleString("pt-BR")} pts
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-exact-points">Definir exatamente para</Label>
-            <Input
-              id="edit-exact-points"
-              type="number"
-              min={0}
-              value={exactPoints}
-              disabled={saving}
-              onChange={(e) => applyExact(e.target.value)}
-            />
           </div>
 
           <div className="space-y-2">
@@ -192,11 +190,11 @@ export function EconomyUserEditDrawer({
               min={0}
               value={coins}
               disabled={saving || loadingCoins}
-              onChange={(e) =>
-                setCoins(Math.max(0, Number(e.target.value) || 0))
+              onChange={(event) =>
+                setCoins(Math.max(0, Number(event.target.value) || 0))
               }
             />
-            <p className="text-caption">
+            <p className="text-caption text-muted-foreground">
               Coins são da conta na plataforma, não do canal.
             </p>
           </div>
@@ -205,7 +203,7 @@ export function EconomyUserEditDrawer({
             <input
               type="checkbox"
               checked={resetXp}
-              onChange={(e) => setResetXp(e.target.checked)}
+              onChange={(event) => setResetXp(event.target.checked)}
               disabled={saving}
               className="rounded border-input"
             />
@@ -215,17 +213,78 @@ export function EconomyUserEditDrawer({
           <div className="space-y-2">
             <Label htmlFor="edit-reason">
               Motivo da alteração{" "}
-              <span className="text-caption">(mín. {MIN_REASON_LENGTH} caracteres)</span>
+              <span className="text-caption">
+                (mín. {MIN_REASON_LENGTH} caracteres)
+              </span>
             </Label>
             <Textarea
               id="edit-reason"
               rows={3}
               value={reason}
               disabled={saving}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(event) => setReason(event.target.value)}
               placeholder="Descreva o motivo desta alteração…"
             />
+            {!reasonOk && hasChanges ? (
+              <p className="text-xs text-destructive/80">
+                Informe um motivo com pelo menos {MIN_REASON_LENGTH} caracteres
+                para salvar ou remover.
+              </p>
+            ) : null}
+            {reasonOk && !hasChanges ? (
+              <p className="text-xs text-muted-foreground">
+                Altere pontos, coins ou marque zerar XP para habilitar o salvar.
+              </p>
+            ) : null}
           </div>
+
+          {onRemove ? (
+            <div className="border-t border-outline-variant/20 pt-4">
+              {confirmRemove ? (
+                <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                  <p className="text-sm text-foreground">
+                    Remover @{user.twitchUsername} da lista deste canal?
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    O histórico de pontuação do canal será excluído. Coins da
+                    plataforma não são afetadas.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => setConfirmRemove(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={saving || !canRemove}
+                      onClick={() => void handleRemove()}
+                    >
+                      {saving ? "Removendo…" : "Confirmar remoção"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={saving}
+                  onClick={() => setConfirmRemove(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir da lista
+                </Button>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <SheetFooter className="mt-auto gap-2 border-t border-outline-variant/20 px-6 py-4">

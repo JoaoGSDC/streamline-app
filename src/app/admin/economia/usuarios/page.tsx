@@ -55,6 +55,7 @@ export default function EconomyUsersPage() {
     excludeLogins,
     addViewer,
     applyUserEdit,
+    removeUser,
     resetAllPoints,
   } = useEconomyUsersPage();
 
@@ -203,6 +204,7 @@ export default function EconomyUsersPage() {
           if (!open) setEditUser(null);
         }}
         onApply={applyUserEdit}
+        onRemove={removeUser}
       />
 
       <Dialog open={resetAllOpen} onOpenChange={setResetAllOpen}>
