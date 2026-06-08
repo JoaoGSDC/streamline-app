@@ -126,14 +126,14 @@ export function resolveAdminBreadcrumbs(
 ): AdminBreadcrumbItem[] {
   const path = pathname.split("?")[0];
 
-  for (const module of ADMIN_MODULES) {
-    if (!path.startsWith(module.prefix)) continue;
+  for (const adminModule of ADMIN_MODULES) {
+    if (!path.startsWith(adminModule.prefix)) continue;
 
-    const child = module.children.find((item) => item.match(path));
-    if (!child || child.href === module.href) return [];
+    const child = adminModule.children.find((item) => item.match(path));
+    if (!child || child.href === adminModule.href) return [];
 
     return [
-      { label: module.label, href: module.href },
+      { label: adminModule.label, href: adminModule.href },
       { label: child.label },
     ];
   }
@@ -146,9 +146,9 @@ export function getAdminModuleChildren(
 ): AdminNavChild[] | null {
   const path = pathname.split("?")[0];
 
-  for (const module of ADMIN_MODULES) {
-    if (path.startsWith(module.prefix)) {
-      return module.children;
+  for (const adminModule of ADMIN_MODULES) {
+    if (path.startsWith(adminModule.prefix)) {
+      return adminModule.children;
     }
   }
 
