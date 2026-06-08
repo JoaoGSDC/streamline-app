@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAdminContext } from "@/components/admin/AdminProvider";
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
 import { BotActivationProvider } from "@features/bot/context/BotActivationContext";
 import { BotActivationPanel } from "@features/bot/components/BotActivationPanel";
 import { BotModuleGate } from "@features/bot/components/BotModuleGate";
@@ -28,11 +29,13 @@ export default function BotModuleLayout({
   }
 
   return (
-    <BotActivationProvider>
-      <div className="admin-page-stack">
-        <BotActivationPanel />
-        <BotModuleGate>{children}</BotModuleGate>
-      </div>
-    </BotActivationProvider>
+    <FeatureGuard featureKey="bot" redirectTo="/admin/feature-disabled">
+      <BotActivationProvider>
+        <div className="admin-page-stack">
+          <BotActivationPanel />
+          <BotModuleGate>{children}</BotModuleGate>
+        </div>
+      </BotActivationProvider>
+    </FeatureGuard>
   );
 }

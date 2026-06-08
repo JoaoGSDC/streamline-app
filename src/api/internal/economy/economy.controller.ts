@@ -28,6 +28,8 @@ import {
   updateEconomyPointsSchema,
 } from "@server/economy/economy.validators";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
+import { assertFeatureAccess } from "@lib/plan";
+import { assertFeatureEnabledForStreamer } from "@server/panel/assert-feature-enabled";
 import { createRandomString } from "@utils/factories/create-random-string";
 import { twitchServerService } from "@server/twitch/twitch.service";
 
@@ -105,6 +107,9 @@ export async function patchEconomyLevelsController(request: NextRequest) {
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
+
+    await assertFeatureAccess(resolved.streamerId, "economy.levels");
+    await assertFeatureEnabledForStreamer(resolved.streamerId, "economy.levels");
 
     const body = await request.json();
     const parsed = updateEconomyLevelsSchema.safeParse(body);

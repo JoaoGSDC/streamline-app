@@ -12,6 +12,10 @@ import {
   resolveLinkPageConfig,
 } from "./link-page-config";
 import type { LinkPageConfig } from "@/types/link-page";
+import {
+  hasPremiumAccessFromPlan,
+  resolveStreamerPlan,
+} from "@server/panel/streamer-plan";
 
 export type { StreamerSocialLink } from "@/lib/streamer-social";
 import type { StreamerSocialLink } from "@/lib/streamer-social";
@@ -56,6 +60,8 @@ function parseStreamerRow(row: typeof streamers.$inferSelect) {
     linkPageConfig,
     partner: Boolean(row.partner),
     premium: Boolean(row.premium),
+    plan: row.plan ?? "free",
+    planExpiresAt: row.planExpiresAt ?? null,
   };
 }
 
@@ -123,8 +129,10 @@ export async function upsertStreamerFromTwitch(data: {
 export function hasPremiumAccess(streamer: {
   partner?: boolean;
   premium?: boolean;
+  plan?: string | null;
+  planExpiresAt?: Date | null;
 }): boolean {
-  return Boolean(streamer.partner || streamer.premium);
+  return hasPremiumAccessFromPlan(resolveStreamerPlan(streamer));
 }
 
 export async function getStreamerById(id: string) {

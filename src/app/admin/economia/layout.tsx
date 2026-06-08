@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAdminContext } from "@/components/admin/AdminProvider";
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
 
 export default function EconomyModuleLayout({
   children,
@@ -24,5 +25,9 @@ export default function EconomyModuleLayout({
     return null;
   }
 
-  return <div className="admin-page-stack">{children}</div>;
+  return (
+    <FeatureGuard featureKey="economy" redirectTo="/admin/feature-disabled">
+      <div className="admin-page-stack">{children}</div>
+    </FeatureGuard>
+  );
 }

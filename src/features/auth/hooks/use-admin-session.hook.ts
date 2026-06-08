@@ -80,6 +80,9 @@ export function useAdminSession() {
   const switchChannel = useCallback(async (streamerId: string) => {
     const nextActingAs = await services.auth.admin.channels.switchTo(streamerId);
     setActingAs(mapChannelDto(nextActingAs));
+    window.dispatchEvent(
+      new CustomEvent("admin:acting-as-changed", { detail: { streamerId } })
+    );
   }, []);
 
   const refreshChannels = useCallback(async () => {

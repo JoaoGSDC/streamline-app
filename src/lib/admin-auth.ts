@@ -15,6 +15,10 @@ export interface SessionUser {
 
 export function parseSessionUser(request: NextRequest): SessionUser | null {
   const raw = request.cookies.get("twitch_session")?.value;
+  return parseSessionFromCookie(raw);
+}
+
+export function parseSessionFromCookie(raw: string | undefined): SessionUser | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as SessionUser;

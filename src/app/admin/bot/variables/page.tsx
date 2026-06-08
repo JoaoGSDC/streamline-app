@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { services } from "@services";
 import type { BotVariablesCatalogResponse } from "@services/entities/bot-variables.services";
 import { BotVariablesReference } from "@features/bot/components/BotVariablesReference";
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
 
 export default function BotVariablesPage() {
   const [catalog, setCatalog] = useState<BotVariablesCatalogResponse | null>(null);
@@ -29,6 +30,7 @@ export default function BotVariablesPage() {
   }, []);
 
   return (
+    <FeatureGuard featureKey="bot.variables" redirectTo="/admin/bot">
     <div className="space-y-6">
       <AdminPageHeader
         title="Variáveis do Bot"
@@ -69,5 +71,6 @@ export default function BotVariablesPage() {
         </div>
       )}
     </div>
+    </FeatureGuard>
   );
 }

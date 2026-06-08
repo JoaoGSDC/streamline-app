@@ -20,6 +20,7 @@ import {
 } from "@server/bot/bot-variables.catalog";
 import { BOT_COMMAND_ARG_VARIABLES } from "@lib/bot-message-substitution";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
+import { assertFeatureEnabledForStreamer } from "@server/panel/assert-feature-enabled";
 
 export async function listBotVariablesController(request: NextRequest) {
   try {
@@ -27,6 +28,8 @@ export async function listBotVariablesController(request: NextRequest) {
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
+
+    await assertFeatureEnabledForStreamer(resolved.streamerId, "bot.variables");
 
     const streamer = await getStreamerById(resolved.streamerId);
     const timers = await listBotTimers(resolved.streamerId);

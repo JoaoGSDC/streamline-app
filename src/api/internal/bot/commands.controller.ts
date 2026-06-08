@@ -21,6 +21,7 @@ import {
   logInvalidRegexAttempt,
   resolveActorUsername,
 } from "./bot-commands-shared";
+import { assertFeatureEnabledForStreamer } from "@server/panel/assert-feature-enabled";
 
 export async function listBotCommandsController(request: NextRequest) {
   try {
@@ -28,6 +29,8 @@ export async function listBotCommandsController(request: NextRequest) {
     if ("error" in resolved) {
       return jsonError(resolved.error, resolved.status, resolved.code);
     }
+
+    await assertFeatureEnabledForStreamer(resolved.streamerId, "bot.commands");
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search") ?? undefined;

@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useEconomyLevelsPage } from "@features/economy/hooks/use-economy-levels-page.hook";
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
 
 export default function EconomyLevelsPage() {
   const {
@@ -45,6 +46,7 @@ export default function EconomyLevelsPage() {
   }
 
   return (
+    <FeatureGuard featureKey="economy.levels" redirectTo="/admin/economia">
     <div className="admin-page-stack pb-20">
       <AdminPageHeader
         title="Sistema de Níveis"
@@ -173,5 +175,6 @@ export default function EconomyLevelsPage() {
         onSave={() => void save()}
       />
     </div>
+    </FeatureGuard>
   );
 }

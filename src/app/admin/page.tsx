@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAdminChannelOptions,
@@ -126,7 +127,8 @@ export default function AdminSchedulePage() {
   if (!ownerChannel && channels.length === 0) return null;
 
   return (
-    <>
+    <FeatureGuard featureKey="stream_schedule" redirectTo="/admin/feature-disabled">
+      <>
       <AdminPageHeader
         title="Agendar Stream"
         description="Planeje transmissões com clareza. Filtre por canal e período para encontrar eventos rapidamente."
@@ -268,6 +270,7 @@ export default function AdminSchedulePage() {
           )}
         </AdminSection>
       </div>
-    </>
+      </>
+    </FeatureGuard>
   );
 }

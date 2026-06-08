@@ -2,61 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePanelConfig } from "@/contexts/PanelConfigContext";
 import {
-  LayoutDashboard,
-  Coins,
-  Trophy,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+  getVisibleChildFeatures,
+  isAdminPathActive,
+} from "@features/admin/lib/panel-nav";
+import { getPanelFeatureIcon } from "@features/admin/lib/panel-icons";
 import { cn } from "@/lib/utils";
 
-const economyNavItems = [
-  {
-    href: "/admin/economia",
-    label: "Visão Geral",
-    icon: LayoutDashboard,
-    match: (path: string) => path === "/admin/economia",
-  },
-  {
-    href: "/admin/economia/pontos",
-    label: "Pontos",
-    icon: Coins,
-    match: (path: string) => path.startsWith("/admin/economia/pontos"),
-  },
-  {
-    href: "/admin/economia/niveis",
-    label: "Níveis",
-    icon: TrendingUp,
-    match: (path: string) => path.startsWith("/admin/economia/niveis"),
-  },
-  {
-    href: "/admin/economia/ranking",
-    label: "Ranking",
-    icon: Trophy,
-    match: (path: string) => path.startsWith("/admin/economia/ranking"),
-  },
-  {
-    href: "/admin/economia/usuarios",
-    label: "Usuários",
-    icon: Users,
-    match: (path: string) => path.startsWith("/admin/economia/usuarios"),
-  },
-] as const;
-
 export function EconomySubNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
+  const { isLoading: configLoading, isEnabled } = usePanelConfig();
+
+  const navItems = configLoading
+    ? []
+    : getVisibleChildFeatures("economy", isEnabled);
 
   return (
     <nav
       className="flex gap-1 overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-low/40 p-1"
       aria-label="Seções da Pontuação"
     >
-      {economyNavItems.map(({ href, label, icon: Icon, match }) => {
-        const isActiveRoute = match(pathname ?? "");
+      {navItems.map((item) => {
+        const href = item.route!;
+        const Icon = getPanelFeatureIcon(item.icon);
+        const isActiveRoute = isAdminPathActive(pathname, href);
+
         return (
           <Link
-            key={href}
+            key={item.key}
             href={href}
             prefetch
             className={cn(
@@ -67,7 +41,7 @@ export function EconomySubNav() {
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
-            {label}
+            {item.label}
           </Link>
         );
       })}

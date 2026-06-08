@@ -1,7 +1,15 @@
+"use client";
+
+import { FeatureGuard } from "@/components/panel/FeatureGuard";
+
 export default function StoreModuleLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="admin-page-stack">{children}</div>;
+  return (
+    <FeatureGuard featureKey="store" redirectTo="/admin/feature-disabled">
+      <div className="admin-page-stack">{children}</div>
+    </FeatureGuard>
+  );
 }

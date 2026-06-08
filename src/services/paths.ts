@@ -32,6 +32,7 @@ export const ENDPOINTS = {
     StreamerModerators: (streamerId: string) =>
       `/api/internal/streamers/${streamerId}/moderators`,
     AdminChannels: "/api/internal/admin/channels",
+    AdminPanelConfig: "/api/internal/admin/panel-config",
     Bot: {
       Activation: "/api/internal/bot/activation",
       Commands: "/api/internal/bot/commands",
@@ -115,6 +116,10 @@ export const ENDPOINTS = {
       InternalCatalog: (username: string) =>
         `/api/internal/store/internal/catalog/${encodeURIComponent(username)}`,
     },
+  },
+  Panel: {
+    Config: "/api/panel/config",
+    ConfigCheck: "/api/panel/config/check",
   },
   Auth: {
     TwitchCallback: "/api/auth/twitch/callback",

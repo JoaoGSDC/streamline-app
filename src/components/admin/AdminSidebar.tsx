@@ -3,27 +3,30 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bot,
-  CalendarPlus,
-  CircleDollarSign,
-  Gamepad2,
-  Home,
-  Link2,
   ExternalLink,
+  Home,
   LogOut,
-  ShoppingBag,
-  Users,
+  Settings2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  ADMIN_BOT_CHILDREN,
-  ADMIN_ECONOMY_CHILDREN,
-  ADMIN_STORE_CHILDREN,
-  type AdminNavChild,
-} from "@/lib/admin-navigation";
+  getChildFeatures,
+  getTopLevelFeatures,
+  OWNER_ONLY_FEATURE_KEYS,
+  type PanelFeature,
+} from "@/config/panel-features";
+import { isAdminPathActive } from "@features/admin/lib/panel-nav";
+import { getPanelFeatureIcon } from "@features/admin/lib/panel-icons";
+import { usePanelConfig } from "@/contexts/PanelConfigContext";
 import { AdminChannelSwitcher } from "./AdminChannelSwitcher";
+import { PlanIndicator } from "@/components/panel/PlanIndicator";
 import type { AdminChannel } from "./AdminProvider";
+
+const MODULES_WITH_SUBNAV = new Set(["bot", "economy", "store"]);
+
+/** Não entra no loop principal — link fixo no rodapé. */
+const SIDEBAR_UTILITY_FEATURE_KEYS = new Set(["panel_settings"]);
 
 interface AdminSidebarProps {
   channels: AdminChannel[];
@@ -32,98 +35,6 @@ interface AdminSidebarProps {
   onLogout: () => void;
   className?: string;
   onNavigate?: () => void;
-}
-
-interface NavItemConfig {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  match: (path: string) => boolean;
-  children?: AdminNavChild[];
-}
-
-const baseNavItems: NavItemConfig[] = [
-  {
-    href: "/admin",
-    label: "Agendar Stream",
-    icon: CalendarPlus,
-    match: (path) => path === "/admin",
-  },
-  {
-    href: "/admin/games",
-    label: "Gerenciar Jogos",
-    icon: Gamepad2,
-    match: (path) => path.startsWith("/admin/games"),
-  },
-  {
-    href: "/admin/links",
-    label: "Link Page",
-    icon: Link2,
-    match: (path) => path.startsWith("/admin/links"),
-  },
-  {
-    href: "/admin/loja",
-    label: "Loja",
-    icon: ShoppingBag,
-    match: (path) => path.startsWith("/admin/loja"),
-    children: ADMIN_STORE_CHILDREN,
-  },
-];
-
-const ownerNavItems: NavItemConfig[] = [
-  {
-    href: "/admin/bot",
-    label: "Bot",
-    icon: Bot,
-    match: (path) => path.startsWith("/admin/bot"),
-    children: ADMIN_BOT_CHILDREN,
-  },
-  {
-    href: "/admin/economia",
-    label: "Pontuação",
-    icon: CircleDollarSign,
-    match: (path) => path.startsWith("/admin/economia"),
-    children: ADMIN_ECONOMY_CHILDREN,
-  },
-  {
-    href: "/admin/moderators",
-    label: "Moderadores",
-    icon: Users,
-    match: (path) => path.startsWith("/admin/moderators"),
-  },
-];
-
-function SidebarSubNav({
-  items,
-  pathname,
-  onNavigate,
-}: {
-  items: AdminNavChild[];
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  return (
-    <div className="admin-sidebar-subnav" role="group">
-      {items.map((child) => {
-        const childActive = child.match(pathname);
-        return (
-          <Link
-            key={child.href}
-            href={child.href}
-            prefetch
-            onClick={onNavigate}
-            className={cn(
-              "admin-sidebar-subnav-link",
-              childActive && "admin-sidebar-subnav-link--active"
-            )}
-            aria-current={childActive ? "page" : undefined}
-          >
-            {child.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
 }
 
 export function AdminSidebar({
@@ -135,12 +46,12 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps) {
   const pathname = usePathname() ?? "";
-  const publicProfileUrl = `/${actingAs.twitchUsername}`;
+  const { isEnabled, isLoading } = usePanelConfig();
   const isOwner = actingAs.role === "owner";
 
-  const navItems = isOwner
-    ? [...baseNavItems, ...ownerNavItems]
-    : baseNavItems;
+  const topFeatures = getTopLevelFeatures().filter(
+    (feature) => !SIDEBAR_UTILITY_FEATURE_KEYS.has(feature.key)
+  );
 
   return (
     <nav
@@ -154,6 +65,8 @@ export function AdminSidebar({
         className="-mx-1 mb-1"
       />
 
+      <PlanIndicator />
+
       <div className="admin-sidebar-divider" role="separator" />
 
       <p className="mb-1.5 px-3 text-caption font-semibold uppercase tracking-wider">
@@ -161,63 +74,173 @@ export function AdminSidebar({
       </p>
 
       <div className="flex-1 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon, match, children }) => {
-          const active = match(pathname);
-          const showChildren = Boolean(children?.length && active);
+        {!isLoading
+          ? topFeatures.map((feature) => {
+              if (OWNER_ONLY_FEATURE_KEYS.has(feature.key) && !isOwner) {
+                return null;
+              }
+              if (!isEnabled(feature.key)) return null;
 
-          return (
-            <div key={href}>
-              <Link
-                href={href}
-                prefetch
-                onClick={onNavigate}
-                className={cn(
-                  "flex h-9 items-center gap-3 rounded-md px-3 text-body-admin font-medium transition-colors",
-                  active
-                    ? "bg-[hsl(var(--sidebar-active-bg))] text-white"
-                    : "text-muted-foreground hover:bg-surface-container-high/60 hover:text-foreground"
-                )}
-                aria-current={active && !showChildren ? "page" : undefined}
-              >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                {label}
-              </Link>
+              const children = getChildFeatures(feature.key);
+              const enabledChildren = children.filter(
+                (child) => child.route && isEnabled(child.key)
+              );
+              const subItems = MODULES_WITH_SUBNAV.has(feature.key)
+                ? enabledChildren
+                : [];
 
-              {showChildren ? (
-                <SidebarSubNav
-                  items={children!}
+              return (
+                <SidebarItem
+                  key={feature.key}
+                  feature={feature}
+                  subItems={subItems}
                   pathname={pathname}
                   onNavigate={onNavigate}
                 />
-              ) : null}
-            </div>
-          );
-        })}
+              );
+            })
+          : null}
       </div>
 
-      <div className="admin-sidebar-divider" role="separator" />
+      <div className="admin-sidebar-divider my-2" role="separator" />
 
+      <SidebarUtilityLinks
+        actingAs={actingAs}
+        isOwner={isOwner}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+      />
+    </nav>
+  );
+}
+
+function SidebarItem({
+  feature,
+  subItems,
+  pathname,
+  onNavigate,
+}: {
+  feature: PanelFeature;
+  subItems: PanelFeature[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const href = feature.route ?? "/admin";
+  const Icon = getPanelFeatureIcon(feature.icon);
+  const active = isAdminPathActive(pathname, href);
+  const showSubNav = subItems.length > 0 && active;
+
+  return (
+    <div>
       <Link
+        href={href}
+        prefetch
+        onClick={onNavigate}
+        className={cn(
+          "flex h-9 items-center gap-3 rounded-md px-3 text-body-admin font-medium transition-colors",
+          active
+            ? "bg-[hsl(var(--sidebar-active-bg))] text-white"
+            : "text-muted-foreground hover:bg-surface-container-high/60 hover:text-foreground"
+        )}
+        aria-current={active && !showSubNav ? "page" : undefined}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+        {feature.label}
+      </Link>
+
+      {showSubNav ? (
+        <div className="admin-sidebar-subnav" role="group">
+          {subItems.map((child) => {
+            const childHref = child.route!;
+            const childActive = isAdminPathActive(pathname, childHref);
+            return (
+              <Link
+                key={child.key}
+                href={childHref}
+                prefetch
+                onClick={onNavigate}
+                className={cn(
+                  "admin-sidebar-subnav-link",
+                  childActive && "admin-sidebar-subnav-link--active"
+                )}
+                aria-current={childActive ? "page" : undefined}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SidebarLink({
+  href,
+  icon: Icon,
+  label,
+  onNavigate,
+  external,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  onNavigate?: () => void;
+  external?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+      onClick={onNavigate}
+      className="flex h-9 items-center gap-3 rounded-md px-3 text-body-admin font-medium text-muted-foreground transition-colors hover:bg-surface-container-high/60 hover:text-foreground"
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+function SidebarUtilityLinks({
+  actingAs,
+  isOwner,
+  onNavigate,
+  onLogout,
+}: {
+  actingAs: AdminChannel;
+  isOwner: boolean;
+  onNavigate?: () => void;
+  onLogout: () => void;
+}) {
+  const publicProfileUrl = `/${actingAs.twitchUsername}`;
+
+  return (
+    <div className="space-y-0.5">
+      {isOwner ? (
+        <SidebarLink
+          href="/admin/personalizacao"
+          icon={Settings2}
+          label="Personalizar painel"
+          onNavigate={onNavigate}
+        />
+      ) : null}
+
+      <SidebarLink
         href={publicProfileUrl}
-        prefetch
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onNavigate}
-        className="flex h-9 items-center gap-3 rounded-md px-3 text-body-admin font-medium text-muted-foreground transition-colors hover:bg-surface-container-high/60 hover:text-foreground"
-      >
-        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-        Ver Perfil Público
-      </Link>
+        icon={ExternalLink}
+        label="Ver Perfil Público"
+        onNavigate={onNavigate}
+        external
+      />
 
-      <Link
+      <SidebarLink
         href="/"
-        prefetch
-        onClick={onNavigate}
-        className="flex h-9 items-center gap-3 rounded-md px-3 text-body-admin font-medium text-muted-foreground transition-colors hover:bg-surface-container-high/60 hover:text-foreground"
-      >
-        <Home className="h-4 w-4 shrink-0" aria-hidden />
-        Voltar ao Início
-      </Link>
+        icon={Home}
+        label="Voltar ao Início"
+        onNavigate={onNavigate}
+      />
 
       <button
         type="button"
@@ -227,6 +250,6 @@ export function AdminSidebar({
         <LogOut className="h-4 w-4 shrink-0" aria-hidden />
         Sair
       </button>
-    </nav>
+    </div>
   );
 }

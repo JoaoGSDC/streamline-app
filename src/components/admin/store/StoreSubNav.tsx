@@ -2,61 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePanelConfig } from "@/contexts/PanelConfigContext";
 import {
-  LayoutDashboard,
-  Package,
-  FolderOpen,
-  ClipboardList,
-  Settings,
-} from "lucide-react";
+  getVisibleChildFeatures,
+  isAdminPathActive,
+} from "@features/admin/lib/panel-nav";
+import { getPanelFeatureIcon } from "@features/admin/lib/panel-icons";
 import { cn } from "@/lib/utils";
 
-const storeNavItems = [
-  {
-    href: "/admin/loja",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    match: (path: string) => path === "/admin/loja",
-  },
-  {
-    href: "/admin/loja/produtos",
-    label: "Produtos",
-    icon: Package,
-    match: (path: string) => path.startsWith("/admin/loja/produtos"),
-  },
-  {
-    href: "/admin/loja/categorias",
-    label: "Categorias",
-    icon: FolderOpen,
-    match: (path: string) => path.startsWith("/admin/loja/categorias"),
-  },
-  {
-    href: "/admin/loja/resgates",
-    label: "Resgates",
-    icon: ClipboardList,
-    match: (path: string) => path.startsWith("/admin/loja/resgates"),
-  },
-  {
-    href: "/admin/loja/configuracoes",
-    label: "Configurações",
-    icon: Settings,
-    match: (path: string) => path.startsWith("/admin/loja/configuracoes"),
-  },
-] as const;
-
 export function StoreSubNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
+  const { isLoading: configLoading, isEnabled } = usePanelConfig();
+
+  const navItems = configLoading
+    ? []
+    : getVisibleChildFeatures("store", isEnabled);
 
   return (
     <nav
       className="flex gap-1 overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-low/40 p-1"
       aria-label="Seções da Loja"
     >
-      {storeNavItems.map(({ href, label, icon: Icon, match }) => {
-        const isActiveRoute = match(pathname ?? "");
+      {navItems.map((item) => {
+        const href = item.route!;
+        const Icon = getPanelFeatureIcon(item.icon);
+        const isActiveRoute = isAdminPathActive(pathname, href);
+
         return (
           <Link
-            key={href}
+            key={item.key}
             href={href}
             prefetch
             className={cn(
@@ -67,7 +41,7 @@ export function StoreSubNav() {
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
-            {label}
+            {item.label}
           </Link>
         );
       })}

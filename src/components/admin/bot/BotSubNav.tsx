@@ -3,66 +3,38 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBotActivationContext } from "@features/bot/context/BotActivationContext";
+import { usePanelConfig } from "@/contexts/PanelConfigContext";
 import {
-  LayoutDashboard,
-  MessageSquare,
-  Clock,
-  Shield,
-  BookOpen,
-} from "lucide-react";
+  getVisibleChildFeatures,
+  isAdminPathActive,
+} from "@features/admin/lib/panel-nav";
+import { getPanelFeatureIcon } from "@features/admin/lib/panel-icons";
 import { cn } from "@/lib/utils";
 
-const botNavItems = [
-  {
-    href: "/admin/bot",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    match: (path: string) => path === "/admin/bot",
-  },
-  {
-    href: "/admin/bot/commands",
-    label: "Comandos",
-    icon: MessageSquare,
-    match: (path: string) => path.startsWith("/admin/bot/commands"),
-  },
-  {
-    href: "/admin/bot/timers",
-    label: "Timers",
-    icon: Clock,
-    match: (path: string) => path.startsWith("/admin/bot/timers"),
-  },
-  {
-    href: "/admin/bot/moderation",
-    label: "Moderação",
-    icon: Shield,
-    match: (path: string) => path.startsWith("/admin/bot/moderation"),
-  },
-  {
-    href: "/admin/bot/variables",
-    label: "Variáveis",
-    icon: BookOpen,
-    match: (path: string) => path.startsWith("/admin/bot/variables"),
-  },
-] as const;
-
 export function BotSubNav() {
-  const pathname = usePathname();
-  const { active, loading } = useBotActivationContext();
+  const pathname = usePathname() ?? "";
+  const { active, loading: botLoading } = useBotActivationContext();
+  const { isLoading: configLoading, isEnabled } = usePanelConfig();
+
+  const navItems = configLoading
+    ? []
+    : getVisibleChildFeatures("bot", isEnabled);
 
   return (
     <nav
       className="flex gap-1 overflow-x-auto rounded-lg border border-outline-variant/30 bg-surface-container-low/40 p-1"
       aria-label="Seções do Bot"
     >
-      {botNavItems.map(({ href, label, icon: Icon, match }) => {
-        const isActiveRoute = match(pathname ?? "");
-        const isDashboard = href === "/admin/bot";
-        const disabled = !loading && !active && !isDashboard;
+      {navItems.map((item) => {
+        const href = item.route!;
+        const Icon = getPanelFeatureIcon(item.icon);
+        const isActiveRoute = isAdminPathActive(pathname, href);
+        const disabled = !botLoading && !active && href !== "/admin/bot";
 
         if (disabled) {
           return (
             <span
-              key={href}
+              key={item.key}
               aria-disabled="true"
               title="Ative o bot para acessar esta seção"
               className={cn(
@@ -71,14 +43,14 @@ export function BotSubNav() {
               )}
             >
               <Icon className="h-4 w-4" aria-hidden />
-              {label}
+              {item.label}
             </span>
           );
         }
 
         return (
           <Link
-            key={href}
+            key={item.key}
             href={href}
             prefetch
             className={cn(
@@ -89,7 +61,7 @@ export function BotSubNav() {
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
-            {label}
+            {item.label}
           </Link>
         );
       })}

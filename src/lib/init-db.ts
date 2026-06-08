@@ -585,6 +585,8 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE bot_timers ADD COLUMN schedule_mode TEXT NOT NULL DEFAULT 'live_elapsed'`,
     `ALTER TABLE bot_timers ADD COLUMN min_viewers INTEGER`,
     `ALTER TABLE store_channel_config ADD COLUMN pixie_username TEXT`,
+    `ALTER TABLE streamers ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'`,
+    `ALTER TABLE streamers ADD COLUMN plan_expires_at INTEGER`,
   ];
 
   for (const sql of migrations) {
@@ -632,6 +634,36 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     } catch {
       /* índice já existe */
     }
+  }
+
+  const USER_PANEL_CONFIG_TABLE = `
+    CREATE TABLE IF NOT EXISTS user_panel_config (
+      user_id TEXT PRIMARY KEY,
+      overrides TEXT NOT NULL DEFAULT '{}',
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES streamers(id) ON DELETE CASCADE
+    );
+  `;
+
+  try {
+    await execute(USER_PANEL_CONFIG_TABLE);
+  } catch {
+    /* tabela já existe */
+  }
+
+  try {
+    await execute(`
+      INSERT OR IGNORE INTO user_panel_config (user_id, overrides, updated_at)
+      SELECT streamer_id, overrides, updated_at FROM streamer_panel_config
+    `);
+  } catch {
+    /* migração legacy opcional */
+  }
+
+  try {
+    await execute(`DROP TABLE IF EXISTS streamer_panel_config`);
+  } catch {
+    /* ignore */
   }
 
   try {

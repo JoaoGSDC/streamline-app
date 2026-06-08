@@ -17,7 +17,19 @@ export const streamers = sqliteTable("streamers", {
   partner: integer("partner", { mode: "boolean" }).notNull().default(false),
   /** Assinatura premium paga */
   premium: integer("premium", { mode: "boolean" }).notNull().default(false),
+  /** Plano de assinatura: free | pro | enterprise */
+  plan: text("plan").notNull().default("free"),
+  planExpiresAt: integer("plan_expires_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Overrides de visibilidade do painel admin (somente diferenças do registry). */
+export const userPanelConfig = sqliteTable("user_panel_config", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  overrides: text("overrides").notNull().default("{}"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
 // Tabela de Jogos
