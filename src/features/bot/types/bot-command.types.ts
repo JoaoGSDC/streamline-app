@@ -1,4 +1,5 @@
 import type { BotCommandAdvancedFields } from "@server/bot/bot-command.types";
+import type { CommandPointsEffect } from "@server/bot/command-points-effect";
 import type { BotBuiltinCategoryId } from "@services/entities/bot-variables.services";
 
 export interface BotCommandRowState extends BotCommandAdvancedFields {
@@ -19,6 +20,10 @@ export interface BotCommandRowState extends BotCommandAdvancedFields {
   confirmationPrompt?: string | null;
   runtimeNotes?: string | null;
   externalApiUrlTemplate?: string | null;
+  economyRewardKey?: "daily" | "early" | null;
+  economyRewardPoints?: number | null;
+  pointsEffect?: CommandPointsEffect | null;
+  cooldownMessage: string | null;
   isDraft?: boolean;
   isNew?: boolean;
 }

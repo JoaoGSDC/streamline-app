@@ -22,6 +22,7 @@ import { AdvancedSection } from "@features/bot/components/bot-command-edit/Advan
 import { BasicSection } from "@features/bot/components/bot-command-edit/BasicSection";
 import { MultipleResponsesSection } from "@features/bot/components/bot-command-edit/MultipleResponsesSection";
 import { PermissionSection } from "@features/bot/components/bot-command-edit/PermissionSection";
+import { PointsEffectSection } from "@features/bot/components/bot-command-edit/PointsEffectSection";
 import { UsageLimitsSection } from "@features/bot/components/bot-command-edit/UsageLimitsSection";
 import { validateTrigger } from "@features/bot/components/bot-command-edit/command-form.utils";
 
@@ -176,6 +177,15 @@ export function BotCommandEditDialog({
           <PermissionSection {...formBinding} />
 
           <UsageLimitsSection {...formBinding} />
+
+          <PointsEffectSection
+            {...formBinding}
+            economyRewardKey={
+              (command.economyRewardKey as "daily" | "early" | null | undefined) ??
+              null
+            }
+            economyRewardPoints={command.economyRewardPoints ?? null}
+          />
 
           <AdvancedSection {...formBinding} />
 

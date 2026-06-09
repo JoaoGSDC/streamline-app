@@ -1152,6 +1152,7 @@ export async function claimEconomyLiveReward(input: {
   displayName: string;
   streamStartedAt: string;
   viewerId: string;
+  pointsAmount?: number;
 }): Promise<{
   status: EconomyLiveRewardClaimStatus;
   pointsAwarded: number;
@@ -1198,7 +1199,8 @@ export async function claimEconomyLiveReward(input: {
     };
   }
 
-  const basePoints = ECONOMY_LIVE_REWARD_POINTS[input.rewardKey];
+  const basePoints =
+    input.pointsAmount ?? ECONOMY_LIVE_REWARD_POINTS[input.rewardKey];
   const previousPoints = viewer.points;
 
   const award = await botAwardPoints({

@@ -10,6 +10,7 @@ export type BotVariableCategoryId =
   | "live"
   | "user"
   | "points"
+  | "cooldown"
   | "random"
   | "datetime"
   | "usage"

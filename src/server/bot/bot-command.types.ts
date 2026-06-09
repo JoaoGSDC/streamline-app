@@ -1,5 +1,7 @@
 /** Tipos e defaults dos campos avançados de `bot_commands`. */
 
+import type { CommandPointsEffect } from "./command-points-effect";
+
 export const BOT_COMMAND_MIN_PERMISSIONS = [
   "everyone",
   "follower",
@@ -65,6 +67,7 @@ export const BOT_COMMAND_ADVANCED_DEFAULTS = {
   responseType: "text" as BotCommandResponseType,
   responseAlternatives: [] as string[],
   useCount: 0,
+  cooldownMessage: null as string | null,
 } as const;
 
 export interface BotCommandAdvancedFields {
@@ -86,6 +89,8 @@ export interface BotCommandAdvancedFields {
   responseType: BotCommandResponseType;
   responseAlternatives: string[];
   useCount: number;
+  /** Mensagem exibida 1× por período de cooldown quando bloqueado */
+  cooldownMessage: string | null;
 }
 
 export interface BotCommandDto extends BotCommandAdvancedFields {
@@ -97,6 +102,7 @@ export interface BotCommandDto extends BotCommandAdvancedFields {
   enabled: boolean;
   builtinKey: string | null;
   isBuiltin: boolean;
+  pointsEffect: CommandPointsEffect | null;
   createdAt: Date;
   updatedAt: Date;
 }

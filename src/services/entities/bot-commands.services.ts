@@ -15,6 +15,7 @@ export interface BotCommandRecord extends BotCommandAdvancedFields {
   enabled: boolean;
   isBuiltin?: boolean;
   builtinKey?: string | null;
+  pointsEffect?: import("@server/bot/command-points-effect").CommandPointsEffect | null;
   updatedAt: string | Date;
   createdAt?: string | Date;
   configVersion?: number;
@@ -49,6 +50,8 @@ export interface CreateBotCommandPayload {
   argValidationError?: string | null;
   responseType?: BotCommandAdvancedFields["responseType"];
   responseAlternatives?: string[];
+  pointsEffect?: import("@server/bot/command-points-effect").CommandPointsEffect | null;
+  cooldownMessage?: string | null;
 }
 
 export const botCommands = {

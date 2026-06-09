@@ -7,6 +7,7 @@ export type BotVariableCategory =
   | "live"
   | "user"
   | "points"
+  | "cooldown"
   | "random"
   | "datetime"
   | "usage"
@@ -104,6 +105,7 @@ export const BOT_CATEGORY_LABELS: Record<BotVariableCategory, string> = {
   live: "Informações da live",
   user: "Informações do usuário",
   points: "Pontuação",
+  cooldown: "Cooldown",
   random: "Randomização",
   datetime: "Data e hora",
   usage: "Uso do comando",
@@ -216,6 +218,23 @@ export const BOT_POINTS_VARIABLES: BotVariableDefinition[] = [
     example: "1250",
   },
   {
+    key: "{totalPoints}",
+    label: "Saldo total de pontos",
+    description: "Saldo após o comando (alias de {points} em recompensas).",
+    usage: "Saldo: {totalPoints} pontos",
+    category: "points",
+    example: "1300",
+  },
+  {
+    key: "{pointsAdded}",
+    label: "Pontos alterados",
+    description:
+      "Quantidade concedida ou removida neste uso (efeito de pontos do comando). Positivo = ganhou; negativo = perdeu.",
+    usage: "Você ganhou {pointsAdded} pontos!",
+    category: "points",
+    example: "50",
+  },
+  {
     key: "{rank}",
     label: "Posição no ranking",
     description: "Posição no ranking de pontos do canal.",
@@ -226,10 +245,55 @@ export const BOT_POINTS_VARIABLES: BotVariableDefinition[] = [
   {
     key: "{level}",
     label: "Nível de XP",
-    description: "Nível do viewer no sistema de XP.",
+    description: "Nível numérico do viewer no sistema de XP.",
     usage: "Nível {level}",
     category: "points",
     example: "12",
+  },
+  {
+    key: "{levelTitle}",
+    label: "Título do nível",
+    description: "Nome do nível configurado (ex.: Regular, VIP).",
+    usage: "Rank: {levelTitle}",
+    category: "points",
+    example: "Regular",
+  },
+];
+
+export const BOT_COOLDOWN_VARIABLES: BotVariableDefinition[] = [
+  {
+    key: "{cooldownRemaining}",
+    label: "Tempo restante (este comando)",
+    description:
+      "Tempo formatado até o comando atual sair de cooldown (ex.: 45 segundos, 2 minutos). Use na mensagem de cooldown.",
+    usage: "Aguarde {cooldownRemaining} para usar de novo.",
+    category: "cooldown",
+    example: "2 minutos",
+  },
+  {
+    key: "{cooldownSeconds}",
+    label: "Segundos restantes (este comando)",
+    description: "Segundos inteiros até o fim do cooldown do comando atual.",
+    usage: "Faltam {cooldownSeconds}s",
+    category: "cooldown",
+    example: "45",
+  },
+  {
+    key: "{cooldownRemaining:!daily}",
+    label: "Cooldown de outro comando",
+    description:
+      "Tempo restante do cooldown de outro trigger (global ou por viewer). Troque !daily pelo comando desejado.",
+    usage: "!daily libera em {cooldownRemaining:!daily}",
+    category: "cooldown",
+    example: "5 minutos",
+  },
+  {
+    key: "{cooldownSeconds:!daily}",
+    label: "Segundos de outro comando",
+    description: "Segundos restantes do cooldown de outro trigger.",
+    usage: "{if:{cooldownSeconds:!daily}|Aguarde|Liberado!}",
+    category: "cooldown",
+    example: "300",
   },
 ];
 
@@ -377,6 +441,7 @@ export const BOT_EXPANDED_VARIABLE_GROUPS: Record<string, BotVariableDefinition[
   live: BOT_LIVE_VARIABLES,
   user: BOT_USER_INFO_VARIABLES,
   points: BOT_POINTS_VARIABLES,
+  cooldown: BOT_COOLDOWN_VARIABLES,
   random: BOT_RANDOM_VARIABLES,
   datetime: BOT_DATETIME_VARIABLES,
   usage: BOT_USAGE_VARIABLES,
@@ -497,9 +562,10 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
   },
   {
     key: "{pointsAdded}",
-    label: "Pontos adicionados",
-    description: "Quantidade adicionada no !addpontos.",
-    usage: "+{pointsAdded} pontos!",
+    label: "Pontos alterados",
+    description:
+      "Quantidade concedida ou removida neste uso (efeito de pontos configurável).",
+    usage: "Você ganhou {pointsAdded} pontos!",
     category: "meta",
   },
   {
@@ -514,6 +580,59 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     label: "Saldo total de pontos",
     description: "Saldo do viewer no canal após o comando.",
     usage: "Saldo: {totalPoints} pontos.",
+    category: "meta",
+  },
+  {
+    key: "{levelTitle}",
+    label: "Título do nível",
+    description: "Nome do nível do viewer (sistema de XP).",
+    usage: "Seu rank: {levelTitle}",
+    category: "meta",
+  },
+  {
+    key: "{firstResult}",
+    label: "Resultado do !first",
+    description: 'won = foi o primeiro do dia; already_taken = alguém já abriu.',
+    usage: "Usado em regras condicionais de pontos.",
+    category: "meta",
+    example: "won",
+  },
+  {
+    key: "{jokenpoResult}",
+    label: "Resultado jokenpo (máquina)",
+    description: "win, lose ou draw — para regras de pontos condicionais.",
+    usage: "Regra: jokenpoResult = win → +10 pts",
+    category: "meta",
+    example: "win",
+  },
+  {
+    key: "{coinSide}",
+    label: "Lado da moeda",
+    description: "Resultado sorteado no !moeda: cara ou coroa.",
+    usage: "Deu {coinSide}!",
+    category: "meta",
+    example: "cara",
+  },
+  {
+    key: "{coinResult}",
+    label: "Resultado moeda (win/lose)",
+    description: "win ou lose — para regras de pontos no !moeda.",
+    usage: "Regra condicional de pontos.",
+    category: "meta",
+    example: "win",
+  },
+  {
+    key: "{cooldownRemaining}",
+    label: "Cooldown restante",
+    description: "Tempo formatado até o comando sair de cooldown.",
+    usage: "Aguarde {cooldownRemaining}.",
+    category: "meta",
+  },
+  {
+    key: "{cooldownSeconds}",
+    label: "Segundos de cooldown",
+    description: "Segundos inteiros restantes de cooldown.",
+    usage: "Faltam {cooldownSeconds}s",
     category: "meta",
   },
   {
@@ -546,10 +665,11 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
   },
   {
     key: "{coinResult}",
-    label: "Resultado moeda",
-    description: "cara ou coroa sorteado.",
-    usage: "Deu {coinResult}!",
+    label: "Resultado moeda (win/lose)",
+    description: "win ou lose — use em regras de pontos. Para cara/coroa sorteado, use {coinSide}.",
+    usage: "{coinResult}",
     category: "meta",
+    example: "win",
   },
   {
     key: "{coinOutcome}",
@@ -571,6 +691,14 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     description: "Vitória, derrota ou empate humanizado.",
     usage: "{jokenpoOutcome}",
     category: "meta",
+  },
+  {
+    key: "{jokenpoResult}",
+    label: "Resultado jokenpo (máquina)",
+    description: "win, lose ou draw — para regras condicionais de pontos.",
+    usage: "{jokenpoResult}",
+    category: "meta",
+    example: "win",
   },
   {
     key: "{rouletteResult}",

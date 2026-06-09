@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,9 @@ import {
   seasonalExample,
   seasonalPeriodLabel,
 } from "./command-form.utils";
+
+const DEFAULT_COOLDOWN_MESSAGE =
+  "Esse comando está em cooldown. Tente novamente mais tarde!";
 
 const LIMIT_OPTIONS = [
   { value: "0", label: "Ilimitado" },
@@ -86,6 +90,33 @@ export function UsageLimitsSection({
           tooltip="Quantas vezes cada viewer pode usar por stream"
         />
       </div>
+
+      {command.cooldownSeconds > 0 || command.userCooldown > 0 ? (
+        <div className="space-y-1.5 border-t border-border/40 pt-3">
+          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Mensagem de cooldown
+          </Label>
+          <Textarea
+            value={command.cooldownMessage ?? ""}
+            disabled={sectionDisabled}
+            placeholder={DEFAULT_COOLDOWN_MESSAGE}
+            maxLength={500}
+            rows={3}
+            onChange={(event) =>
+              onChange({
+                cooldownMessage: event.target.value || null,
+              })
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            Exibida <strong>uma vez</strong> por período de cooldown quando alguém
+            tenta usar o comando bloqueado. Variáveis:{" "}
+            <code className="text-purple-300">{`{cooldownRemaining}`}</code>,{" "}
+            <code className="text-purple-300">{`{cooldownSeconds}`}</code>,{" "}
+            <code className="text-purple-300">{`{cooldownRemaining:!outro}`}</code>
+          </p>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label className="text-xs uppercase tracking-wide text-muted-foreground">

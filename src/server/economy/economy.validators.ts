@@ -152,6 +152,7 @@ export const botClaimLiveRewardSchema = z.object({
     .min(1)
     .max(64)
     .regex(/^\d{4}-\d{2}-\d{2}T/, "streamStartedAt deve ser ISO 8601 (started_at da Twitch)"),
+  pointsAmount: z.coerce.number().int().min(0).max(1_000_000).optional(),
 });
 
 export const defaultLevelsDefinitionJson = JSON.stringify(DEFAULT_LEVELS_DEFINITION);

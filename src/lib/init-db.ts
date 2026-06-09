@@ -587,6 +587,8 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE store_channel_config ADD COLUMN pixie_username TEXT`,
     `ALTER TABLE streamers ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'`,
     `ALTER TABLE streamers ADD COLUMN plan_expires_at INTEGER`,
+    `ALTER TABLE bot_commands ADD COLUMN points_effect TEXT`,
+    `ALTER TABLE bot_commands ADD COLUMN cooldown_message TEXT`,
   ];
 
   for (const sql of migrations) {

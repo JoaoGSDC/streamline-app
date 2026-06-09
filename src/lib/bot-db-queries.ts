@@ -11,6 +11,8 @@ import {
 } from "@lib/bot-timer-schedule";
 import {
   mapBotCommandAdvancedFields,
+  mapBotCommandPointsEffect,
+  serializeCommandPointsEffectField,
   serializeJsonStringArray,
 } from "./bot-command-fields";
 import { db } from "./db";
@@ -28,6 +30,7 @@ import type {
   BotCommandUsagePeriod,
   BotCommandUsageStatsDto,
 } from "@server/bot/bot-command.types";
+import type { CommandPointsEffect } from "@server/bot/command-points-effect";
 import {
   SAFE_TRIGGER,
   sanitizeResponse,
@@ -104,6 +107,7 @@ function mapCommandRow(row: typeof botCommands.$inferSelect): BotCommandDto {
     isBuiltin: Boolean(builtinKey),
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
+    pointsEffect: mapBotCommandPointsEffect(row),
     ...mapBotCommandAdvancedFields(row),
   };
 }
@@ -329,6 +333,8 @@ export type BotCommandWriteAdvancedFields = Partial<{
   argValidationError: string | null;
   responseType: string;
   responseAlternatives: string[];
+  pointsEffect?: CommandPointsEffect | null;
+  cooldownMessage?: string | null;
 }>;
 
 function applyAdvancedFieldsToPatch(
@@ -383,6 +389,12 @@ function applyAdvancedFieldsToPatch(
     patch.responseAlternatives = serializeJsonStringArray(
       data.responseAlternatives
     );
+  }
+  if (data.pointsEffect !== undefined) {
+    patch.pointsEffect = serializeCommandPointsEffectField(data.pointsEffect);
+  }
+  if (data.cooldownMessage !== undefined) {
+    patch.cooldownMessage = data.cooldownMessage?.trim() || null;
   }
 }
 

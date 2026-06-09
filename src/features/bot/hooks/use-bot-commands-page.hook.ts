@@ -64,6 +64,10 @@ function recordToRow(
     externalApiUrlTemplate: catalogItem?.externalApiUrlTemplate,
     responseTemplate: catalogItem?.responseTemplate,
     confirmationPrompt: catalogItem?.confirmationPrompt,
+    economyRewardKey: catalogItem?.economyRewardKey ?? null,
+    economyRewardPoints: catalogItem?.economyRewardPoints ?? null,
+    pointsEffect: record.pointsEffect ?? null,
+    cooldownMessage: record.cooldownMessage ?? null,
   };
 }
 

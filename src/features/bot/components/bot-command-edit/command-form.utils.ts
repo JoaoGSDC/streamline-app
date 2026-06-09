@@ -200,5 +200,7 @@ export function buildCustomCommandPayload(command: BotCommandRowState) {
     argValidationError: command.argValidationError,
     responseType: command.responseType,
     responseAlternatives: command.responseAlternatives,
+    pointsEffect: command.pointsEffect ?? null,
+    cooldownMessage: command.cooldownMessage ?? null,
   };
 }

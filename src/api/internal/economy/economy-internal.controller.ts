@@ -342,6 +342,7 @@ export async function postEconomyInternalLiveRewardClaimController(
       displayName: parsed.data.displayName,
       streamStartedAt: parsed.data.streamStartedAt,
       viewerId: createRandomString(12),
+      pointsAmount: parsed.data.pointsAmount,
     });
 
     return jsonSuccess({

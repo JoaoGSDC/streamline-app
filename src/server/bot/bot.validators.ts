@@ -7,6 +7,7 @@ import {
   BOT_COMMAND_SEASONAL_LIMIT_TYPES,
   type BotCommandDto,
 } from "@server/bot/bot-command.types";
+import { commandPointsEffectSchema } from "@server/bot/command-points-effect";
 import { isSafeRegex } from "@server/utils/is-safe-regex";
 import {
   SAFE_TRIGGER,
@@ -165,6 +166,8 @@ const botCommandFieldsObject = z.object({
     .array(z.string().max(500))
     .max(20)
     .default([]),
+  pointsEffect: commandPointsEffectSchema.nullable().optional(),
+  cooldownMessage: z.string().max(500).nullable().optional(),
 });
 
 export const botCommandFieldsSchema = botCommandFieldsObject.superRefine(
@@ -218,6 +221,8 @@ export function commandDtoToValidationShape(
     argValidationError: command.argValidationError,
     responseType: command.responseType,
     responseAlternatives: command.responseAlternatives,
+    pointsEffect: command.pointsEffect,
+    cooldownMessage: command.cooldownMessage,
   };
 }
 

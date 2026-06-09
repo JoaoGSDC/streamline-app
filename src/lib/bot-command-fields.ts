@@ -12,6 +12,11 @@ import {
   type BotCommandResponseType,
   type BotCommandSeasonalLimitType,
 } from "@server/bot/bot-command.types";
+import {
+  parseCommandPointsEffect,
+  serializeCommandPointsEffect,
+  type CommandPointsEffect,
+} from "@server/bot/command-points-effect";
 import type { botCommands } from "./schema";
 
 function parseJsonStringArray(raw: string | null | undefined): string[] {
@@ -45,6 +50,18 @@ function asEnum<T extends string>(
 
 export function serializeJsonStringArray(values: string[]): string {
   return JSON.stringify(values);
+}
+
+export function serializeCommandPointsEffectField(
+  effect: CommandPointsEffect | null | undefined
+): string | null {
+  return serializeCommandPointsEffect(effect);
+}
+
+export function mapBotCommandPointsEffect(
+  row: typeof botCommands.$inferSelect
+): CommandPointsEffect | null {
+  return parseCommandPointsEffect(row.pointsEffect);
 }
 
 export function mapBotCommandAdvancedFields(
@@ -96,5 +113,6 @@ export function mapBotCommandAdvancedFields(
     ),
     responseAlternatives: parseJsonStringArray(row.responseAlternatives),
     useCount: row.useCount ?? BOT_COMMAND_ADVANCED_DEFAULTS.useCount,
+    cooldownMessage: row.cooldownMessage ?? null,
   };
 }

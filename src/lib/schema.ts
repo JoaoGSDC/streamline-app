@@ -160,6 +160,10 @@ export const botCommands = sqliteTable("bot_commands", {
   /** JSON array de respostas para response_type = random */
   responseAlternatives: text("response_alternatives").notNull().default("[]"),
   useCount: integer("use_count").notNull().default(0),
+  /** JSON — efeito de pontos configurável por comando */
+  pointsEffect: text("points_effect"),
+  /** Mensagem exibida 1× por período de cooldown quando bloqueado */
+  cooldownMessage: text("cooldown_message"),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
