@@ -30,6 +30,8 @@ import {
   Sparkles,
   ExternalLink,
   Home,
+  MessageSquareQuote,
+  Hash,
   type LucideIcon,
 } from "lucide-react";
 
@@ -65,6 +67,8 @@ const PANEL_ICON_MAP: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   "external-link": ExternalLink,
   home: Home,
+  quote: MessageSquareQuote,
+  hash: Hash,
 };
 
 export function getPanelFeatureIcon(iconName: string): LucideIcon {

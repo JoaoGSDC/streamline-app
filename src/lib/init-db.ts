@@ -480,6 +480,203 @@ const STORE_USER_BADGES_TABLE = `
   );
 `;
 
+const QUOTES_CHANNEL_CONFIG_TABLE = `
+  CREATE TABLE IF NOT EXISTS quotes_channel_config (
+    streamer_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    public_enabled INTEGER NOT NULL DEFAULT 0,
+    auto_capture_context INTEGER NOT NULL DEFAULT 1,
+    config_version INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
+const QUOTE_CATEGORIES_TABLE = `
+  CREATE TABLE IF NOT EXISTS quote_categories (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    color TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    deleted_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+    UNIQUE(streamer_id, slug)
+  );
+  CREATE INDEX IF NOT EXISTS idx_quote_categories_streamer_sort
+    ON quote_categories(streamer_id, sort_order);
+`;
+
+const QUOTE_TAGS_TABLE = `
+  CREATE TABLE IF NOT EXISTS quote_tags (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    usage_count INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+    UNIQUE(streamer_id, slug)
+  );
+`;
+
+const QUOTES_TABLE = `
+  CREATE TABLE IF NOT EXISTS quotes (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    text_normalized TEXT NOT NULL,
+    speaker_type TEXT NOT NULL DEFAULT 'custom',
+    speaker_name TEXT NOT NULL,
+    speaker_twitch_id TEXT,
+    registered_by_user_id TEXT,
+    registered_by_username TEXT NOT NULL,
+    registered_by_role TEXT NOT NULL DEFAULT 'owner',
+    source TEXT NOT NULL DEFAULT 'panel',
+    occurred_at INTEGER NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+    platform TEXT NOT NULL DEFAULT 'twitch',
+    stream_title TEXT,
+    stream_category TEXT,
+    game_name TEXT,
+    stream_tags TEXT NOT NULL DEFAULT '[]',
+    stream_started_at INTEGER,
+    stream_elapsed_seconds INTEGER,
+    category_id TEXT,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    is_iconic INTEGER NOT NULL DEFAULT 0,
+    is_historic INTEGER NOT NULL DEFAULT 0,
+    is_channel_meme INTEGER NOT NULL DEFAULT 0,
+    display_count INTEGER NOT NULL DEFAULT 0,
+    share_count INTEGER NOT NULL DEFAULT 0,
+    custom_fields TEXT NOT NULL DEFAULT '{}',
+    internal_notes TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'active',
+    deleted_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+    UNIQUE(streamer_id, number)
+  );
+  CREATE INDEX IF NOT EXISTS idx_quotes_streamer_status
+    ON quotes(streamer_id, status, occurred_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_quotes_streamer_number
+    ON quotes(streamer_id, number);
+  CREATE INDEX IF NOT EXISTS idx_quotes_game
+    ON quotes(streamer_id, game_name, occurred_at DESC);
+`;
+
+const QUOTE_TAG_ASSIGNMENTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS quote_tag_assignments (
+    quote_id TEXT NOT NULL,
+    tag_id TEXT NOT NULL,
+    PRIMARY KEY (quote_id, tag_id),
+    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES quote_tags(id) ON DELETE CASCADE
+  );
+`;
+
+const COUNTERS_CHANNEL_CONFIG_TABLE = `
+  CREATE TABLE IF NOT EXISTS counters_channel_config (
+    streamer_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    config_version INTEGER NOT NULL DEFAULT 1,
+    live_mode_pins TEXT NOT NULL DEFAULT '[]',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
+const COUNTER_CATEGORIES_TABLE = `
+  CREATE TABLE IF NOT EXISTS counter_categories (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    color TEXT,
+    icon TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    deleted_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+    UNIQUE(streamer_id, slug)
+  );
+  CREATE INDEX IF NOT EXISTS idx_counter_categories_streamer_sort
+    ON counter_categories(streamer_id, sort_order);
+`;
+
+const COUNTERS_TABLE = `
+  CREATE TABLE IF NOT EXISTS counters (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    category_id TEXT,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'incremental',
+    value REAL NOT NULL DEFAULT 0,
+    min_value REAL,
+    max_value REAL,
+    goal_value REAL,
+    goal_reached_at INTEGER,
+    color TEXT NOT NULL DEFAULT '#6366f1',
+    icon TEXT,
+    emoji TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
+    visibility TEXT NOT NULL DEFAULT 'team',
+    status TEXT NOT NULL DEFAULT 'active',
+    reset_policy TEXT NOT NULL DEFAULT 'manual',
+    overlay_config TEXT NOT NULL DEFAULT '{}',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    last_changed_at INTEGER,
+    last_changed_by TEXT,
+    deleted_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES counter_categories(id) ON DELETE SET NULL,
+    UNIQUE(streamer_id, slug)
+  );
+  CREATE INDEX IF NOT EXISTS idx_counters_streamer_status
+    ON counters(streamer_id, status, sort_order);
+`;
+
+const COUNTER_HISTORY_TABLE = `
+  CREATE TABLE IF NOT EXISTS counter_history (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    counter_id TEXT NOT NULL,
+    counter_slug TEXT NOT NULL,
+    counter_name TEXT NOT NULL,
+    previous_value REAL NOT NULL,
+    new_value REAL NOT NULL,
+    delta REAL,
+    operation TEXT NOT NULL,
+    source TEXT NOT NULL,
+    actor_user_id TEXT,
+    actor_username TEXT,
+    actor_display_name TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_counter_history_streamer_created
+    ON counter_history(streamer_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_counter_history_counter
+    ON counter_history(counter_id, created_at DESC);
+`;
+
 const SCHEDULED_STREAMS_TABLE = `
   CREATE TABLE IF NOT EXISTS scheduled_streams (
     id TEXT PRIMARY KEY,
@@ -549,6 +746,37 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
   ];
 
   for (const sql of storeTables) {
+    try {
+      await execute(sql);
+    } catch {
+      /* tabela já existe ou ambiente remoto */
+    }
+  }
+
+  const quotesTables = [
+    QUOTES_CHANNEL_CONFIG_TABLE,
+    QUOTE_CATEGORIES_TABLE,
+    QUOTE_TAGS_TABLE,
+    QUOTES_TABLE,
+    QUOTE_TAG_ASSIGNMENTS_TABLE,
+  ];
+
+  for (const sql of quotesTables) {
+    try {
+      await execute(sql);
+    } catch {
+      /* tabela já existe ou ambiente remoto */
+    }
+  }
+
+  const countersTables = [
+    COUNTERS_CHANNEL_CONFIG_TABLE,
+    COUNTER_CATEGORIES_TABLE,
+    COUNTERS_TABLE,
+    COUNTER_HISTORY_TABLE,
+  ];
+
+  for (const sql of countersTables) {
     try {
       await execute(sql);
     } catch {
@@ -717,7 +945,7 @@ export async function initializeDatabase() {
     }
 
     await serviceClient.executeMultiple(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}${ECONOMY_CHANNEL_CONFIG_TABLE}${ECONOMY_POINTS_CONFIG_TABLE}${ECONOMY_LEVELS_CONFIG_TABLE}${CHANNEL_VIEWER_ECONOMY_TABLE}${PLATFORM_USER_COINS_TABLE}${ECONOMY_LIVE_REWARD_CLAIMS_TABLE}${ECONOMY_AUDIT_LOG_TABLE}${STORE_CHANNEL_CONFIG_TABLE}${STORE_CATEGORIES_TABLE}${STORE_PRODUCTS_TABLE}${STORE_REDEMPTIONS_TABLE}${STORE_AUDIT_LOG_TABLE}${STORE_BADGE_DEFINITIONS_TABLE}${STORE_USER_BADGES_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}${ECONOMY_CHANNEL_CONFIG_TABLE}${ECONOMY_POINTS_CONFIG_TABLE}${ECONOMY_LEVELS_CONFIG_TABLE}${CHANNEL_VIEWER_ECONOMY_TABLE}${PLATFORM_USER_COINS_TABLE}${ECONOMY_LIVE_REWARD_CLAIMS_TABLE}${ECONOMY_AUDIT_LOG_TABLE}${STORE_CHANNEL_CONFIG_TABLE}${STORE_CATEGORIES_TABLE}${STORE_PRODUCTS_TABLE}${STORE_REDEMPTIONS_TABLE}${STORE_AUDIT_LOG_TABLE}${STORE_BADGE_DEFINITIONS_TABLE}${STORE_USER_BADGES_TABLE}${QUOTES_CHANNEL_CONFIG_TABLE}${QUOTE_CATEGORIES_TABLE}${QUOTE_TAGS_TABLE}${QUOTES_TABLE}${QUOTE_TAG_ASSIGNMENTS_TABLE}${COUNTERS_CHANNEL_CONFIG_TABLE}${COUNTER_CATEGORIES_TABLE}${COUNTERS_TABLE}${COUNTER_HISTORY_TABLE}`
     );
   } else {
     const dbPath = dbUrl.startsWith("file:")
@@ -736,7 +964,7 @@ export async function initializeDatabase() {
     });
 
     sqlite.exec(
-      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}${ECONOMY_CHANNEL_CONFIG_TABLE}${ECONOMY_POINTS_CONFIG_TABLE}${ECONOMY_LEVELS_CONFIG_TABLE}${CHANNEL_VIEWER_ECONOMY_TABLE}${PLATFORM_USER_COINS_TABLE}${ECONOMY_LIVE_REWARD_CLAIMS_TABLE}${ECONOMY_AUDIT_LOG_TABLE}${STORE_CHANNEL_CONFIG_TABLE}${STORE_CATEGORIES_TABLE}${STORE_PRODUCTS_TABLE}${STORE_REDEMPTIONS_TABLE}${STORE_AUDIT_LOG_TABLE}${STORE_BADGE_DEFINITIONS_TABLE}${STORE_USER_BADGES_TABLE}`
+      `${STREAMERS_TABLE}${GAMES_TABLE}${STREAMER_GAMES_TABLE}${STREAMER_MODERATORS_TABLE}${SCHEDULED_STREAMS_TABLE}${BOT_ACTIVE_CHANNELS_TABLE}${BOT_CHANNEL_CONFIG_TABLE}${BOT_COMMANDS_TABLE}${BOT_TIMERS_TABLE}${BOT_BLACKLIST_TERMS_TABLE}${BOT_CHANNEL_HEARTBEAT_TABLE}${ECONOMY_CHANNEL_CONFIG_TABLE}${ECONOMY_POINTS_CONFIG_TABLE}${ECONOMY_LEVELS_CONFIG_TABLE}${CHANNEL_VIEWER_ECONOMY_TABLE}${PLATFORM_USER_COINS_TABLE}${ECONOMY_LIVE_REWARD_CLAIMS_TABLE}${ECONOMY_AUDIT_LOG_TABLE}${STORE_CHANNEL_CONFIG_TABLE}${STORE_CATEGORIES_TABLE}${STORE_PRODUCTS_TABLE}${STORE_REDEMPTIONS_TABLE}${STORE_AUDIT_LOG_TABLE}${STORE_BADGE_DEFINITIONS_TABLE}${STORE_USER_BADGES_TABLE}${QUOTES_CHANNEL_CONFIG_TABLE}${QUOTE_CATEGORIES_TABLE}${QUOTE_TAGS_TABLE}${QUOTES_TABLE}${QUOTE_TAG_ASSIGNMENTS_TABLE}${COUNTERS_CHANNEL_CONFIG_TABLE}${COUNTER_CATEGORIES_TABLE}${COUNTERS_TABLE}${COUNTER_HISTORY_TABLE}`
     );
 
     console.log("Local SQLite database initialized ✅");

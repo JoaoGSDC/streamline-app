@@ -1,4 +1,5 @@
 import { GENERAL_BUILTIN_COMMANDS } from "./general";
+import { QUOTES_BUILTIN_COMMANDS } from "./quotes";
 import { MODERATOR_BUILTIN_COMMANDS } from "./moderator";
 import { RAFFLES_BUILTIN_COMMANDS } from "./raffles";
 import { STREAMER_BUILTIN_COMMANDS } from "./streamer";
@@ -29,6 +30,7 @@ export {
 
 export const BOT_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
   ...GENERAL_BUILTIN_COMMANDS,
+  ...QUOTES_BUILTIN_COMMANDS,
   ...RAFFLES_BUILTIN_COMMANDS,
   ...MODERATOR_BUILTIN_COMMANDS,
   ...STREAMER_BUILTIN_COMMANDS,

@@ -92,6 +92,17 @@ export function raffleRuntime(
   return builtin(key, trigger, "raffles", "runtime", "everyone", options);
 }
 
+export function modRuntime(
+  key: string,
+  trigger: string,
+  options: BuiltinBaseOptions & { responseTemplate: string }
+) {
+  return builtin(key, trigger, "moderator", "runtime", "moderator", {
+    ...options,
+    defaultCooldownSeconds: options.defaultCooldownSeconds ?? 10,
+  });
+}
+
 export function modAction(
   key: string,
   trigger: string,

@@ -15,6 +15,8 @@ import { botVariables } from "./entities/bot-variables.services";
 import { botEmotes } from "./entities/bot-emotes.services";
 import { economy } from "./entities/economy.services";
 import { store } from "./entities/store.services";
+import { counters } from "./entities/counters.services";
+import { quotes } from "./entities/quotes.services";
 import { panelConfig } from "./entities/panel-config.services";
 import {
   GameService,
@@ -53,6 +55,8 @@ export const services = {
   botEmotes,
   economy,
   store,
+  counters,
+  quotes,
   panelConfig,
   gamesLegacy: GameService,
   scheduledStreamsLegacy: ScheduledStreamService,

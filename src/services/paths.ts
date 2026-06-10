@@ -84,6 +84,39 @@ export const ENDPOINTS = {
       InternalLiveRewardClaim: (streamerId: string) =>
         `/api/internal/economy/internal/channels/${streamerId}/live-rewards/claim`,
     },
+    Counters: {
+      Dashboard: "/api/internal/counters/dashboard",
+      Config: "/api/internal/counters/config",
+      Categories: "/api/internal/counters/categories",
+      Counters: "/api/internal/counters/counters",
+      History: "/api/internal/counters/history",
+      CounterById: (id: string) => `/api/internal/counters/counters/${id}`,
+      CounterAdjust: (id: string) => `/api/internal/counters/counters/${id}/adjust`,
+      CounterArchive: (id: string) => `/api/internal/counters/counters/${id}/archive`,
+      CounterDuplicate: (id: string) =>
+        `/api/internal/counters/counters/${id}/duplicate`,
+      InternalConfig: (streamerId: string) =>
+        `/api/internal/counters/internal/channels/${streamerId}/config`,
+      InternalAdjust: (streamerId: string) =>
+        `/api/internal/counters/internal/channels/${streamerId}/adjust`,
+    },
+    Quotes: {
+      Dashboard: "/api/internal/quotes/dashboard",
+      Config: "/api/internal/quotes/config",
+      Categories: "/api/internal/quotes/categories",
+      Quotes: "/api/internal/quotes/quotes",
+      QuoteById: (id: string) => `/api/internal/quotes/quotes/${id}`,
+      QuoteArchive: (id: string) => `/api/internal/quotes/quotes/${id}/archive`,
+      QuoteDuplicate: (id: string) => `/api/internal/quotes/quotes/${id}/duplicate`,
+      InternalConfig: (streamerId: string) =>
+        `/api/internal/quotes/internal/channels/${streamerId}/config`,
+      InternalCreate: (streamerId: string) =>
+        `/api/internal/quotes/internal/channels/${streamerId}/quotes`,
+      InternalRandom: (streamerId: string) =>
+        `/api/internal/quotes/internal/channels/${streamerId}/quotes/random`,
+      InternalByNumber: (streamerId: string, number: number) =>
+        `/api/internal/quotes/internal/channels/${streamerId}/quotes/by-number/${number}`,
+    },
     Store: {
       Dashboard: "/api/internal/store/dashboard",
       Config: "/api/internal/store/config",

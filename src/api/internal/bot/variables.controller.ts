@@ -21,6 +21,7 @@ import {
 import { BOT_COMMAND_ARG_VARIABLES } from "@lib/bot-message-substitution";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
 import { assertFeatureEnabledForStreamer } from "@server/panel/assert-feature-enabled";
+import { listCounters } from "@lib/counters-db-queries";
 
 export async function listBotVariablesController(request: NextRequest) {
   try {
@@ -34,7 +35,15 @@ export async function listBotVariablesController(request: NextRequest) {
     const streamer = await getStreamerById(resolved.streamerId);
     const timers = await listBotTimers(resolved.streamerId);
 
-    const dynamicCounters: BotVariableDefinition[] = [];
+    const activeCounters = await listCounters(resolved.streamerId, { status: "active" });
+    const dynamicCounters: BotVariableDefinition[] = activeCounters.items.map((counter) => ({
+      key: `{count:${counter.slug}}`,
+      label: counter.name,
+      description: `Valor atual do contador "${counter.name}".`,
+      usage: `Mortes: {count:${counter.slug}}`,
+      example: String(counter.value),
+      category: "counter" as const,
+    }));
     const dynamicTimers: BotVariableDefinition[] = timers.map((timer) => ({
       key: timer.name ? `{timer:${timer.name}}` : `{timer:${timer.id}}`,
       label: timer.name ?? "Timer sem nome",

@@ -6,6 +6,7 @@ import {
   listActiveBotBlacklistForSnapshot,
   listActiveBotTimersForSnapshot,
 } from "@lib/bot-db-queries";
+import { listCountersForBotSnapshot } from "@lib/counters-db-queries";
 import { getActiveCommandsCached } from "@lib/bot-command-cache";
 import { getStreamerById } from "@lib/db-queries";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
@@ -105,10 +106,11 @@ export async function getBotConfigSnapshotController(
       });
     }
 
-    const [commands, timers, blacklist] = await Promise.all([
+    const [commands, timers, blacklist, counters] = await Promise.all([
       getActiveCommandsCached(streamerId, configVersion),
       listActiveBotTimersForSnapshot(streamerId),
       listActiveBotBlacklistForSnapshot(streamerId),
+      listCountersForBotSnapshot(streamerId),
     ]);
 
     return jsonSuccess(
@@ -118,7 +120,7 @@ export async function getBotConfigSnapshotController(
         timers,
         blacklist,
         activeRaffle: null,
-        counters: [],
+        counters: counters.map((c) => ({ name: c.name, value: c.value })),
       },
       200,
       { "X-Config-Version": String(configVersion) }

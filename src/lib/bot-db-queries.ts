@@ -151,6 +151,13 @@ export async function ensureBuiltinBotCommands(streamerId: string) {
       builtin.responseTemplate?.trim() ||
       "";
 
+    const minPermission =
+      builtin.minRole === "streamer"
+        ? "streamer"
+        : builtin.minRole === "moderator"
+          ? "moderator"
+          : "everyone";
+
     await db.insert(botCommands).values({
       id: `builtin-${builtin.key}-${streamerId}`,
       streamerId,
@@ -159,6 +166,7 @@ export async function ensureBuiltinBotCommands(streamerId: string) {
       cooldownSeconds: builtin.defaultCooldownSeconds,
       enabled: true,
       builtinKey: builtin.key,
+      minPermission,
       createdAt: now,
       updatedAt: now,
     });

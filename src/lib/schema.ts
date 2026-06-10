@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 // Tabela de Streamers
 export const streamers = sqliteTable("streamers", {
@@ -510,6 +510,193 @@ export const storeUserBadges = sqliteTable("store_user_badges", {
     .references(() => storeBadgeDefinitions.id, { onDelete: "cascade" }),
   twitchUserId: text("twitch_user_id").notNull(),
   grantedAt: integer("granted_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Configuração do módulo de quotes por canal */
+export const quotesChannelConfig = sqliteTable("quotes_channel_config", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  publicEnabled: integer("public_enabled", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  autoCaptureContext: integer("auto_capture_context", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  configVersion: integer("config_version").notNull().default(1),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Categorias personalizadas de quotes */
+export const quoteCategories = sqliteTable("quote_categories", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Tags normalizadas de quotes */
+export const quoteTags = sqliteTable("quote_tags", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  usageCount: integer("usage_count").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Quotes do canal */
+export const quotes = sqliteTable("quotes", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  number: integer("number").notNull(),
+  text: text("text").notNull(),
+  textNormalized: text("text_normalized").notNull(),
+  speakerType: text("speaker_type").notNull().default("custom"),
+  speakerName: text("speaker_name").notNull(),
+  speakerTwitchId: text("speaker_twitch_id"),
+  registeredByUserId: text("registered_by_user_id"),
+  registeredByUsername: text("registered_by_username").notNull(),
+  registeredByRole: text("registered_by_role").notNull().default("owner"),
+  source: text("source").notNull().default("panel"),
+  occurredAt: integer("occurred_at", { mode: "timestamp" }).notNull(),
+  timezone: text("timezone").notNull().default("America/Sao_Paulo"),
+  platform: text("platform").notNull().default("twitch"),
+  streamTitle: text("stream_title"),
+  streamCategory: text("stream_category"),
+  gameName: text("game_name"),
+  streamTags: text("stream_tags").notNull().default("[]"),
+  streamStartedAt: integer("stream_started_at", { mode: "timestamp" }),
+  streamElapsedSeconds: integer("stream_elapsed_seconds"),
+  categoryId: text("category_id"),
+  isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
+  isIconic: integer("is_iconic", { mode: "boolean" }).notNull().default(false),
+  isHistoric: integer("is_historic", { mode: "boolean" }).notNull().default(false),
+  isChannelMeme: integer("is_channel_meme", { mode: "boolean" }).notNull().default(false),
+  displayCount: integer("display_count").notNull().default(0),
+  shareCount: integer("share_count").notNull().default(0),
+  customFields: text("custom_fields").notNull().default("{}"),
+  internalNotes: text("internal_notes"),
+  metadataJson: text("metadata_json").notNull().default("{}"),
+  status: text("status").notNull().default("active"),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Relação N:N quote ↔ tag */
+export const quoteTagAssignments = sqliteTable(
+  "quote_tag_assignments",
+  {
+    quoteId: text("quote_id")
+      .notNull()
+      .references(() => quotes.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => quoteTags.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.quoteId, table.tagId] }),
+  })
+);
+
+/** Config do módulo de contadores por canal */
+export const countersChannelConfig = sqliteTable("counters_channel_config", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  configVersion: integer("config_version").notNull().default(1),
+  liveModePins: text("live_mode_pins").notNull().default("[]"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Categorias de contadores */
+export const counterCategories = sqliteTable("counter_categories", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color"),
+  icon: text("icon"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Contadores ao vivo */
+export const counters = sqliteTable("counters", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  categoryId: text("category_id").references(() => counterCategories.id, {
+    onDelete: "set null",
+  }),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("incremental"),
+  value: real("value").notNull().default(0),
+  minValue: real("min_value"),
+  maxValue: real("max_value"),
+  goalValue: real("goal_value"),
+  goalReachedAt: integer("goal_reached_at", { mode: "timestamp" }),
+  color: text("color").notNull().default("#6366f1"),
+  icon: text("icon"),
+  emoji: text("emoji"),
+  tags: text("tags").notNull().default("[]"),
+  visibility: text("visibility").notNull().default("team"),
+  status: text("status").notNull().default("active"),
+  resetPolicy: text("reset_policy").notNull().default("manual"),
+  overlayConfig: text("overlay_config").notNull().default("{}"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  useCount: integer("use_count").notNull().default(0),
+  lastChangedAt: integer("last_changed_at", { mode: "timestamp" }),
+  lastChangedBy: text("last_changed_by"),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Histórico de alterações de contadores */
+export const counterHistory = sqliteTable("counter_history", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  counterId: text("counter_id").notNull(),
+  counterSlug: text("counter_slug").notNull(),
+  counterName: text("counter_name").notNull(),
+  previousValue: real("previous_value").notNull(),
+  newValue: real("new_value").notNull(),
+  delta: real("delta"),
+  operation: text("operation").notNull(),
+  source: text("source").notNull(),
+  actorUserId: text("actor_user_id"),
+  actorUsername: text("actor_username"),
+  actorDisplayName: text("actor_display_name"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 /** Blacklist de termos para moderação simples */

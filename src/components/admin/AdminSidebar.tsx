@@ -23,7 +23,7 @@ import { AdminChannelSwitcher } from "./AdminChannelSwitcher";
 import { PlanIndicator } from "@/components/panel/PlanIndicator";
 import type { AdminChannel } from "./AdminProvider";
 
-const MODULES_WITH_SUBNAV = new Set(["bot", "economy", "store"]);
+const MODULES_WITH_SUBNAV = new Set(["bot", "economy", "store", "quotes", "counters"]);
 
 /** Não entra no loop principal — link fixo no rodapé. */
 const SIDEBAR_UTILITY_FEATURE_KEYS = new Set(["panel_settings"]);
