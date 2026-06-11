@@ -10,6 +10,7 @@ import { botCommands } from "./entities/bot-commands.services";
 import { botTimers } from "./entities/bot-timers.services";
 import { botBlacklist } from "./entities/bot-blacklist.services";
 import { botActivation } from "./entities/bot-activation.services";
+import { botOAuth } from "./entities/bot-oauth.services";
 import { botStatus } from "./entities/bot-status.services";
 import { botVariables } from "./entities/bot-variables.services";
 import { botEmotes } from "./entities/bot-emotes.services";
@@ -50,6 +51,7 @@ export const services = {
   botTimers,
   botBlacklist,
   botActivation,
+  botOAuth,
   botStatus,
   botVariables,
   botEmotes,

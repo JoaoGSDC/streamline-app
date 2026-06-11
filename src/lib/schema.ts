@@ -110,6 +110,20 @@ export const botActiveChannels = sqliteTable("bot_active_channels", {
   deactivatedAt: integer("deactivated_at", { mode: "timestamp" }),
 });
 
+/**
+ * OAuth do streamer para comandos de broadcast (!setjogo, !settitulo, polls).
+ * Escrita pelo painel; o bot lê e renova o access token localmente.
+ */
+export const streamerTwitchOAuth = sqliteTable("streamer_twitch_oauth", {
+  streamerId: text("streamer_id")
+    .primaryKey()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  refreshToken: text("refresh_token").notNull(),
+  scopes: text("scopes").notNull().default("[]"),
+  twitchUserId: text("twitch_user_id").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 /** Versão monotônica da config do bot por canal (sync com serviço Bot) */
 export const botChannelConfig = sqliteTable("bot_channel_config", {
   streamerId: text("streamer_id")

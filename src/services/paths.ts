@@ -35,6 +35,7 @@ export const ENDPOINTS = {
     AdminPanelConfig: "/api/internal/admin/panel-config",
     Bot: {
       Activation: "/api/internal/bot/activation",
+      OAuthAuthorize: "/api/internal/bot/oauth/authorize",
       Commands: "/api/internal/bot/commands",
       CommandById: (id: string) => `/api/internal/bot/commands/${id}`,
       CommandUsage: (id: string) => `/api/internal/bot/commands/${id}/usage`,

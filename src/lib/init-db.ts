@@ -87,6 +87,17 @@ const BOT_ACTIVE_CHANNELS_TABLE = `
   );
 `;
 
+const STREAMER_TWITCH_OAUTH_TABLE = `
+  CREATE TABLE IF NOT EXISTS streamer_twitch_oauth (
+    streamer_id TEXT PRIMARY KEY,
+    refresh_token TEXT NOT NULL,
+    scopes TEXT NOT NULL DEFAULT '[]',
+    twitch_user_id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+`;
+
 const BOT_CHANNEL_CONFIG_TABLE = `
   CREATE TABLE IF NOT EXISTS bot_channel_config (
     streamer_id TEXT PRIMARY KEY,
@@ -813,6 +824,12 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
 
   try {
     await execute(BOT_ACTIVE_CHANNELS_TABLE);
+  } catch {
+    /* tabela já existe ou ambiente remoto */
+  }
+
+  try {
+    await execute(STREAMER_TWITCH_OAUTH_TABLE);
   } catch {
     /* tabela já existe ou ambiente remoto */
   }

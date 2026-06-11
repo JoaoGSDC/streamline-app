@@ -7,7 +7,22 @@ import {
   isBotChannelActive,
 } from "@lib/bot-db-queries";
 import { getStreamerById } from "@lib/db-queries";
+import {
+  deleteStreamerTwitchOAuth,
+  getStreamerTwitchOAuthStatus,
+  type StreamerTwitchOAuthStatus,
+} from "@lib/streamer-oauth-db-queries";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
+
+function mapTwitchOAuthResponse(status: StreamerTwitchOAuthStatus) {
+  return {
+    connected: status.connected,
+    hasBroadcastScope: status.hasBroadcastScope,
+    hasBotScope: status.hasBotScope,
+    scopes: status.scopes,
+    updatedAt: status.updatedAt?.toISOString() ?? null,
+  };
+}
 
 function mapActivationResponse(
   streamerId: string,
@@ -15,7 +30,8 @@ function mapActivationResponse(
   active: boolean,
   createdAt: Date | null,
   updatedAt: Date | null,
-  deactivatedAt: Date | null
+  deactivatedAt: Date | null,
+  twitchOAuth: StreamerTwitchOAuthStatus
 ) {
   return {
     active,
@@ -25,6 +41,7 @@ function mapActivationResponse(
     createdAt: createdAt?.toISOString() ?? null,
     updatedAt: updatedAt?.toISOString() ?? null,
     deactivatedAt: deactivatedAt?.toISOString() ?? null,
+    twitchOAuth: mapTwitchOAuthResponse(twitchOAuth),
   };
 }
 
@@ -42,6 +59,7 @@ export async function getBotActivationController(request: NextRequest) {
 
     const row = await getBotActiveChannel(resolved.streamerId);
     const active = await isBotChannelActive(resolved.streamerId);
+    const twitchOAuth = await getStreamerTwitchOAuthStatus(resolved.streamerId);
 
     return jsonSuccess(
       mapActivationResponse(
@@ -50,7 +68,8 @@ export async function getBotActivationController(request: NextRequest) {
         active,
         row?.createdAt ?? null,
         row?.updatedAt ?? null,
-        row?.deactivatedAt ?? null
+        row?.deactivatedAt ?? null,
+        twitchOAuth
       )
     );
   } catch (error) {
@@ -71,6 +90,8 @@ export async function activateBotChannelController(request: NextRequest) {
     }
 
     const alreadyActive = await isBotChannelActive(resolved.streamerId);
+    const twitchOAuth = await getStreamerTwitchOAuthStatus(resolved.streamerId);
+
     if (alreadyActive) {
       const row = await getBotActiveChannel(resolved.streamerId);
       return jsonSuccess(
@@ -80,7 +101,8 @@ export async function activateBotChannelController(request: NextRequest) {
           true,
           row?.createdAt ?? null,
           row?.updatedAt ?? null,
-          null
+          null,
+          twitchOAuth
         )
       );
     }
@@ -97,7 +119,8 @@ export async function activateBotChannelController(request: NextRequest) {
         true,
         result.createdAt,
         result.updatedAt,
-        null
+        null,
+        twitchOAuth
       ),
       result.reactivated ? 200 : 201
     );
@@ -119,6 +142,9 @@ export async function deactivateBotChannelController(request: NextRequest) {
     }
 
     const result = await deactivateBotChannel(resolved.streamerId);
+    await deleteStreamerTwitchOAuth(resolved.streamerId);
+    const twitchOAuth = await getStreamerTwitchOAuthStatus(resolved.streamerId);
+
     if (!result) {
       return jsonSuccess(
         mapActivationResponse(
@@ -127,7 +153,8 @@ export async function deactivateBotChannelController(request: NextRequest) {
           false,
           null,
           null,
-          null
+          null,
+          twitchOAuth
         )
       );
     }
@@ -141,7 +168,8 @@ export async function deactivateBotChannelController(request: NextRequest) {
         false,
         row?.createdAt ?? null,
         row?.updatedAt ?? null,
-        result.deactivatedAt
+        result.deactivatedAt,
+        twitchOAuth
       )
     );
   } catch (error) {

@@ -1,6 +1,14 @@
 import { httpClient } from "@services/axios";
 import { ENDPOINTS } from "@services/paths";
 
+export interface BotTwitchOAuthStatus {
+  connected: boolean;
+  hasBroadcastScope: boolean;
+  hasBotScope: boolean;
+  scopes: string[];
+  updatedAt: string | null;
+}
+
 export interface BotActivationResponse {
   active: boolean;
   streamerId: string;
@@ -9,6 +17,7 @@ export interface BotActivationResponse {
   createdAt: string | null;
   updatedAt: string | null;
   deactivatedAt: string | null;
+  twitchOAuth: BotTwitchOAuthStatus;
 }
 
 export const botActivation = {

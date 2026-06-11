@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Bot, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { AlertTriangle, Bot, Link2, Loader2 } from "lucide-react";
 import { useBotActivationContext } from "@features/bot/context/BotActivationContext";
+import { services } from "@services";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -18,8 +21,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  denied: "Autorização negada na Twitch.",
+  no_code: "Código OAuth ausente. Tente conectar novamente.",
+  invalid_state: "Sessão OAuth expirada. Tente conectar novamente.",
+  no_refresh_token: "A Twitch não retornou refresh token. Reconecte a conta.",
+  no_user: "Não foi possível obter o perfil da Twitch.",
+  account_mismatch:
+    "A conta autorizada não é a do canal. Faça login com a conta do streamer.",
+  callback_error: "Erro ao concluir a conexão. Tente novamente.",
+  streamer_not_found: "Canal não encontrado. Recarregue a página.",
+};
+
 export function BotActivationPanel() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const {
     activation,
     active,
@@ -27,13 +43,44 @@ export function BotActivationPanel() {
     submitting,
     activate,
     deactivate,
+    refresh,
   } = useBotActivationContext();
 
   const [confirmActivateOpen, setConfirmActivateOpen] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [connectingOAuth, setConnectingOAuth] = useState(false);
 
   const botUsername = activation?.botUsername ?? "streaminhubbot";
   const channelUsername = activation?.twitchUsername ?? "seu canal";
+  const twitchOAuth = activation?.twitchOAuth;
+  const needsBroadcastReconnect =
+    !twitchOAuth?.connected || !twitchOAuth?.hasBroadcastScope;
+
+  useEffect(() => {
+    const oauthResult = searchParams.get("oauth");
+    if (!oauthResult) return;
+
+    if (oauthResult === "connected") {
+      toast({
+        title: "Conta Twitch conectada",
+        description:
+          "Comandos como !setjogo e !settitulo estão habilitados para o bot.",
+      });
+      void refresh();
+    } else {
+      toast({
+        title: "Falha na conexão Twitch",
+        description:
+          OAUTH_ERROR_MESSAGES[oauthResult] ??
+          "Não foi possível conectar a conta Twitch.",
+        variant: "destructive",
+      });
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("oauth");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }, [refresh, searchParams, toast]);
 
   const handleToggle = (checked: boolean) => {
     if (checked) {
@@ -41,6 +88,21 @@ export function BotActivationPanel() {
       return;
     }
     setConfirmDeactivateOpen(true);
+  };
+
+  const handleConnectTwitch = async () => {
+    setConnectingOAuth(true);
+    try {
+      const { url } = await services.botOAuth.getAuthorizeUrl();
+      window.location.href = url;
+    } catch {
+      toast({
+        title: "Não foi possível iniciar a conexão",
+        description: "Tente novamente em instantes.",
+        variant: "destructive",
+      });
+      setConnectingOAuth(false);
+    }
   };
 
   const handleConfirmActivate = async () => {
@@ -77,7 +139,8 @@ export function BotActivationPanel() {
 
     toast({
       title: "Bot desativado",
-      description: "As configurações foram preservadas, mas o bot não atuará no seu chat.",
+      description:
+        "As configurações foram preservadas, mas o bot não atuará no seu chat.",
     });
   };
 
@@ -124,9 +187,7 @@ export function BotActivationPanel() {
               disabled={submitting}
               onCheckedChange={handleToggle}
               aria-label={
-                active
-                  ? "Desativar bot no chat"
-                  : "Ativar bot no chat"
+                active ? "Desativar bot no chat" : "Ativar bot no chat"
               }
             />
           </div>
@@ -138,6 +199,54 @@ export function BotActivationPanel() {
             moderação e variáveis ficam bloqueadas.
           </p>
         )}
+
+        <div className="mt-4 space-y-3 border-t border-outline-variant/20 pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-body-sm font-medium">Conta Twitch do canal</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {twitchOAuth?.connected && twitchOAuth.hasBroadcastScope
+                  ? "Conectada — !setjogo, !settitulo, polls e raid disponíveis."
+                  : "Conecte sua conta Twitch para habilitar comandos de broadcast."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={connectingOAuth || submitting}
+              onClick={() => void handleConnectTwitch()}
+            >
+              {connectingOAuth ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Redirecionando…
+                </>
+              ) : (
+                <>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  {twitchOAuth?.connected ? "Reconectar Twitch" : "Conectar Twitch"}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {needsBroadcastReconnect ? (
+            <div
+              className="flex gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-200/90"
+              role="alert"
+            >
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <p>
+                Reconecte sua conta Twitch para habilitar{" "}
+                <strong>!setjogo</strong> e <strong>!settitulo</strong> (e
+                outros comandos de broadcast). A autorização exige os escopos{" "}
+                <code className="text-amber-100">channel:bot</code> e{" "}
+                <code className="text-amber-100">channel:manage:broadcast</code>.
+              </p>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <AlertDialog open={confirmActivateOpen} onOpenChange={setConfirmActivateOpen}>
@@ -158,8 +267,9 @@ export function BotActivationPanel() {
                   .
                 </p>
                 <p>
-                  Você poderá configurar comandos, timers e moderação somente
-                  após a ativação.
+                  Para comandos como <strong>!setjogo</strong> e{" "}
+                  <strong>!settitulo</strong>, conecte sua conta Twitch logo
+                  após ativar.
                 </p>
               </div>
             </AlertDialogDescription>
@@ -195,7 +305,8 @@ export function BotActivationPanel() {
             <AlertDialogTitle>Desativar bot no chat?</AlertDialogTitle>
             <AlertDialogDescription>
               O bot @{botUsername} deixará de atuar no chat de {channelUsername}.
-              Suas configurações serão mantidas para quando você reativar.
+              Suas configurações serão mantidas, mas a autorização Twitch do canal
+              será removida.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
