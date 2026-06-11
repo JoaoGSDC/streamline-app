@@ -17,9 +17,12 @@ export const STREAMER_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
   }),
   streamerAction("marker", "!marker", {
     description: "Cria marcador na transmissão (VOD).",
+    argsHint: "[descrição opcional]",
     responseTemplate: "Marcador criado na transmissão.",
     confirmationPrompt:
       "@{displayName}, criar um marcador na live agora? Responda sim ou não.",
+    runtimeNotes:
+      "POST Helix /streams/markers — exige live, VOD habilitado e token do streamer (channel:manage:broadcast).",
   }),
   streamerAction("ad", "!ad", {
     description: "Inicia anúncio na live.",

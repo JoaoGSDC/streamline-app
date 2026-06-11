@@ -22,6 +22,7 @@ import { AdvancedSection } from "@features/bot/components/bot-command-edit/Advan
 import { BasicSection } from "@features/bot/components/bot-command-edit/BasicSection";
 import { MultipleResponsesSection } from "@features/bot/components/bot-command-edit/MultipleResponsesSection";
 import { PermissionSection } from "@features/bot/components/bot-command-edit/PermissionSection";
+import { CounterEffectSection } from "@features/bot/components/bot-command-edit/CounterEffectSection";
 import { PointsEffectSection } from "@features/bot/components/bot-command-edit/PointsEffectSection";
 import { UsageLimitsSection } from "@features/bot/components/bot-command-edit/UsageLimitsSection";
 import { validateTrigger } from "@features/bot/components/bot-command-edit/command-form.utils";
@@ -186,6 +187,8 @@ export function BotCommandEditDialog({
             }
             economyRewardPoints={command.economyRewardPoints ?? null}
           />
+
+          <CounterEffectSection {...formBinding} />
 
           <AdvancedSection {...formBinding} />
 

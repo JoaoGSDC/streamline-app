@@ -10,6 +10,7 @@ import {
   getEconomyConfigSnapshot,
   getEconomyConfigVersion,
   getViewerBalance,
+  isViewerBlockedFromPoints,
   setViewerPoints,
   upsertChannelViewer,
 } from "@lib/economy-db-queries";
@@ -265,6 +266,23 @@ export async function postEconomyInternalAdjustPointsController(
     const actorUsername = parsed.data.actorTwitchUsername;
 
     if (parsed.data.action === "set") {
+      const blocked = await isViewerBlockedFromPoints(
+        streamerId,
+        targetUserId,
+        targetUsername
+      );
+      if (blocked) {
+        const current = await getViewerBalance(streamerId, targetUserId);
+        const currentPoints = current.channel?.points ?? 0;
+        if (parsed.data.amount > currentPoints) {
+          return jsonError(
+            "Usuário bloqueado de receber pontos",
+            403,
+            "USER_BLOCKED"
+          );
+        }
+      }
+
       const viewer = await setViewerPoints({
         auditId: createRandomString(16),
         streamerId,
@@ -292,6 +310,21 @@ export async function postEconomyInternalAdjustPointsController(
 
     const delta =
       parsed.data.action === "remove" ? -parsed.data.amount : parsed.data.amount;
+
+    if (delta > 0) {
+      const blocked = await isViewerBlockedFromPoints(
+        streamerId,
+        targetUserId,
+        targetUsername
+      );
+      if (blocked) {
+        return jsonError(
+          "Usuário bloqueado de receber pontos",
+          403,
+          "USER_BLOCKED"
+        );
+      }
+    }
 
     const viewer = await adjustViewerPoints({
       auditId: createRandomString(16),

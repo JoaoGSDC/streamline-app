@@ -67,6 +67,7 @@ function recordToRow(
     economyRewardKey: catalogItem?.economyRewardKey ?? null,
     economyRewardPoints: catalogItem?.economyRewardPoints ?? null,
     pointsEffect: record.pointsEffect ?? null,
+    counterEffect: record.counterEffect ?? null,
     cooldownMessage: record.cooldownMessage ?? null,
   };
 }

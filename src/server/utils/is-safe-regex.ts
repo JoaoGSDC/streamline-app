@@ -1,11 +1,12 @@
 import safeRegex from "safe-regex2";
+import { cleanRegexPattern } from "@/lib/regex-utils";
 
 /**
- * Heurística anti-ReDoS para padrões aceitos em comandos customizados.
+ * Heurística anti-ReDoS para padrões aceitos em comandos customizados e moderação.
  * Usa safe-regex2 + validação sintática e limites de tamanho.
  */
 export function isSafeRegex(pattern: string): boolean {
-  const clean = pattern.replace(/^\/(.*)\/[gimsuy]*$/, "$1");
+  const clean = cleanRegexPattern(pattern);
 
   if (clean.length > 300) return false;
 

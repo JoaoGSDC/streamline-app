@@ -323,6 +323,25 @@ const ECONOMY_AUDIT_LOG_TABLE = `
     ON economy_audit_log(streamer_id, created_at DESC);
 `;
 
+const ECONOMY_POINTS_BLOCKLIST_TABLE = `
+  CREATE TABLE IF NOT EXISTS economy_points_blocklist (
+    id TEXT PRIMARY KEY,
+    streamer_id TEXT NOT NULL,
+    twitch_user_id TEXT NOT NULL,
+    twitch_login TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    reason TEXT,
+    created_by_user_id TEXT,
+    created_by_username TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_economy_points_blocklist_streamer_login
+    ON economy_points_blocklist(streamer_id, twitch_login);
+  CREATE INDEX IF NOT EXISTS idx_economy_points_blocklist_streamer_user
+    ON economy_points_blocklist(streamer_id, twitch_user_id);
+`;
+
 const STORE_CHANNEL_CONFIG_TABLE = `
   CREATE TABLE IF NOT EXISTS store_channel_config (
     streamer_id TEXT PRIMARY KEY,
@@ -637,6 +656,8 @@ const COUNTERS_TABLE = `
     visibility TEXT NOT NULL DEFAULT 'team',
     status TEXT NOT NULL DEFAULT 'active',
     reset_policy TEXT NOT NULL DEFAULT 'manual',
+    source TEXT NOT NULL DEFAULT 'manual',
+    readonly INTEGER NOT NULL DEFAULT 0,
     overlay_config TEXT NOT NULL DEFAULT '{}',
     sort_order INTEGER NOT NULL DEFAULT 0,
     use_count INTEGER NOT NULL DEFAULT 0,
@@ -675,6 +696,91 @@ const COUNTER_HISTORY_TABLE = `
     ON counter_history(streamer_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_counter_history_counter
     ON counter_history(counter_id, created_at DESC);
+`;
+
+const RAFFLES_TABLE = `
+  CREATE TABLE IF NOT EXISTS raffles (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    streamer_id TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    keyword TEXT,
+    title TEXT,
+    prize_description TEXT,
+    winner_count INTEGER NOT NULL DEFAULT 1,
+    max_entries_per_user INTEGER NOT NULL DEFAULT 1,
+    duration_seconds INTEGER,
+    points_cost INTEGER NOT NULL DEFAULT 0,
+    require_follower INTEGER NOT NULL DEFAULT 0,
+    min_follow_days INTEGER NOT NULL DEFAULT 0,
+    require_sub INTEGER NOT NULL DEFAULT 0,
+    allowed_sub_tiers TEXT NOT NULL DEFAULT '["1","2","3"]',
+    require_vip INTEGER NOT NULL DEFAULT 0,
+    exclude_mods INTEGER NOT NULL DEFAULT 0,
+    exclude_vips INTEGER NOT NULL DEFAULT 0,
+    require_winner_confirmation INTEGER NOT NULL DEFAULT 0,
+    confirmation_timeout_seconds INTEGER NOT NULL DEFAULT 60,
+    confirmation_keyword TEXT NOT NULL DEFAULT 'sim',
+    announce_start INTEGER NOT NULL DEFAULT 1,
+    announce_reminders TEXT NOT NULL DEFAULT '[120,60,30]',
+    announce_winner INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'draft',
+    started_at INTEGER,
+    closed_at INTEGER,
+    completed_at INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (streamer_id) REFERENCES streamers(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_raffles_channel_status ON raffles(channel_id, status);
+  CREATE INDEX IF NOT EXISTS idx_raffles_streamer_status ON raffles(streamer_id, status);
+`;
+
+const RAFFLE_ENTRIES_TABLE = `
+  CREATE TABLE IF NOT EXISTS raffle_entries (
+    id TEXT PRIMARY KEY,
+    raffle_id TEXT NOT NULL,
+    twitch_user_id TEXT NOT NULL,
+    twitch_login TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    entry_count INTEGER NOT NULL DEFAULT 1,
+    source TEXT NOT NULL DEFAULT 'chat',
+    entered_at INTEGER NOT NULL,
+    FOREIGN KEY (raffle_id) REFERENCES raffles(id) ON DELETE CASCADE,
+    UNIQUE (raffle_id, twitch_user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_raffle_entries_raffle ON raffle_entries(raffle_id);
+`;
+
+const RAFFLE_WINNERS_TABLE = `
+  CREATE TABLE IF NOT EXISTS raffle_winners (
+    id TEXT PRIMARY KEY,
+    raffle_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 1,
+    drawn_at INTEGER NOT NULL,
+    confirmed_at INTEGER,
+    rerolled_at INTEGER,
+    reroll_reason TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    FOREIGN KEY (raffle_id) REFERENCES raffles(id) ON DELETE CASCADE,
+    FOREIGN KEY (entry_id) REFERENCES raffle_entries(id)
+  );
+`;
+
+const RAFFLE_CHAT_MESSAGES_TABLE = `
+  CREATE TABLE IF NOT EXISTS raffle_chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raffle_id TEXT NOT NULL,
+    twitch_user_id TEXT NOT NULL,
+    twitch_login TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    message TEXT NOT NULL,
+    message_type TEXT NOT NULL DEFAULT 'chat',
+    sent_at INTEGER NOT NULL,
+    FOREIGN KEY (raffle_id) REFERENCES raffles(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_raffle_messages_raffle ON raffle_chat_messages(raffle_id, sent_at DESC);
 `;
 
 const SCHEDULED_STREAMS_TABLE = `
@@ -725,6 +831,7 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     PLATFORM_USER_COINS_TABLE,
     ECONOMY_LIVE_REWARD_CLAIMS_TABLE,
     ECONOMY_AUDIT_LOG_TABLE,
+    ECONOMY_POINTS_BLOCKLIST_TABLE,
   ];
 
   for (const sql of economyTables) {
@@ -784,6 +891,21 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     }
   }
 
+  const rafflesTables = [
+    RAFFLES_TABLE,
+    RAFFLE_ENTRIES_TABLE,
+    RAFFLE_WINNERS_TABLE,
+    RAFFLE_CHAT_MESSAGES_TABLE,
+  ];
+
+  for (const sql of rafflesTables) {
+    try {
+      await execute(sql);
+    } catch {
+      /* tabela já existe ou ambiente remoto */
+    }
+  }
+
   const migrations = [
     `ALTER TABLE streamers ADD COLUMN social_links TEXT`,
     `ALTER TABLE streamers ADD COLUMN partner INTEGER NOT NULL DEFAULT 0`,
@@ -817,6 +939,9 @@ async function runStreamerMigrations(execute: (sql: string) => unknown) {
     `ALTER TABLE streamers ADD COLUMN plan_expires_at INTEGER`,
     `ALTER TABLE bot_commands ADD COLUMN points_effect TEXT`,
     `ALTER TABLE bot_commands ADD COLUMN cooldown_message TEXT`,
+    `ALTER TABLE counters ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`,
+    `ALTER TABLE counters ADD COLUMN readonly INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE bot_commands ADD COLUMN counter_effect TEXT`,
   ];
 
   for (const sql of migrations) {

@@ -41,6 +41,14 @@ export const COUNTER_CHANGE_SOURCES = [
 
 export type CounterChangeSource = (typeof COUNTER_CHANGE_SOURCES)[number];
 
+export const COUNTER_SOURCES = [
+  "manual",
+  "twitch_followers",
+  "twitch_subscribers",
+] as const;
+
+export type CounterSource = (typeof COUNTER_SOURCES)[number];
+
 export interface CounterCategoryDto {
   id: string;
   streamerId: string;
@@ -89,6 +97,8 @@ export interface CounterDto {
   visibility: string;
   status: CounterStatus;
   resetPolicy: CounterResetPolicy;
+  source: CounterSource;
+  readonly: boolean;
   overlayConfig: CounterOverlayConfig;
   sortOrder: number;
   useCount: number;
@@ -170,6 +180,8 @@ export interface CreateCounterInput {
   categoryId?: string | null;
   tags?: string[];
   resetPolicy?: CounterResetPolicy;
+  source?: CounterSource;
+  readonly?: boolean;
   overlayConfig?: CounterOverlayConfig;
 }
 
@@ -186,8 +198,12 @@ export interface BotAdjustCounterInput {
 /** Snapshot leve para o bot ({count:slug}) */
 export interface CounterBotSnapshot {
   id: string;
+  slug: string;
   name: string;
+  displayName: string;
   value: number;
   goalValue: number | null;
   type: CounterType;
+  source: CounterSource;
+  readonly: boolean;
 }

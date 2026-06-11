@@ -162,6 +162,7 @@ export const botCommands = sqliteTable("bot_commands", {
   useCount: integer("use_count").notNull().default(0),
   /** JSON — efeito de pontos configurável por comando */
   pointsEffect: text("points_effect"),
+  counterEffect: text("counter_effect"),
   /** Mensagem exibida 1× por período de cooldown quando bloqueado */
   cooldownMessage: text("cooldown_message"),
   deletedAt: integer("deleted_at", { mode: "timestamp" }),
@@ -335,6 +336,21 @@ export const economyLiveRewardClaims = sqliteTable("economy_live_reward_claims",
   streamStartedAt: text("stream_started_at").notNull(),
   pointsAwarded: integer("points_awarded").notNull().default(0),
   claimedAt: integer("claimed_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Viewers bloqueados de receber pontos automaticamente no canal */
+export const economyPointsBlocklist = sqliteTable("economy_points_blocklist", {
+  id: text("id").primaryKey(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  twitchUserId: text("twitch_user_id").notNull(),
+  twitchLogin: text("twitch_login").notNull(),
+  displayName: text("display_name").notNull(),
+  reason: text("reason"),
+  createdByUserId: text("created_by_user_id"),
+  createdByUsername: text("created_by_username"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 /** Auditoria de alterações manuais na economia */
@@ -669,6 +685,8 @@ export const counters = sqliteTable("counters", {
   visibility: text("visibility").notNull().default("team"),
   status: text("status").notNull().default("active"),
   resetPolicy: text("reset_policy").notNull().default("manual"),
+  source: text("source").notNull().default("manual"),
+  readonly: integer("readonly", { mode: "boolean" }).notNull().default(false),
   overlayConfig: text("overlay_config").notNull().default("{}"),
   sortOrder: integer("sort_order").notNull().default(0),
   useCount: integer("use_count").notNull().default(0),
@@ -697,6 +715,90 @@ export const counterHistory = sqliteTable("counter_history", {
   actorUsername: text("actor_username"),
   actorDisplayName: text("actor_display_name"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+/** Sorteios ao vivo */
+export const raffles = sqliteTable("raffles", {
+  id: text("id").primaryKey(),
+  channelId: text("channel_id").notNull(),
+  streamerId: text("streamer_id")
+    .notNull()
+    .references(() => streamers.id, { onDelete: "cascade" }),
+  mode: text("mode").notNull(),
+  keyword: text("keyword"),
+  title: text("title"),
+  prizeDescription: text("prize_description"),
+  winnerCount: integer("winner_count").notNull().default(1),
+  maxEntriesPerUser: integer("max_entries_per_user").notNull().default(1),
+  durationSeconds: integer("duration_seconds"),
+  pointsCost: integer("points_cost").notNull().default(0),
+  requireFollower: integer("require_follower", { mode: "boolean" }).notNull().default(false),
+  minFollowDays: integer("min_follow_days").notNull().default(0),
+  requireSub: integer("require_sub", { mode: "boolean" }).notNull().default(false),
+  allowedSubTiers: text("allowed_sub_tiers").notNull().default('["1","2","3"]'),
+  requireVip: integer("require_vip", { mode: "boolean" }).notNull().default(false),
+  excludeMods: integer("exclude_mods", { mode: "boolean" }).notNull().default(false),
+  excludeVips: integer("exclude_vips", { mode: "boolean" }).notNull().default(false),
+  requireWinnerConfirmation: integer("require_winner_confirmation", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(false),
+  confirmationTimeoutSeconds: integer("confirmation_timeout_seconds")
+    .notNull()
+    .default(60),
+  confirmationKeyword: text("confirmation_keyword").notNull().default("sim"),
+  announceStart: integer("announce_start", { mode: "boolean" }).notNull().default(true),
+  announceReminders: text("announce_reminders").notNull().default("[120,60,30]"),
+  announceWinner: integer("announce_winner", { mode: "boolean" }).notNull().default(true),
+  status: text("status").notNull().default("draft"),
+  startedAt: integer("started_at", { mode: "timestamp" }),
+  closedAt: integer("closed_at", { mode: "timestamp" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const raffleEntries = sqliteTable("raffle_entries", {
+  id: text("id").primaryKey(),
+  raffleId: text("raffle_id")
+    .notNull()
+    .references(() => raffles.id, { onDelete: "cascade" }),
+  twitchUserId: text("twitch_user_id").notNull(),
+  twitchLogin: text("twitch_login").notNull(),
+  displayName: text("display_name").notNull(),
+  entryCount: integer("entry_count").notNull().default(1),
+  source: text("source").notNull().default("chat"),
+  enteredAt: integer("entered_at", { mode: "timestamp" }).notNull(),
+});
+
+export const raffleWinners = sqliteTable("raffle_winners", {
+  id: text("id").primaryKey(),
+  raffleId: text("raffle_id")
+    .notNull()
+    .references(() => raffles.id, { onDelete: "cascade" }),
+  entryId: text("entry_id")
+    .notNull()
+    .references(() => raffleEntries.id),
+  position: integer("position").notNull().default(1),
+  drawnAt: integer("drawn_at", { mode: "timestamp" }).notNull(),
+  confirmedAt: integer("confirmed_at", { mode: "timestamp" }),
+  rerolledAt: integer("rerolled_at", { mode: "timestamp" }),
+  rerollReason: text("reroll_reason"),
+  status: text("status").notNull().default("pending"),
+});
+
+export const raffleChatMessages = sqliteTable("raffle_chat_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  raffleId: text("raffle_id")
+    .notNull()
+    .references(() => raffles.id, { onDelete: "cascade" }),
+  twitchUserId: text("twitch_user_id").notNull(),
+  twitchLogin: text("twitch_login").notNull(),
+  displayName: text("display_name").notNull(),
+  message: text("message").notNull(),
+  messageType: text("message_type").notNull().default("chat"),
+  sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
 });
 
 /** Blacklist de termos para moderação simples */

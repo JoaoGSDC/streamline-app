@@ -1,5 +1,6 @@
 /** Tipos e defaults dos campos avançados de `bot_commands`. */
 
+import type { CommandCounterEffect } from "./command-counter-effect";
 import type { CommandPointsEffect } from "./command-points-effect";
 
 export const BOT_COMMAND_MIN_PERMISSIONS = [
@@ -103,6 +104,7 @@ export interface BotCommandDto extends BotCommandAdvancedFields {
   builtinKey: string | null;
   isBuiltin: boolean;
   pointsEffect: CommandPointsEffect | null;
+  counterEffect: CommandCounterEffect | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -23,6 +23,7 @@ export interface BotCommandRowState extends BotCommandAdvancedFields {
   economyRewardKey?: "daily" | "early" | null;
   economyRewardPoints?: number | null;
   pointsEffect?: CommandPointsEffect | null;
+  counterEffect?: import("@server/bot/command-counter-effect").CommandCounterEffect | null;
   cooldownMessage: string | null;
   isDraft?: boolean;
   isNew?: boolean;

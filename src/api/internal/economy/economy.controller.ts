@@ -2,14 +2,18 @@ import { NextRequest } from "next/server";
 import { resolveEconomyOwnerStreamerId } from "@lib/economy-auth";
 import {
   addChannelViewerManual,
+  addPointsBlocklistEntry,
   adjustUserCoins,
   adjustViewerPoints,
   getChannelRanking,
   getEconomyFullConfig,
   getEconomyOverview,
   getViewerBalance,
+  isViewerBlockedFromPoints,
   listChannelViewers,
+  listPointsBlocklist,
   removeChannelViewer,
+  removePointsBlocklistEntry,
   resetAllChannelPoints,
   resetViewerEconomy,
   setViewerPoints,
@@ -19,6 +23,7 @@ import {
 } from "@lib/economy-db-queries";
 import {
   economyAddViewerSchema,
+  economyPointsBlocklistAddSchema,
   economyRemoveViewerSchema,
   economyResetAllPointsSchema,
   economySetPointsSchema,
@@ -463,5 +468,78 @@ export async function postEconomyResetAllPointsController(request: NextRequest) 
     return jsonSuccess(result);
   } catch (error) {
     return handleRouteError(error, "Falha ao resetar pontos do canal");
+  }
+}
+
+export async function getEconomyPointsBlocklistController(request: NextRequest) {
+  try {
+    const resolved = await resolveEconomyOwnerStreamerId(request);
+    if ("error" in resolved) {
+      return jsonError(resolved.error, resolved.status, resolved.code);
+    }
+
+    const items = await listPointsBlocklist(resolved.streamerId);
+    return jsonSuccess(items);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao carregar bloqueios de pontos");
+  }
+}
+
+export async function postEconomyPointsBlocklistController(request: NextRequest) {
+  try {
+    const resolved = await resolveEconomyOwnerStreamerId(request);
+    if ("error" in resolved) {
+      return jsonError(resolved.error, resolved.status, resolved.code);
+    }
+
+    const body = await request.json();
+    const parsed = economyPointsBlocklistAddSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(formatZodErrorMessages(parsed.error), 400, "VALIDATION_ERROR");
+    }
+
+    let twitchUserId = parsed.data.twitchUserId;
+    let displayName = parsed.data.displayName;
+
+    if (!twitchUserId || !displayName) {
+      const twitchUser = await twitchServerService.getUserByLogin(parsed.data.twitchLogin);
+      if (!twitchUser) {
+        return jsonError("Usuário não encontrado na Twitch", 404, "NOT_FOUND");
+      }
+      twitchUserId = twitchUser.id;
+      displayName = displayName ?? twitchUser.displayName;
+    }
+
+    const entry = await addPointsBlocklistEntry({
+      streamerId: resolved.streamerId,
+      twitchUserId,
+      twitchLogin: parsed.data.twitchLogin,
+      displayName,
+      reason: parsed.data.reason,
+      createdByUserId: resolved.user.id,
+      createdByUsername:
+        resolved.user.twitchUsername ?? resolved.user.name ?? resolved.user.id,
+    });
+
+    return jsonSuccess(entry, 201);
+  } catch (error) {
+    return handleRouteError(error, "Falha ao bloquear usuário");
+  }
+}
+
+export async function deleteEconomyPointsBlocklistController(
+  request: NextRequest,
+  entryId: string
+) {
+  try {
+    const resolved = await resolveEconomyOwnerStreamerId(request);
+    if ("error" in resolved) {
+      return jsonError(resolved.error, resolved.status, resolved.code);
+    }
+
+    await removePointsBlocklistEntry(resolved.streamerId, entryId);
+    return jsonSuccess({ success: true });
+  } catch (error) {
+    return handleRouteError(error, "Falha ao remover bloqueio");
   }
 }

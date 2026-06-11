@@ -11,4 +11,5 @@ export const ECONOMY_LIVE_REWARD_POINTS: Record<EconomyLiveRewardKey, number> = 
 export type EconomyLiveRewardClaimStatus =
   | "claimed"
   | "already_claimed"
-  | "economy_disabled";
+  | "economy_disabled"
+  | "user_blocked";

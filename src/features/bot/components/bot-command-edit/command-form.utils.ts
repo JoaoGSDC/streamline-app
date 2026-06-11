@@ -156,26 +156,8 @@ export function inferCooldownUnit(seconds: number): CooldownUnit {
   return "seconds";
 }
 
-export type RegexTestResult = "match" | "no_match" | "invalid" | "timeout";
-
-export function testRegexSafely(
-  pattern: string,
-  input: string
-): Promise<RegexTestResult> {
-  return new Promise((resolve) => {
-    const timer = window.setTimeout(() => resolve("timeout"), 500);
-
-    try {
-      const regex = new RegExp(pattern);
-      const matched = regex.test(input);
-      window.clearTimeout(timer);
-      resolve(matched ? "match" : "no_match");
-    } catch {
-      window.clearTimeout(timer);
-      resolve("invalid");
-    }
-  });
-}
+export type { RegexTestResult } from "@/lib/regex-utils";
+export { testRegexSafely } from "@/lib/regex-utils";
 
 export function buildCustomCommandPayload(command: BotCommandRowState) {
   return {
@@ -201,6 +183,7 @@ export function buildCustomCommandPayload(command: BotCommandRowState) {
     responseType: command.responseType,
     responseAlternatives: command.responseAlternatives,
     pointsEffect: command.pointsEffect ?? null,
+    counterEffect: command.counterEffect ?? null,
     cooldownMessage: command.cooldownMessage ?? null,
   };
 }

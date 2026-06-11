@@ -98,11 +98,12 @@ export const GENERAL_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
     responseTemplate: "Bem-vindo de volta, {displayName}! Que bom te ver por aqui de novo.",
   }),
   generalRuntime("watchtime", "!watchtime", {
-    description: "Tempo total assistindo ao canal.",
+    description: "Tempo assistindo a live atual.",
     defaultCooldownSeconds: 20,
     responseTemplate:
-      "{displayName}, você já passou {watchtime} acompanhando o {channel}.",
-    runtimeNotes: "Depende de contador/pontos persistidos pelo bot.",
+      "{displayName}, você já passou {watchtime} nesta live do {channel}.",
+    runtimeNotes:
+      "Contador por live (zera ao encerrar). Independente do sistema de pontos.",
   }),
   generalRuntime("daily", "!daily", {
     description:
@@ -147,11 +148,11 @@ export const GENERAL_BUILTIN_COMMANDS: BotBuiltinCommandDefinition[] = [
     economyBalanceCommand: true,
   }),
   generalRuntime("rank", "!rank", {
-    description: "Posição do usuário no ranking de watchtime do canal.",
+    description: "Top 5 assistidores da live e posição do usuário.",
     defaultCooldownSeconds: 20,
     responseTemplate:
-      "{displayName}, você está em #{rank} no ranking de presença do canal.",
-    runtimeNotes: "Depende de contador/pontos persistidos pelo bot.",
+      "Top da live: {watchRankTop} — {displayName}, você está em #{rank}.",
+    runtimeNotes: "Ranking de watchtime da live atual — não confundir com ranking de pontos.",
   }),
   generalStatic(
     "pix",

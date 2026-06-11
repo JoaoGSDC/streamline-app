@@ -12,6 +12,7 @@ import {
 } from "@server/bot/bot.validators";
 import { HttpError } from "@server/utils/http-error";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
+import { logInvalidBlacklistRegexAttempt } from "@api/internal/bot/bot-commands-shared";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -36,6 +37,13 @@ export async function patchBotBlacklistController(
     const body = await request.json();
     const parsed = updateBotBlacklistSchema.safeParse(body);
     if (!parsed.success) {
+      await logInvalidBlacklistRegexAttempt({
+        streamerId: resolved.streamerId,
+        actor: resolved.user,
+        error: parsed.error,
+        body,
+        targetId: id,
+      });
       return jsonError(
         formatZodErrorMessages(parsed.error),
         400,
@@ -43,10 +51,13 @@ export async function patchBotBlacklistController(
       );
     }
 
+    const nextMatchType = parsed.data.matchType ?? existing.matchType;
+
     if (parsed.data.term) {
       const duplicate = await getBotBlacklistByTerm(
         resolved.streamerId,
         parsed.data.term,
+        nextMatchType,
         id
       );
       if (duplicate) {

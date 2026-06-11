@@ -75,12 +75,14 @@ export default function BotModerationPage() {
     <div className="admin-page-stack overflow-x-hidden">
       <AdminPageHeader
         title="Moderação"
-        description="Palavras e termos que o bot detectará no chat. Correspondência sem diferenciar maiúsculas/minúsculas."
+        description="Palavras, termos e patterns regex que o bot detectará no chat."
       />
 
       <p className="rounded-lg bg-muted/30 px-5 py-3 text-body-admin text-muted-foreground">
-        Regex não é suportado no MVP. Revise termos curtos para evitar falsos
-        positivos.
+        Contém e Exato funcionam com palavras literais (sem diferenciar
+        maiúsculas). Regex captura evasões — ex.: variações de &quot;bola&quot;
+        como &quot;bolinha&quot; ou &quot;b0la&quot;. Patterns passam por
+        validação anti-ReDoS antes de serem aceitos.
       </p>
 
       <BotBlacklistQuickAdd submitting={submitting} onSubmit={handleAdd} />

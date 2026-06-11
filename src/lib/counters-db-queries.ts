@@ -21,10 +21,19 @@ import type {
   CreateCounterInput,
   CounterChangeSource,
 } from "@server/counters/counters.types";
+import { DEFAULT_CHANNEL_COUNTERS } from "@server/counters/counters-defaults";
 import { slugifyCounterText } from "@server/counters/counters.validators";
+import {
+  fetchChannelFollowerTotal,
+  fetchChannelSubscriberTotal,
+} from "@server/twitch/twitch-channel-stats";
 import { HttpError } from "@server/utils/http-error";
 import { touchBotConfig } from "./bot-db-queries";
+import { getStreamerById } from "./db-queries";
 import { createRandomString } from "@utils/factories/create-random-string";
+
+const TWITCH_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const twitchSyncAt = new Map<string, number>();
 
 function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -78,6 +87,8 @@ async function ensureCountersConfig(streamerId: string): Promise<CountersChannel
     updatedAt: now,
   });
 
+  await ensureDefaultCounters(streamerId);
+
   return {
     streamerId,
     enabled: true,
@@ -126,6 +137,8 @@ function mapCounterRow(
     visibility: row.visibility,
     status: row.status as CounterDto["status"],
     resetPolicy: row.resetPolicy as CounterDto["resetPolicy"],
+    source: (row.source as CounterDto["source"]) ?? "manual",
+    readonly: Boolean(row.readonly),
     overlayConfig: parseOverlayConfig(row.overlayConfig),
     sortOrder: row.sortOrder,
     useCount: row.useCount,
@@ -195,8 +208,112 @@ function resolveNewValue(
   }
 }
 
+export async function ensureDefaultCounters(streamerId: string): Promise<void> {
+  for (const definition of DEFAULT_CHANNEL_COUNTERS) {
+    const existing = await getCounterBySlug(streamerId, definition.slug);
+    if (existing) continue;
+
+    const now = new Date();
+    await db.insert(counters).values({
+      id: createRandomString(12),
+      streamerId,
+      categoryId: null,
+      slug: definition.slug,
+      name: definition.name,
+      description: definition.description,
+      type: "free",
+      value: 0,
+      color: definition.color,
+      emoji: definition.emoji,
+      tags: JSON.stringify(["twitch", "default"]),
+      source: definition.source,
+      readonly: definition.readonly,
+      sortOrder: definition.sortOrder,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+}
+
+async function setCounterValueFromAutomation(
+  streamerId: string,
+  counter: CounterDto,
+  value: number
+): Promise<void> {
+  const previousValue = counter.value;
+  const newValue = clampValue(value, counter.minValue, counter.maxValue);
+  if (previousValue === newValue) return;
+
+  const now = new Date();
+  await db
+    .update(counters)
+    .set({
+      value: newValue,
+      lastChangedAt: now,
+      lastChangedBy: "twitch-sync",
+      updatedAt: now,
+    })
+    .where(and(eq(counters.streamerId, streamerId), eq(counters.id, counter.id)));
+
+  await recordHistory({
+    streamerId,
+    counter,
+    previousValue,
+    newValue,
+    operation: "set",
+    source: "automation",
+    actorUserId: null,
+    actorUsername: "twitch-sync",
+    actorDisplayName: "Twitch API",
+  });
+
+  await syncBotAfterCounterChange(streamerId);
+}
+
+export async function syncTwitchDefaultCounters(
+  streamerId: string,
+  options: { force?: boolean } = {}
+): Promise<void> {
+  const config = await ensureCountersConfig(streamerId);
+  if (!config.enabled) return;
+
+  const lastSync = twitchSyncAt.get(streamerId) ?? 0;
+  if (!options.force && Date.now() - lastSync < TWITCH_SYNC_INTERVAL_MS) {
+    return;
+  }
+
+  await ensureDefaultCounters(streamerId);
+
+  const streamer = await getStreamerById(streamerId);
+  if (!streamer?.twitchId) return;
+
+  const broadcasterId = streamer.twitchId;
+  const [followers, subscribers] = await Promise.all([
+    fetchChannelFollowerTotal(broadcasterId),
+    fetchChannelSubscriberTotal(broadcasterId),
+  ]);
+
+  if (followers !== null) {
+    const counter = await getCounterBySlug(streamerId, "followers");
+    if (counter) {
+      await setCounterValueFromAutomation(streamerId, counter, followers);
+    }
+  }
+
+  if (subscribers !== null) {
+    const counter = await getCounterBySlug(streamerId, "subscribers");
+    if (counter) {
+      await setCounterValueFromAutomation(streamerId, counter, subscribers);
+    }
+  }
+
+  twitchSyncAt.set(streamerId, Date.now());
+}
+
 export async function getCountersConfig(streamerId: string): Promise<CountersChannelConfigDto> {
-  return ensureCountersConfig(streamerId);
+  const config = await ensureCountersConfig(streamerId);
+  await ensureDefaultCounters(streamerId);
+  return config;
 }
 
 export async function getCountersConfigVersion(streamerId: string): Promise<number> {
@@ -396,6 +513,8 @@ export async function createCounter(input: CreateCounterInput): Promise<CounterD
     emoji: input.emoji ?? null,
     tags: JSON.stringify(input.tags ?? []),
     resetPolicy: input.resetPolicy ?? "manual",
+    source: input.source ?? "manual",
+    readonly: input.readonly ?? false,
     overlayConfig: JSON.stringify(input.overlayConfig ?? {}),
     createdAt: now,
     updatedAt: now,
@@ -525,7 +644,7 @@ async function recordHistory(params: {
     counterName: params.counter.name,
     previousValue: params.previousValue,
     newValue: params.newValue,
-    delta: operationIsRead(params.operation) ? null : delta,
+    delta,
     operation: params.operation,
     source: params.source,
     actorUserId: params.actorUserId ?? null,
@@ -533,10 +652,6 @@ async function recordHistory(params: {
     actorDisplayName: params.actorDisplayName ?? null,
     createdAt: new Date(),
   });
-}
-
-function operationIsRead(operation: CounterOperation): boolean {
-  return false;
 }
 
 export async function adjustCounter(
@@ -560,6 +675,15 @@ export async function adjustCounter(
   if (!counter) throw new HttpError("Contador não encontrado", 404, "NOT_FOUND");
   if (counter.status === "archived") {
     throw new HttpError("Contador arquivado", 400, "COUNTER_ARCHIVED");
+  }
+
+  const source = options.source ?? "panel";
+  if (counter.readonly && source !== "automation") {
+    throw new HttpError(
+      "Este contador é somente leitura (sincronizado pela Twitch)",
+      403,
+      "COUNTER_READONLY"
+    );
   }
 
   const previousValue = counter.value;
@@ -708,12 +832,18 @@ export async function listCountersForBotSnapshot(
   const config = await ensureCountersConfig(streamerId);
   if (!config.enabled) return [];
 
+  await syncTwitchDefaultCounters(streamerId);
+
   const result = await listCounters(streamerId, { status: "active" });
   return result.items.map((c) => ({
     id: c.id,
+    slug: c.slug,
     name: c.slug,
+    displayName: c.name,
     value: c.value,
     goalValue: c.goalValue,
     type: c.type,
+    source: c.source,
+    readonly: c.readonly,
   }));
 }

@@ -1,8 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { FlaskConical } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -14,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CollapsibleSection } from "./CollapsibleSection";
-import { RegexTestDialog } from "./RegexTestDialog";
+import { RegexPatternInput } from "@/components/shared/RegexPatternInput";
 import type { CommandFormBinding } from "./command-form.types";
 
 interface ToggleRowProps {
@@ -52,8 +49,6 @@ export function AdvancedSection({
   onChange,
   disabled = false,
 }: CommandFormBinding) {
-  const [regexTestOpen, setRegexTestOpen] = useState(false);
-
   return (
     <>
       <CollapsibleSection
@@ -119,30 +114,12 @@ export function AdvancedSection({
 
             {command.argValidationType === "regex" ? (
               <div className="mt-2 space-y-2">
-                <div className="space-y-1">
-                  <div className="flex gap-2">
-                    <Input
-                      value={command.argRegexPattern || ""}
-                      disabled={disabled}
-                      onChange={(event) =>
-                        onChange({ argRegexPattern: event.target.value })
-                      }
-                      placeholder="^[a-zA-Z0-9_]+$"
-                      className="font-mono text-xs"
-                      maxLength={300}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      disabled={!command.argRegexPattern?.trim()}
-                      onClick={() => setRegexTestOpen(true)}
-                    >
-                      <FlaskConical className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
+                <RegexPatternInput
+                  value={command.argRegexPattern || ""}
+                  onChange={(argRegexPattern) => onChange({ argRegexPattern })}
+                  disabled={disabled}
+                  placeholder="^[a-zA-Z0-9_]+$"
+                />
                 <Input
                   value={command.argValidationError || ""}
                   disabled={disabled}
@@ -162,12 +139,6 @@ export function AdvancedSection({
           </div>
         </div>
       </CollapsibleSection>
-
-      <RegexTestDialog
-        open={regexTestOpen}
-        onOpenChange={setRegexTestOpen}
-        pattern={command.argRegexPattern}
-      />
     </>
   );
 }

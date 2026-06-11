@@ -7,6 +7,7 @@ import {
   listActiveBotTimersForSnapshot,
 } from "@lib/bot-db-queries";
 import { listCountersForBotSnapshot } from "@lib/counters-db-queries";
+import { getActiveRaffleBotSnapshot } from "@lib/raffles-db-queries";
 import { getActiveCommandsCached } from "@lib/bot-command-cache";
 import { getStreamerById } from "@lib/db-queries";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
@@ -106,11 +107,12 @@ export async function getBotConfigSnapshotController(
       });
     }
 
-    const [commands, timers, blacklist, counters] = await Promise.all([
+    const [commands, timers, blacklist, counters, activeRaffle] = await Promise.all([
       getActiveCommandsCached(streamerId, configVersion),
       listActiveBotTimersForSnapshot(streamerId),
       listActiveBotBlacklistForSnapshot(streamerId),
       listCountersForBotSnapshot(streamerId),
+      getActiveRaffleBotSnapshot(streamerId),
     ]);
 
     return jsonSuccess(
@@ -119,8 +121,18 @@ export async function getBotConfigSnapshotController(
         commands,
         timers,
         blacklist,
-        activeRaffle: null,
-        counters: counters.map((c) => ({ name: c.name, value: c.value })),
+        activeRaffle,
+        counters: counters.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.slug,
+          displayName: c.displayName,
+          value: c.value,
+          goalValue: c.goalValue,
+          type: c.type,
+          source: c.source,
+          readonly: c.readonly,
+        })),
       },
       200,
       { "X-Config-Version": String(configVersion) }

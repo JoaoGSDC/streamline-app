@@ -67,6 +67,9 @@ export const ENDPOINTS = {
       ResetUser: "/api/internal/economy/users/reset",
       RemoveUser: "/api/internal/economy/users/remove",
       ResetAllPoints: "/api/internal/economy/users/reset-all-points",
+      PointsBlocklist: "/api/internal/economy/points-blocklist",
+      PointsBlocklistEntry: (id: string) =>
+        `/api/internal/economy/points-blocklist/${id}`,
       InternalConfig: (streamerId: string) =>
         `/api/internal/economy/internal/channels/${streamerId}/config`,
       InternalBalance: (streamerId: string, twitchUserId: string) =>
@@ -149,6 +152,28 @@ export const ENDPOINTS = {
         `/api/internal/store/internal/channels/${streamerId}/redemptions`,
       InternalCatalog: (username: string) =>
         `/api/internal/store/internal/catalog/${encodeURIComponent(username)}`,
+    },
+    Raffles: {
+      Active: "/api/internal/raffles/active",
+      History: "/api/internal/raffles/history",
+      Raffles: "/api/internal/raffles",
+      RaffleById: (id: string) => `/api/internal/raffles/${id}`,
+      RaffleStart: (id: string) => `/api/internal/raffles/${id}/start`,
+      RafflePause: (id: string) => `/api/internal/raffles/${id}/pause`,
+      RaffleResume: (id: string) => `/api/internal/raffles/${id}/resume`,
+      RaffleClose: (id: string) => `/api/internal/raffles/${id}/close`,
+      RaffleReopen: (id: string) => `/api/internal/raffles/${id}/reopen`,
+      RaffleDraw: (id: string) => `/api/internal/raffles/${id}/draw`,
+      RaffleReroll: (id: string) => `/api/internal/raffles/${id}/reroll`,
+      RaffleStream: (id: string) => `/api/internal/raffles/${id}/stream`,
+      RaffleExport: (id: string) => `/api/internal/raffles/${id}/export`,
+      RaffleEntries: (id: string) => `/api/internal/raffles/${id}/entries`,
+      RaffleEntryById: (id: string, entryId: string) =>
+        `/api/internal/raffles/${id}/entries/${entryId}`,
+      RaffleConfirmWinner: (id: string, winnerId: string) =>
+        `/api/internal/raffles/${id}/winners/${winnerId}/confirm`,
+      BotEntry: "/api/internal/raffles/bot/entry",
+      BotMessage: "/api/internal/raffles/bot/message",
     },
   },
   Panel: {

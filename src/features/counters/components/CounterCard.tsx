@@ -32,9 +32,16 @@ export function CounterCard({
           {counter.emoji ? <span>{counter.emoji}</span> : null}
           <span className="truncate">{counter.name}</span>
         </CardTitle>
-        {counter.categoryName ? (
-          <p className="text-caption text-muted-foreground">{counter.categoryName}</p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {counter.categoryName ? (
+            <p className="text-caption text-muted-foreground">{counter.categoryName}</p>
+          ) : null}
+          {counter.readonly ? (
+            <span className="rounded-full bg-[#9146FF]/15 px-2 py-0.5 text-caption text-[#b9a3ff]">
+              Twitch
+            </span>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="font-headline text-headline-lg font-bold tabular-nums">

@@ -80,10 +80,28 @@ export const BOT_GLOBAL_VARIABLES: BotVariableDefinition[] = [
     key: "{count:<nome>}",
     label: "Valor de contador",
     description:
-      "Substitui pelo valor atual de um contador. Troque <nome> pelo identificador do contador (ex.: vitórias).",
-    usage: "Vitórias hoje: {count:vitorias}",
+      "Substitui pelo valor atual de um contador. Troque <nome> pelo identificador (slug) do contador.",
+    usage: "Mortes: {count:mortes} | Seguidores: {count:followers}",
     category: "counter",
-    example: "{count:vitorias} → 12",
+    example: "{count:mortes} → 12",
+  },
+  {
+    key: "{count:followers}",
+    label: "Seguidores (Twitch)",
+    description:
+      "Contador padrão sincronizado com a API da Twitch. Atualiza automaticamente.",
+    usage: "Temos {count:followers} seguidores!",
+    category: "counter",
+    example: "{count:followers} → 15420",
+  },
+  {
+    key: "{count:subscribers}",
+    label: "Inscritos (Twitch)",
+    description:
+      "Contador padrão de inscritos do canal. Atualizado pela Twitch quando disponível.",
+    usage: "Obrigado aos {count:subscribers} inscritos!",
+    category: "counter",
+    example: "{count:subscribers} → 340",
   },
 ];
 
@@ -137,7 +155,7 @@ export const BOT_LIVE_VARIABLES: BotVariableDefinition[] = [
     description: "Duração desde o início da transmissão.",
     usage: "Live há {uptime}",
     category: "live",
-    example: "3h 42min",
+    example: "3 horas e 42 minutos",
   },
   {
     key: "{viewers}",
@@ -458,7 +476,7 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     description: "Duração formatada desde o início da transmissão.",
     usage: "A live está no ar há {uptime}.",
     category: "meta",
-    example: "2h 15min",
+    example: "2 horas e 15 minutos",
   },
   {
     key: "{followage}",
@@ -466,7 +484,7 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     description: "Há quanto tempo o usuário segue o canal.",
     usage: "Você segue há {followage}.",
     category: "meta",
-    example: "3 meses",
+    example: "2 anos, 3 meses e 15 dias",
   },
   {
     key: "{game}",
@@ -481,7 +499,7 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     description: "Tempo na categoria/jogo atual.",
     usage: "Já faz {gameDuration} nessa categoria.",
     category: "meta",
-    example: "45 min",
+    example: "45 minutos",
   },
   {
     key: "{title}",
@@ -503,6 +521,7 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
     description: "Tempo desde a criação da conta Twitch do usuário.",
     usage: "Conta criada há {accountage}.",
     category: "meta",
+    example: "5 anos, 1 mês e 8 dias",
   },
   {
     key: "{firstChatter}",
@@ -514,9 +533,18 @@ export const BOT_RUNTIME_TEMPLATE_VARIABLES: BotVariableDefinition[] = [
   {
     key: "{watchtime}",
     label: "Watchtime",
-    description: "Tempo total assistindo ao canal.",
-    usage: "Você já passou {watchtime} aqui.",
+    description: "Tempo assistindo a live atual (zera ao encerrar a transmissão).",
+    usage: "Você já passou {watchtime} nesta live.",
     category: "meta",
+    example: "45 minutos",
+  },
+  {
+    key: "{watchRankTop}",
+    label: "Top assistidores",
+    description: "Top 5 de quem mais assistiu a live atual.",
+    usage: "Top da live: {watchRankTop}",
+    category: "meta",
+    example: "1º Alice (2 horas) · 2º Bob (1 hora e 30 minutos)",
   },
   {
     key: "{rank}",

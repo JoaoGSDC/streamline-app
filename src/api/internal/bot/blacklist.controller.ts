@@ -11,6 +11,7 @@ import {
 } from "@server/bot/bot.validators";
 import { handleRouteError, jsonError, jsonSuccess } from "@api/shared/api-response";
 import { createRandomString } from "@utils/factories/create-random-string";
+import { logInvalidBlacklistRegexAttempt } from "@api/internal/bot/bot-commands-shared";
 
 export async function listBotBlacklistController(request: NextRequest) {
   try {
@@ -37,6 +38,12 @@ export async function createBotBlacklistController(request: NextRequest) {
     const body = await request.json();
     const parsed = createBotBlacklistSchema.safeParse(body);
     if (!parsed.success) {
+      await logInvalidBlacklistRegexAttempt({
+        streamerId: resolved.streamerId,
+        actor: resolved.user,
+        error: parsed.error,
+        body,
+      });
       return jsonError(
         formatZodErrorMessages(parsed.error),
         400,
@@ -46,7 +53,8 @@ export async function createBotBlacklistController(request: NextRequest) {
 
     const duplicate = await getBotBlacklistByTerm(
       resolved.streamerId,
-      parsed.data.term
+      parsed.data.term,
+      parsed.data.matchType
     );
     if (duplicate) {
       return jsonError("Este termo já está na blacklist", 409, "CONFLICT");

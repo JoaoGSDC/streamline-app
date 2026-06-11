@@ -89,6 +89,15 @@ export function advancedFieldsFromValidated(
   if (data.responseAlternatives !== undefined) {
     fields.responseAlternatives = data.responseAlternatives;
   }
+  if (data.pointsEffect !== undefined) {
+    fields.pointsEffect = data.pointsEffect;
+  }
+  if (data.counterEffect !== undefined) {
+    fields.counterEffect = data.counterEffect;
+  }
+  if (data.cooldownMessage !== undefined) {
+    fields.cooldownMessage = data.cooldownMessage;
+  }
 
   return fields;
 }
@@ -101,6 +110,43 @@ export function collectTriggersForConflictCheck(data: {
   if (data.trigger) triggers.push(data.trigger);
   if (data.aliases?.length) triggers.push(...data.aliases);
   return triggers;
+}
+
+export async function logInvalidBlacklistRegexAttempt(input: {
+  streamerId: string;
+  actor: SessionUser;
+  error: ZodError;
+  body: unknown;
+  targetId?: string;
+}) {
+  const bodyObj =
+    input.body && typeof input.body === "object"
+      ? (input.body as Record<string, unknown>)
+      : {};
+
+  const termIssue = input.error.issues.find((issue) =>
+    issue.path.includes("term")
+  );
+  if (!termIssue) return;
+
+  const isRegexAttempt =
+    bodyObj.matchType === "regex" ||
+    termIssue.message.toLowerCase().includes("regex");
+  if (!isRegexAttempt) return;
+
+  await recordBotAudit({
+    id: createRandomString(16),
+    streamerId: input.streamerId,
+    actorUserId: input.actor.id,
+    actorUsername: resolveActorUsername(input.actor),
+    targetType: "bot_blacklist",
+    targetId: input.targetId ?? "new",
+    action: "invalid_regex_rejected",
+    diff: {
+      pattern: bodyObj.term ?? null,
+      message: termIssue.message,
+    },
+  });
 }
 
 export async function logInvalidRegexAttempt(input: {

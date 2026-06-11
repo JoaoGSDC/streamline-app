@@ -155,4 +155,15 @@ export const botClaimLiveRewardSchema = z.object({
   pointsAmount: z.coerce.number().int().min(0).max(1_000_000).optional(),
 });
 
+export const economyPointsBlocklistAddSchema = z.object({
+  twitchLogin: z
+    .string()
+    .min(1)
+    .max(64)
+    .transform((v) => v.trim().toLowerCase().replace(/^@/, "")),
+  twitchUserId: z.string().min(1).max(64).optional(),
+  displayName: z.string().min(1).max(64).optional(),
+  reason: z.string().max(300).optional(),
+});
+
 export const defaultLevelsDefinitionJson = JSON.stringify(DEFAULT_LEVELS_DEFINITION);

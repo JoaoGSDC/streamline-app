@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { getMultiplierHint } from "@features/economy/utils/multiplier-hint";
 import { useEconomyPointsPage } from "@features/economy/hooks/use-economy-points-page.hook";
+import { EconomyPointsBlocklistSection } from "@features/economy/components/EconomyPointsBlocklistSection";
 
 const MULTIPLIER_FIELDS = [
   {
@@ -207,6 +208,8 @@ export default function EconomyPointsPage() {
             />
           </div>
         </AdminConfigSection>
+
+        <EconomyPointsBlocklistSection />
 
         <AdminConfigSection title="Mensagem no chat">
           <div className="admin-subsection-stack">

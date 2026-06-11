@@ -75,6 +75,15 @@ export const PANEL_FEATURES: PanelFeature[] = [
     route: "/admin/contadores",
   },
   {
+    key: "raffles",
+    label: "Sorteios",
+    description: "Realize sorteios ao vivo com o chat da Twitch.",
+    icon: "confetti",
+    requiredPlan: "free",
+    defaultEnabled: true,
+    route: "/admin/sorteios",
+  },
+  {
     key: "bot",
     label: "Bot",
     description:

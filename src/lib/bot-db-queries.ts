@@ -11,7 +11,9 @@ import {
 } from "@lib/bot-timer-schedule";
 import {
   mapBotCommandAdvancedFields,
+  mapBotCommandCounterEffect,
   mapBotCommandPointsEffect,
+  serializeCommandCounterEffectField,
   serializeCommandPointsEffectField,
   serializeJsonStringArray,
 } from "./bot-command-fields";
@@ -30,11 +32,13 @@ import type {
   BotCommandUsagePeriod,
   BotCommandUsageStatsDto,
 } from "@server/bot/bot-command.types";
+import type { CommandCounterEffect } from "@server/bot/command-counter-effect";
 import type { CommandPointsEffect } from "@server/bot/command-points-effect";
 import {
   SAFE_TRIGGER,
   sanitizeResponse,
 } from "@server/bot/sanitize-response";
+import { cleanRegexPattern } from "@/lib/regex-utils";
 
 export function normalizeBotTrigger(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
@@ -52,8 +56,15 @@ function sanitizeStoredResponse(
   return sanitizeResponse(response, isAction).trim();
 }
 
-export function normalizeBlacklistTerm(raw: string): string {
-  return raw.trim().toLowerCase();
+export function normalizeBlacklistTerm(
+  raw: string,
+  matchType: "exact" | "contains" | "regex" = "contains"
+): string {
+  const trimmed = raw.trim();
+  if (matchType === "regex") {
+    return cleanRegexPattern(trimmed);
+  }
+  return trimmed.toLowerCase();
 }
 
 async function bumpBotConfigVersion(streamerId: string): Promise<number> {
@@ -108,6 +119,7 @@ function mapCommandRow(row: typeof botCommands.$inferSelect): BotCommandDto {
     updatedAt: row.updatedAt,
     createdAt: row.createdAt,
     pointsEffect: mapBotCommandPointsEffect(row),
+    counterEffect: mapBotCommandCounterEffect(row),
     ...mapBotCommandAdvancedFields(row),
   };
 }
@@ -342,6 +354,7 @@ export type BotCommandWriteAdvancedFields = Partial<{
   responseType: string;
   responseAlternatives: string[];
   pointsEffect?: CommandPointsEffect | null;
+  counterEffect?: CommandCounterEffect | null;
   cooldownMessage?: string | null;
 }>;
 
@@ -400,6 +413,9 @@ function applyAdvancedFieldsToPatch(
   }
   if (data.pointsEffect !== undefined) {
     patch.pointsEffect = serializeCommandPointsEffectField(data.pointsEffect);
+  }
+  if (data.counterEffect !== undefined) {
+    patch.counterEffect = serializeCommandCounterEffectField(data.counterEffect);
   }
   if (data.cooldownMessage !== undefined) {
     patch.cooldownMessage = data.cooldownMessage?.trim() || null;
@@ -791,7 +807,7 @@ function mapBlacklistRow(row: typeof botBlacklistTerms.$inferSelect) {
     id: row.id,
     streamerId: row.streamerId,
     term: row.term,
-    matchType: row.matchType as "exact" | "contains",
+    matchType: row.matchType as "exact" | "contains" | "regex",
     action: row.action as "delete" | "timeout",
     timeoutSeconds: row.timeoutSeconds,
     enabled: Boolean(row.enabled),
@@ -858,9 +874,10 @@ export async function getBotBlacklistTermById(id: string, streamerId: string) {
 export async function getBotBlacklistByTerm(
   streamerId: string,
   term: string,
+  matchType: "exact" | "contains" | "regex" = "contains",
   excludeId?: string
 ) {
-  const normalized = normalizeBlacklistTerm(term);
+  const normalized = normalizeBlacklistTerm(term, matchType);
   const rows = await db
     .select()
     .from(botBlacklistTerms)
@@ -868,6 +885,7 @@ export async function getBotBlacklistByTerm(
       and(
         eq(botBlacklistTerms.streamerId, streamerId),
         eq(botBlacklistTerms.term, normalized),
+        eq(botBlacklistTerms.matchType, matchType),
         isNull(botBlacklistTerms.deletedAt),
         ...(excludeId ? [ne(botBlacklistTerms.id, excludeId)] : [])
       )
@@ -882,7 +900,7 @@ export async function createBotBlacklistTerm(data: {
   id: string;
   streamerId: string;
   term: string;
-  matchType: "exact" | "contains";
+  matchType: "exact" | "contains" | "regex";
   action: "delete" | "timeout";
   timeoutSeconds?: number | null;
   enabled: boolean;
@@ -893,7 +911,7 @@ export async function createBotBlacklistTerm(data: {
     .values({
       id: data.id,
       streamerId: data.streamerId,
-      term: normalizeBlacklistTerm(data.term),
+      term: normalizeBlacklistTerm(data.term, data.matchType),
       matchType: data.matchType,
       action: data.action,
       timeoutSeconds:
@@ -913,7 +931,7 @@ export async function updateBotBlacklistTerm(
   streamerId: string,
   data: Partial<{
     term: string;
-    matchType: "exact" | "contains";
+    matchType: "exact" | "contains" | "regex";
     action: "delete" | "timeout";
     timeoutSeconds: number | null;
     enabled: boolean;
@@ -924,9 +942,21 @@ export async function updateBotBlacklistTerm(
   };
 
   if (data.term !== undefined) {
-    patch.term = normalizeBlacklistTerm(data.term);
+    const matchType =
+      data.matchType ??
+      (await getBotBlacklistTermById(id, streamerId))?.matchType ??
+      "contains";
+    patch.term = normalizeBlacklistTerm(data.term, matchType);
   }
-  if (data.matchType !== undefined) patch.matchType = data.matchType;
+  if (data.matchType !== undefined) {
+    patch.matchType = data.matchType;
+    if (data.term === undefined) {
+      const current = await getBotBlacklistTermById(id, streamerId);
+      if (current) {
+        patch.term = normalizeBlacklistTerm(current.term, data.matchType);
+      }
+    }
+  }
   if (data.action !== undefined) {
     patch.action = data.action;
     patch.timeoutSeconds =

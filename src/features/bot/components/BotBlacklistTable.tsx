@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RegexPatternInput } from "@/components/shared/RegexPatternInput";
 import { cn } from "@/lib/utils";
+import { MAX_SAFE_REGEX_LENGTH } from "@/lib/regex-utils";
 import type {
   BotBlacklistAction,
   BotBlacklistMatchType,
@@ -38,6 +40,12 @@ interface BotBlacklistTableProps {
   onDelete: (row: BotBlacklistRecord) => Promise<boolean>;
 }
 
+const MATCH_TYPE_LABELS: Record<BotBlacklistMatchType, string> = {
+  exact: "Exato",
+  contains: "Contém",
+  regex: "Regex",
+};
+
 function MatchTypeChip({
   matchType,
   onClick,
@@ -45,19 +53,20 @@ function MatchTypeChip({
   matchType: BotBlacklistMatchType;
   onClick: () => void;
 }) {
-  const isExact = matchType === "exact";
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         "inline-flex rounded-full border px-2 py-0.5 text-caption font-medium transition-opacity hover:opacity-80",
-        isExact
-          ? "border-sky-500/25 bg-sky-500/15 text-sky-300"
-          : "border-violet-500/25 bg-violet-500/15 text-violet-300"
+        matchType === "exact" && "border-sky-500/25 bg-sky-500/15 text-sky-300",
+        matchType === "contains" &&
+          "border-violet-500/25 bg-violet-500/15 text-violet-300",
+        matchType === "regex" &&
+          "border-amber-500/25 bg-amber-500/15 text-amber-300"
       )}
     >
-      {isExact ? "Exato" : "Contém"}
+      {MATCH_TYPE_LABELS[matchType]}
     </button>
   );
 }
@@ -81,6 +90,8 @@ export function BotBlacklistTable({
     null
   );
   const [draftTerm, setDraftTerm] = useState("");
+  const [draftMatchType, setDraftMatchType] =
+    useState<BotBlacklistMatchType>("contains");
   const [draftAction, setDraftAction] = useState<BotBlacklistAction>("delete");
   const [draftTimeout, setDraftTimeout] = useState(60);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -96,6 +107,7 @@ export function BotBlacklistTable({
   const startEditTerm = (row: BotBlacklistRecord) => {
     setEditing({ id: row.id, field: "term" });
     setDraftTerm(row.term);
+    setDraftMatchType(row.matchType);
   };
 
   const saveTerm = async (row: BotBlacklistRecord) => {
@@ -105,10 +117,15 @@ export function BotBlacklistTable({
     await onUpdate(row, { term: trimmed });
   };
 
-  const toggleMatchType = async (row: BotBlacklistRecord) => {
-    const next: BotBlacklistMatchType =
-      row.matchType === "exact" ? "contains" : "exact";
-    await onUpdate(row, { matchType: next });
+  const startEditMatchType = (row: BotBlacklistRecord) => {
+    setEditing({ id: row.id, field: "matchType" });
+    setDraftMatchType(row.matchType);
+  };
+
+  const saveMatchType = async (row: BotBlacklistRecord) => {
+    setEditing(null);
+    if (draftMatchType === row.matchType) return;
+    await onUpdate(row, { matchType: draftMatchType });
   };
 
   const startEditAction = (row: BotBlacklistRecord) => {
@@ -134,11 +151,11 @@ export function BotBlacklistTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-outline-variant/25">
-      <table className="w-full min-w-[640px] border-collapse text-left">
+      <table className="w-full min-w-[720px] border-collapse text-left">
         <thead>
           <tr className="border-b border-outline-variant/20 text-caption text-muted-foreground">
             <th className="px-3 py-2 font-medium" scope="col">
-              Termo
+              Termo / Pattern
             </th>
             <th className="px-3 py-2 font-medium" scope="col">
               Correspondência
@@ -159,9 +176,12 @@ export function BotBlacklistTable({
             const saving = savingIds.has(row.id);
             const isEditingTerm =
               editing?.id === row.id && editing.field === "term";
+            const isEditingMatchType =
+              editing?.id === row.id && editing.field === "matchType";
             const isEditingAction =
               editing?.id === row.id && editing.field === "action";
             const confirming = confirmDeleteId === row.id;
+            const isRegexRow = row.matchType === "regex";
 
             return (
               <tr
@@ -172,36 +192,99 @@ export function BotBlacklistTable({
                   animatingIds.has(row.id) && "blacklist-row-enter"
                 )}
               >
-                <td className="px-3 py-0 align-middle">
+                <td className="px-3 py-2 align-middle">
                   {isEditingTerm ? (
-                    <Input
-                      value={draftTerm}
-                      autoFocus
-                      disabled={saving}
-                      onChange={(event) => setDraftTerm(event.target.value)}
-                      onBlur={() => void saveTerm(row)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void saveTerm(row);
-                        if (event.key === "Escape") setEditing(null);
-                      }}
-                      className="h-8 font-mono text-body-admin"
-                      maxLength={100}
-                    />
+                    isRegexRow || draftMatchType === "regex" ? (
+                      <RegexPatternInput
+                        value={draftTerm}
+                        onChange={setDraftTerm}
+                        disabled={saving}
+                        showEvasionHelper
+                        evasionSourceWord={draftTerm}
+                        className="min-w-[200px]"
+                      />
+                    ) : (
+                      <Input
+                        value={draftTerm}
+                        autoFocus
+                        disabled={saving}
+                        onChange={(event) => setDraftTerm(event.target.value)}
+                        onBlur={() => void saveTerm(row)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void saveTerm(row);
+                          if (event.key === "Escape") setEditing(null);
+                        }}
+                        className="h-8 font-mono text-body-admin"
+                        maxLength={100}
+                      />
+                    )
                   ) : (
                     <button
                       type="button"
                       onClick={() => startEditTerm(row)}
-                      className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-body-admin text-foreground hover:bg-muted"
+                      className="max-w-xs truncate rounded bg-muted/50 px-1.5 py-0.5 text-left font-mono text-body-admin text-foreground hover:bg-muted"
+                      title={row.term}
                     >
                       {row.term}
                     </button>
                   )}
+                  {isEditingTerm ? (
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-caption"
+                        onClick={() => void saveTerm(row)}
+                      >
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-caption"
+                        onClick={() => setEditing(null)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-3 py-0 align-middle">
-                  <MatchTypeChip
-                    matchType={row.matchType}
-                    onClick={() => void toggleMatchType(row)}
-                  />
+                  {isEditingMatchType ? (
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={draftMatchType}
+                        onValueChange={(value: BotBlacklistMatchType) =>
+                          setDraftMatchType(value)
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="exact">Exato</SelectItem>
+                          <SelectItem value="contains">Contém</SelectItem>
+                          <SelectItem value="regex">Regex</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-caption"
+                        onClick={() => void saveMatchType(row)}
+                      >
+                        OK
+                      </Button>
+                    </div>
+                  ) : (
+                    <MatchTypeChip
+                      matchType={row.matchType}
+                      onClick={() => startEditMatchType(row)}
+                    />
+                  )}
                 </td>
                 <td className="px-3 py-0 align-middle">
                   {isEditingAction ? (
@@ -308,6 +391,10 @@ export function BotBlacklistTable({
           })}
         </tbody>
       </table>
+      <p className="border-t border-outline-variant/15 px-3 py-2 text-xs text-muted-foreground">
+        Regex: máx. {MAX_SAFE_REGEX_LENGTH} caracteres, validado contra ReDoS.
+        Termos literais: máx. 100 caracteres, case-insensitive.
+      </p>
     </div>
   );
 }

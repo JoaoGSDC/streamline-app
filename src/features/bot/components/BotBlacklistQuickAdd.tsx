@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RegexPatternInput } from "@/components/shared/RegexPatternInput";
+import { MAX_SAFE_REGEX_LENGTH } from "@/lib/regex-utils";
 import type {
   BotBlacklistAction,
   BotBlacklistMatchType,
@@ -30,6 +32,9 @@ export function BotBlacklistQuickAdd({
   const [matchType, setMatchType] = useState<BotBlacklistMatchType>("contains");
   const [action, setAction] = useState<BotBlacklistAction>("delete");
   const [timeoutSeconds, setTimeoutSeconds] = useState(60);
+
+  const isRegex = matchType === "regex";
+  const canSubmit = term.trim().length > 0;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -55,67 +60,101 @@ export function BotBlacklistQuickAdd({
   return (
     <form
       onSubmit={(event) => void handleSubmit(event)}
-      className="flex flex-col gap-2 rounded-lg border border-outline-variant/25 bg-surface-container-low/40 p-3 sm:flex-row sm:items-center"
+      className="flex flex-col gap-3 rounded-lg border border-outline-variant/25 bg-surface-container-low/40 p-3"
     >
-      <Input
-        value={term}
-        onChange={(event) => setTerm(event.target.value)}
-        placeholder="Adicionar termo…"
-        disabled={submitting}
-        className="min-w-0 flex-1"
-        maxLength={100}
-      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        {isRegex ? (
+          <RegexPatternInput
+            value={term}
+            onChange={setTerm}
+            disabled={submitting}
+            showEvasionHelper
+            evasionSourceWord={term}
+            placeholder="Pattern regex…"
+            className="min-w-0 flex-1"
+          />
+        ) : (
+          <Input
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+            placeholder="Adicionar termo…"
+            disabled={submitting}
+            className="min-w-0 flex-1"
+            maxLength={100}
+          />
+        )}
 
-      <Select
-        value={matchType}
-        onValueChange={(value: BotBlacklistMatchType) => setMatchType(value)}
-        disabled={submitting}
-      >
-        <SelectTrigger className="w-full sm:w-36">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="exact">Exato</SelectItem>
-          <SelectItem value="contains">Contém</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <div className="flex w-full items-center gap-2 sm:w-auto">
         <Select
-          value={action}
-          onValueChange={(value: BotBlacklistAction) => setAction(value)}
+          value={matchType}
+          onValueChange={(value: BotBlacklistMatchType) => {
+            setMatchType(value);
+            if (value !== "regex" && term.length > 100) {
+              setTerm(term.slice(0, 100));
+            }
+          }}
           disabled={submitting}
         >
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="delete">Apagar msg</SelectItem>
-            <SelectItem value="timeout">Timeout</SelectItem>
+            <SelectItem value="exact">Exato</SelectItem>
+            <SelectItem value="contains">Contém</SelectItem>
+            <SelectItem value="regex">Regex</SelectItem>
           </SelectContent>
         </Select>
-        {action === "timeout" && (
-          <div className="flex items-center gap-1">
-            <Input
-              type="number"
-              min={1}
-              value={timeoutSeconds}
-              onChange={(event) =>
-                setTimeoutSeconds(parseInt(event.target.value, 10) || 60)
-              }
-              disabled={submitting}
-              className="w-20"
-              aria-label="Segundos de timeout"
-            />
-            <span className="text-caption text-muted-foreground">s</span>
-          </div>
-        )}
       </div>
 
-      <Button type="submit" disabled={submitting || !term.trim()} className="shrink-0 sm:ml-auto">
-        <Plus className="mr-2 h-4 w-4" />
-        Adicionar
-      </Button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <Select
+            value={action}
+            onValueChange={(value: BotBlacklistAction) => setAction(value)}
+            disabled={submitting}
+          >
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="delete">Apagar msg</SelectItem>
+              <SelectItem value="timeout">Timeout</SelectItem>
+            </SelectContent>
+          </Select>
+          {action === "timeout" && (
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                min={1}
+                value={timeoutSeconds}
+                onChange={(event) =>
+                  setTimeoutSeconds(parseInt(event.target.value, 10) || 60)
+                }
+                disabled={submitting}
+                className="w-20"
+                aria-label="Segundos de timeout"
+              />
+              <span className="text-caption text-muted-foreground">s</span>
+            </div>
+          )}
+        </div>
+
+        <Button
+          type="submit"
+          disabled={submitting || !canSubmit}
+          className="shrink-0 sm:ml-auto"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Adicionar
+        </Button>
+      </div>
+
+      {isRegex ? (
+        <p className="text-xs text-muted-foreground">
+          Patterns passam por validação anti-ReDoS. Máx. {MAX_SAFE_REGEX_LENGTH}{" "}
+          caracteres. Use &quot;Gerar regex anti-evasão&quot; para pegar variações
+          como leetspeak ou caracteres extras.
+        </p>
+      ) : null}
     </form>
   );
 }

@@ -7,6 +7,7 @@ import {
   BOT_COMMAND_SEASONAL_LIMIT_TYPES,
   type BotCommandDto,
 } from "@server/bot/bot-command.types";
+import { commandCounterEffectSchema } from "@server/bot/command-counter-effect";
 import { commandPointsEffectSchema } from "@server/bot/command-points-effect";
 import { isSafeRegex } from "@server/utils/is-safe-regex";
 import {
@@ -167,6 +168,7 @@ const botCommandFieldsObject = z.object({
     .max(20)
     .default([]),
   pointsEffect: commandPointsEffectSchema.nullable().optional(),
+  counterEffect: commandCounterEffectSchema.nullable().optional(),
   cooldownMessage: z.string().max(500).nullable().optional(),
 });
 
@@ -222,6 +224,7 @@ export function commandDtoToValidationShape(
     responseType: command.responseType,
     responseAlternatives: command.responseAlternatives,
     pointsEffect: command.pointsEffect,
+    counterEffect: command.counterEffect,
     cooldownMessage: command.cooldownMessage,
   };
 }
@@ -256,42 +259,67 @@ export const createBotTimerSchema = z.object({
 
 export const updateBotTimerSchema = createBotTimerSchema.partial();
 
+const BOT_BLACKLIST_MATCH_TYPES = ["exact", "contains", "regex"] as const;
+
+function refineBlacklistFields(
+  data: {
+    term?: string;
+    matchType?: (typeof BOT_BLACKLIST_MATCH_TYPES)[number];
+    action?: "delete" | "timeout";
+    timeoutSeconds?: number;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (data.action === "timeout" && !data.timeoutSeconds) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Informe a duração do timeout em segundos",
+      path: ["timeoutSeconds"],
+    });
+  }
+
+  if (!data.term) return;
+
+  if (data.matchType === "regex") {
+    if (data.term.length > 300) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pattern regex deve ter no máximo 300 caracteres",
+        path: ["term"],
+      });
+    }
+    if (!isSafeRegex(data.term)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Regex inválido ou com risco de backtracking catastrófico (ReDoS)",
+        path: ["term"],
+      });
+    }
+  } else if (data.term.length > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Termo deve ter no máximo 100 caracteres",
+      path: ["term"],
+    });
+  }
+}
+
 const botBlacklistBaseSchema = z.object({
-  term: z.string().min(1).max(100),
-  matchType: z.enum(["exact", "contains"]).default("contains"),
+  term: z.string().min(1),
+  matchType: z.enum(BOT_BLACKLIST_MATCH_TYPES).default("contains"),
   action: z.enum(["delete", "timeout"]).default("delete"),
   timeoutSeconds: z.coerce.number().int().min(1).max(1209600).optional(),
   enabled: z.boolean().optional().default(true),
 });
 
-function refineBlacklistTimeout<
-  T extends z.ZodTypeAny,
->(schema: T) {
-  return schema.superRefine(
-    (
-      data: {
-        action?: "delete" | "timeout";
-        timeoutSeconds?: number;
-      },
-      ctx: z.RefinementCtx
-    ) => {
-      if (data.action === "timeout" && !data.timeoutSeconds) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Informe a duração do timeout em segundos",
-          path: ["timeoutSeconds"],
-        });
-      }
-    }
-  );
-}
-
-export const createBotBlacklistSchema =
-  refineBlacklistTimeout(botBlacklistBaseSchema);
-
-export const updateBotBlacklistSchema = refineBlacklistTimeout(
-  botBlacklistBaseSchema.partial()
+export const createBotBlacklistSchema = botBlacklistBaseSchema.superRefine(
+  refineBlacklistFields
 );
+
+export const updateBotBlacklistSchema = botBlacklistBaseSchema
+  .partial()
+  .superRefine(refineBlacklistFields);
 
 const updateBotBuiltinCommandBaseSchema = z.object({
   response: z

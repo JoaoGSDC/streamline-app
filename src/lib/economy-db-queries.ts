@@ -13,6 +13,7 @@ import {
   economyChannelConfig,
   economyLevelsConfig,
   economyLiveRewardClaims,
+  economyPointsBlocklist,
   economyPointsConfig,
   platformUserCoins,
 } from "./schema";
@@ -25,6 +26,7 @@ import {
   type EconomyGeneralConfigDto,
   type EconomyLevelsConfigDto,
   type EconomyOverviewDto,
+  type EconomyPointsBlocklistEntryDto,
   type EconomyPointsConfigDto,
   type EconomyRankingEntryDto,
   type EconomyLevelDefinition,
@@ -671,6 +673,26 @@ export async function botAwardPoints(input: {
     };
   }
 
+  if (
+    await isViewerBlockedFromPoints(
+      input.streamerId,
+      input.twitchUserId,
+      input.twitchUsername
+    )
+  ) {
+    return {
+      awarded: 0,
+      viewer: await upsertChannelViewer({
+        id: input.viewerId,
+        streamerId: input.streamerId,
+        twitchUserId: input.twitchUserId,
+        twitchUsername: input.twitchUsername,
+        displayName: input.displayName,
+      }),
+      capped: false,
+    };
+  }
+
   const multiplier = input.multiplier ?? 1;
   let pointsToAward = Math.floor(input.basePoints * multiplier);
   if (pointsToAward <= 0) {
@@ -1139,7 +1161,149 @@ export async function resetAllChannelPoints(input: {
 
 export async function getEconomyConfigSnapshot(streamerId: string) {
   await ensureEconomyDefaults(streamerId);
-  return getEconomyFullConfig(streamerId);
+  const [config, blocklist] = await Promise.all([
+    getEconomyFullConfig(streamerId),
+    listPointsBlocklist(streamerId),
+  ]);
+  return {
+    ...config,
+    pointsBlocklist: {
+      twitchUserIds: blocklist.map((entry) => entry.twitchUserId),
+      twitchLogins: blocklist.map((entry) => entry.twitchLogin),
+    },
+  };
+}
+
+function normalizeTwitchLogin(login: string) {
+  return login.trim().toLowerCase().replace(/^@/, "");
+}
+
+function mapPointsBlocklistRow(
+  row: typeof economyPointsBlocklist.$inferSelect
+): EconomyPointsBlocklistEntryDto {
+  return {
+    id: row.id,
+    streamerId: row.streamerId,
+    twitchUserId: row.twitchUserId,
+    twitchLogin: row.twitchLogin,
+    displayName: row.displayName,
+    reason: row.reason,
+    createdByUsername: row.createdByUsername,
+    createdAt: row.createdAt,
+  };
+}
+
+export async function isViewerBlockedFromPoints(
+  streamerId: string,
+  twitchUserId: string,
+  twitchLogin: string
+): Promise<boolean> {
+  const login = normalizeTwitchLogin(twitchLogin);
+  const [row] = await db
+    .select()
+    .from(economyPointsBlocklist)
+    .where(
+      and(
+        eq(economyPointsBlocklist.streamerId, streamerId),
+        or(
+          eq(economyPointsBlocklist.twitchUserId, twitchUserId),
+          eq(economyPointsBlocklist.twitchLogin, login)
+        )
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+export async function listPointsBlocklist(
+  streamerId: string
+): Promise<EconomyPointsBlocklistEntryDto[]> {
+  const rows = await db
+    .select()
+    .from(economyPointsBlocklist)
+    .where(eq(economyPointsBlocklist.streamerId, streamerId))
+    .orderBy(desc(economyPointsBlocklist.createdAt));
+  return rows.map(mapPointsBlocklistRow);
+}
+
+export async function addPointsBlocklistEntry(input: {
+  streamerId: string;
+  twitchUserId: string;
+  twitchLogin: string;
+  displayName: string;
+  reason?: string | null;
+  createdByUserId?: string | null;
+  createdByUsername?: string | null;
+}): Promise<EconomyPointsBlocklistEntryDto> {
+  const login = normalizeTwitchLogin(input.twitchLogin);
+  const [existing] = await db
+    .select()
+    .from(economyPointsBlocklist)
+    .where(
+      and(
+        eq(economyPointsBlocklist.streamerId, input.streamerId),
+        or(
+          eq(economyPointsBlocklist.twitchUserId, input.twitchUserId),
+          eq(economyPointsBlocklist.twitchLogin, login)
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    throw new HttpError("Usuário já está bloqueado de receber pontos", 409, "ALREADY_BLOCKED");
+  }
+
+  const id = crypto.randomUUID();
+  const now = new Date();
+
+  await db.insert(economyPointsBlocklist).values({
+    id,
+    streamerId: input.streamerId,
+    twitchUserId: input.twitchUserId,
+    twitchLogin: login,
+    displayName: input.displayName,
+    reason: input.reason?.trim() || null,
+    createdByUserId: input.createdByUserId ?? null,
+    createdByUsername: input.createdByUsername ?? null,
+    createdAt: now,
+  });
+
+  await bumpEconomyConfigVersion(input.streamerId);
+
+  const [row] = await db
+    .select()
+    .from(economyPointsBlocklist)
+    .where(eq(economyPointsBlocklist.id, id))
+    .limit(1);
+
+  return mapPointsBlocklistRow(row!);
+}
+
+export async function removePointsBlocklistEntry(
+  streamerId: string,
+  entryId: string
+): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(economyPointsBlocklist)
+    .where(
+      and(
+        eq(economyPointsBlocklist.id, entryId),
+        eq(economyPointsBlocklist.streamerId, streamerId)
+      )
+    )
+    .limit(1);
+
+  if (!existing) {
+    throw new HttpError("Bloqueio não encontrado", 404, "NOT_FOUND");
+  }
+
+  await db
+    .delete(economyPointsBlocklist)
+    .where(eq(economyPointsBlocklist.id, entryId));
+
+  await bumpEconomyConfigVersion(streamerId);
 }
 
 export async function claimEconomyLiveReward(input: {
@@ -1172,6 +1336,16 @@ export async function claimEconomyLiveReward(input: {
 
   if (!config.general.enabled || !config.general.pointsEnabled) {
     return { status: "economy_disabled", pointsAwarded: 0, viewer };
+  }
+
+  if (
+    await isViewerBlockedFromPoints(
+      input.streamerId,
+      input.twitchUserId,
+      input.twitchUsername
+    )
+  ) {
+    return { status: "user_blocked", pointsAwarded: 0, viewer };
   }
 
   const [existingClaim] = await db

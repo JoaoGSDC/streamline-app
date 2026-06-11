@@ -1,7 +1,7 @@
 import { httpClient } from "@services/axios";
 import { ENDPOINTS } from "@services/paths";
 
-export type BotBlacklistMatchType = "exact" | "contains";
+export type BotBlacklistMatchType = "exact" | "contains" | "regex";
 export type BotBlacklistAction = "delete" | "timeout";
 
 export interface BotBlacklistRecord {

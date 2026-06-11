@@ -4,6 +4,7 @@ import type {
   ChannelViewerEconomyDto,
   EconomyFullConfigDto,
   EconomyOverviewDto,
+  EconomyPointsBlocklistEntryDto,
   EconomyRankingEntryDto,
   PlatformUserCoinsDto,
   ViewerBalanceDto,
@@ -189,5 +190,29 @@ export const economy = {
       payload
     );
     return response.data as { affected: number };
+  },
+
+  listPointsBlocklist: async (): Promise<EconomyPointsBlocklistEntryDto[]> => {
+    const response = await httpClient.get<EconomyPointsBlocklistEntryDto[]>(
+      ENDPOINTS.Internal.Economy.PointsBlocklist
+    );
+    return response.data;
+  },
+
+  addPointsBlocklist: async (payload: {
+    twitchLogin: string;
+    twitchUserId?: string;
+    displayName?: string;
+    reason?: string;
+  }): Promise<EconomyPointsBlocklistEntryDto> => {
+    const response = await httpClient.post<EconomyPointsBlocklistEntryDto>(
+      ENDPOINTS.Internal.Economy.PointsBlocklist,
+      payload
+    );
+    return response.data;
+  },
+
+  removePointsBlocklist: async (entryId: string): Promise<void> => {
+    await httpClient.delete(ENDPOINTS.Internal.Economy.PointsBlocklistEntry(entryId));
   },
 };

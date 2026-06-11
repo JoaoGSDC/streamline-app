@@ -139,7 +139,7 @@ export function defaultPointsEffectForBuiltin(
     return {
       enabled: false,
       mode: "conditional",
-      rules: [{ variable: "firstResult", equals: "won", amount: 0 }],
+      rules: [{ variable: "firstResult", equals: "won", amount: 10 }],
       limit: "once_per_user_per_stream",
     };
   }

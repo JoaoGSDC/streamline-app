@@ -61,6 +61,24 @@ export interface EconomyFullConfigDto {
   levels: EconomyLevelsConfigDto;
 }
 
+export interface EconomyPointsBlocklistEntryDto {
+  id: string;
+  streamerId: string;
+  twitchUserId: string;
+  twitchLogin: string;
+  displayName: string;
+  reason: string | null;
+  createdByUsername: string | null;
+  createdAt: Date;
+}
+
+export interface EconomyConfigSnapshotDto extends EconomyFullConfigDto {
+  pointsBlocklist: {
+    twitchUserIds: string[];
+    twitchLogins: string[];
+  };
+}
+
 export interface ChannelViewerEconomyDto {
   id: string;
   streamerId: string;

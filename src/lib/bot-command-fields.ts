@@ -13,6 +13,11 @@ import {
   type BotCommandSeasonalLimitType,
 } from "@server/bot/bot-command.types";
 import {
+  parseCommandCounterEffect,
+  serializeCommandCounterEffect,
+  type CommandCounterEffect,
+} from "@server/bot/command-counter-effect";
+import {
   parseCommandPointsEffect,
   serializeCommandPointsEffect,
   type CommandPointsEffect,
@@ -62,6 +67,18 @@ export function mapBotCommandPointsEffect(
   row: typeof botCommands.$inferSelect
 ): CommandPointsEffect | null {
   return parseCommandPointsEffect(row.pointsEffect);
+}
+
+export function mapBotCommandCounterEffect(
+  row: typeof botCommands.$inferSelect
+): CommandCounterEffect | null {
+  return parseCommandCounterEffect(row.counterEffect);
+}
+
+export function serializeCommandCounterEffectField(
+  effect: CommandCounterEffect | null | undefined
+): string | null {
+  return serializeCommandCounterEffect(effect);
 }
 
 export function mapBotCommandAdvancedFields(
