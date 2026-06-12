@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleBotTwitchOAuthCallbackController } from "@api/internal/bot/bot-oauth.controller";
 import { upsertStreamerFromTwitch } from "@lib/db-queries";
+import { TWITCH_BOT_OAUTH_STATE_COOKIE } from "@server/bot/bot-twitch-oauth.constants";
 import {
   buildTwitchAuthorizeUrl,
   createOAuthState,
@@ -62,6 +64,11 @@ function buildSessionPayload(
 export async function handleTwitchOAuthCallbackController(
   request: NextRequest
 ) {
+  const botOAuthState = request.cookies.get(TWITCH_BOT_OAUTH_STATE_COOKIE)?.value;
+  if (botOAuthState) {
+    return handleBotTwitchOAuthCallbackController(request);
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const oauthError = searchParams.get("error");
   const authorizationCode = searchParams.get("code");

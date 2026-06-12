@@ -32,7 +32,14 @@ export async function getBotTwitchOAuthAuthorizeController(request: NextRequest)
     const oauthState = createBotOAuthState();
     const authorizeUrl = buildBotTwitchAuthorizeUrl(oauthState);
 
-    const response = jsonSuccess({ url: authorizeUrl });
+    const wantsJson =
+      request.nextUrl.searchParams.get("format") === "json" ||
+      (request.headers.get("accept") ?? "").includes("application/json");
+
+    const response = wantsJson
+      ? jsonSuccess({ url: authorizeUrl })
+      : NextResponse.redirect(authorizeUrl);
+
     response.cookies.set(TWITCH_BOT_OAUTH_STATE_COOKIE, oauthState, {
       maxAge: 600,
       path: "/",
@@ -72,7 +79,13 @@ export async function handleBotTwitchOAuthCallbackController(
   };
 
   if (oauthError) {
-    return redirectWithError("denied");
+    const errorCode =
+      oauthError === "access_denied"
+        ? "denied"
+        : oauthError === "redirect_mismatch"
+          ? "redirect_mismatch"
+          : `twitch_${oauthError}`;
+    return redirectWithError(errorCode);
   }
 
   if (!authorizationCode || !streamerId) {

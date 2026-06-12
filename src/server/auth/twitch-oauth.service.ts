@@ -10,6 +10,14 @@ const TWITCH_AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 const TWITCH_HELIX_USERS = "https://api.twitch.tv/helix/users";
 
+export function getTwitchOAuthRedirectUri(): string {
+  return (
+    process.env.TWITCH_REDIRECT_URI ||
+    process.env.NEXT_PUBLIC_TWITCH_REDIRECT_URI ||
+    "http://localhost:3000/api/auth/twitch/callback"
+  );
+}
+
 function getOAuthConfig(): TwitchOAuthConfig {
   const clientId =
     process.env.TWITCH_CLIENT_ID ||
@@ -19,10 +27,7 @@ function getOAuthConfig(): TwitchOAuthConfig {
     process.env.TWITCH_CLIENT_SECRET ||
     process.env.NEXT_PUBLIC_TWITCH_CLIENT_SECRET ||
     "";
-  const redirectUri =
-    process.env.TWITCH_REDIRECT_URI ||
-    process.env.NEXT_PUBLIC_TWITCH_REDIRECT_URI ||
-    "http://localhost:3000/api/auth/twitch/callback";
+  const redirectUri = getTwitchOAuthRedirectUri();
 
   if (!clientId || !clientSecret) {
     throw new Error("Missing Twitch OAuth credentials");

@@ -1,3 +1,4 @@
+import { getTwitchOAuthRedirectUri } from "@server/auth/twitch-oauth.service";
 import { getTwitchClientId } from "@server/shared/twitch-oauth.client";
 import { createRandomString } from "@utils/factories/create-random-string";
 import { STREAMER_BOT_OAUTH_SCOPES } from "./bot-twitch-oauth.constants";
@@ -6,16 +7,9 @@ import type { TwitchOAuthTokenResponse } from "@server/auth/twitch-oauth.types";
 const TWITCH_AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
 
+/** Mesmo redirect do login — já cadastrado no app Twitch. */
 function getBotOAuthRedirectUri(): string {
-  const base =
-    process.env.NEXTAUTH_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000";
-
-  return (
-    process.env.TWITCH_BOT_OAUTH_REDIRECT_URI?.trim() ||
-    `${base}/api/auth/twitch/bot/callback`
-  );
+  return getTwitchOAuthRedirectUri();
 }
 
 function getOAuthCredentials() {

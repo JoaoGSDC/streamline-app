@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Bot, Link2, Loader2 } from "lucide-react";
 import { useBotActivationContext } from "@features/bot/context/BotActivationContext";
-import { services } from "@services";
+import { ENDPOINTS } from "@services/paths";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   denied: "Autorização negada na Twitch.",
+  redirect_mismatch:
+    "URL de retorno não cadastrada no app Twitch. Use a mesma URL do login: /api/auth/twitch/callback.",
   no_code: "Código OAuth ausente. Tente conectar novamente.",
   invalid_state: "Sessão OAuth expirada. Tente conectar novamente.",
   no_refresh_token: "A Twitch não retornou refresh token. Reconecte a conta.",
@@ -68,11 +70,14 @@ export function BotActivationPanel() {
       });
       void refresh();
     } else {
+      const description =
+        OAUTH_ERROR_MESSAGES[oauthResult] ??
+        (oauthResult.startsWith("twitch_")
+          ? `Erro retornado pela Twitch: ${oauthResult.replace(/^twitch_/, "")}`
+          : "Não foi possível conectar a conta Twitch.");
       toast({
         title: "Falha na conexão Twitch",
-        description:
-          OAUTH_ERROR_MESSAGES[oauthResult] ??
-          "Não foi possível conectar a conta Twitch.",
+        description,
         variant: "destructive",
       });
     }
@@ -90,19 +95,9 @@ export function BotActivationPanel() {
     setConfirmDeactivateOpen(true);
   };
 
-  const handleConnectTwitch = async () => {
+  const handleConnectTwitch = () => {
     setConnectingOAuth(true);
-    try {
-      const { url } = await services.botOAuth.getAuthorizeUrl();
-      window.location.href = url;
-    } catch {
-      toast({
-        title: "Não foi possível iniciar a conexão",
-        description: "Tente novamente em instantes.",
-        variant: "destructive",
-      });
-      setConnectingOAuth(false);
-    }
+    window.location.href = ENDPOINTS.Internal.Bot.OAuthAuthorize;
   };
 
   const handleConfirmActivate = async () => {
